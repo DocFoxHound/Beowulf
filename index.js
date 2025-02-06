@@ -33,9 +33,6 @@ const client = new Client({
   ],
 });
 
-//stores unique user ID's
-const userIds = new Set();
-
 //used for finding user mentions, later on in the program
 const mentionRegex = /<@!?(\d+)>/g;
 
@@ -74,7 +71,7 @@ async function retrieveAssistant() {
 retrieveAssistant();
 
 //run the vector checker to see if we need to update the vector store for the bot's background knowledge
-generalPurpose.routineFunctions();
+generalPurpose.routineFunctions(userCache);
 
 //Event Listener: login
 client.on("ready", async () => {
@@ -170,7 +167,7 @@ client.on("messageCreate", async (message) => {
     }
   } else {
     // Handle all other messages
-    threadHandler.formatMessage(message, messageArray, mentionRegex);
+    threadHandler.formatMessage(message, messageArray, mentionRegex, userCache);
   }
 });
 
