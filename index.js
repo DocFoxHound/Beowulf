@@ -41,7 +41,7 @@ channelIds = process.env?.CHANNELS?.split(",");
 channelIdAndName = [];
 
 //array of threads (one made per user)
-threadArray = [{userId: "", threadId: ""}];
+threadArray = [{userId: "", threadId: "", isActive: Boolean}];
 
 //array of stored messages to be processed
 messageArray = [];
@@ -95,18 +95,9 @@ client.on("messageCreate", async (message) => {
   // Check if the bot is mentioned or if the message is a reply to the bot
   if (message.mentions.users.has(client.user.id)) {
     message.channel.sendTyping();  // Send typing indicator once we know we need to process
-
-    const newMessage = threadHandler.processMessageToSend(message, mentionRegex, userCache);
-    const previosConvo = threadHandler.processPreviosConvo(messageArray, message, userCache);
-    const combinedMessages = [previosConvo, newMessage];
-
-    // Handle thread creation and message processing
-    try {
-      // const thread = await openai.beta.threads.create();
-      const thread = threadHandler.findExistingThread(message.author.id, threadArray)
-      // for (const message of combinedMessages) {
-      //   await threadHandler.addMessagesToThread(message, thread.id, openai);
-      // }
+    const thread = await threadHandler.findExistingThread(message.author.id, threadArray, openai);
+    try { //TODO: work on adding message to thread
+      await threadHandler.addUserMessageToThreadAndRun(message, thread, openai, client, threadArray);
       // await threadHandler.runThread(message, thread, openai, client);
     } catch (error) {
       console.error("Failed to process thread:", error);
@@ -114,7 +105,14 @@ client.on("messageCreate", async (message) => {
     }
   } else {
     // Handle all other messages
-    threadHandler.formatMessage(message, messageArray, mentionRegex, userCache);
+    if(message.author.id !== client.user.id){ //if this is the bot replying to someone
+      try{
+        const thread = await threadHandler.findExistingThread(message.author.id, threadArray, openai);
+        await threadHandler.addUserMessageToThread(message, thread, openai, threadArray);
+      }catch(error){
+        console.log(`Error adding a message to a thread2: ${error}`);
+      }
+    }
   }
 });
 

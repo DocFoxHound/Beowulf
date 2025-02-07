@@ -28,21 +28,21 @@ function formatMessage(message, messageArray, mentionRegex, userCache) {
 }
 
 //Convert the input text to something the bot can use
-function processMessageToSend(message, mentionRegex, userCache) {
-    const readableMessage = message.content.replace(mentionRegex, (match, userId) => {
-        const user = generalPurpose.getCachedUser(message.guild, userId, userCache);
-        const displayName = user ? `@${user.displayName}` : "@unknown-user";
-        return displayName;
-    });
-    // Format the message, adding metadata
-    const contentText = `<${message.createdTimestamp}> ${message.member.displayName || "Unknown Member"}: ${readableMessage}`;
-    // Ensure the message length does not exceed Discord's limit of 2000 characters
-    if (contentText.length > 2000) {
-        // Return only the last 2000 characters of the message
-        return contentText.slice(-2000);
-    }
-    return contentText;
-}
+// function processMessageToSend(message, mentionRegex, userCache) {
+//     const readableMessage = message.content.replace(mentionRegex, (match, userId) => {
+//         const user = generalPurpose.getCachedUser(message.guild, userId, userCache);
+//         const displayName = user ? `@${user.displayName}` : "@unknown-user";
+//         return displayName;
+//     });
+//     // Format the message, adding metadata
+//     const contentText = `<${message.createdTimestamp}> ${message.member.displayName || "Unknown Member"}: ${readableMessage}`;
+//     // Ensure the message length does not exceed Discord's limit of 2000 characters
+//     if (contentText.length > 2000) {
+//         // Return only the last 2000 characters of the message
+//         return contentText.slice(-2000);
+//     }
+//     return contentText;
+// }
 
 function processPreviosConvo(messageArray, message) {
     const maxEntries = process.env.MESSAGE_AMOUNT; // Default and fallback
@@ -66,7 +66,7 @@ function processPreviosConvo(messageArray, message) {
     return contentText;
 }
 
-async function findExistingThread(authorId, threadArray){
+async function findExistingThread(authorId, threadArray, openai){
     //check if there is a thread that exists that's already paired with the userID
     try{
         const threadPair = threadArray.find(item => item.userId === authorId);
@@ -75,32 +75,55 @@ async function findExistingThread(authorId, threadArray){
         );
         return myThread
     }catch{ //if not, create a new thread and log the threadId - userId pair
-        console.log("Thread does not exist, creating new Thread.")
-        return createNewThread(authorId, threadArray);
+        console.log(`Created thread for ${authorId}`)
+        return createNewThread(authorId, threadArray, openai);
     }
 }
 
-async function createNewThread(authorId, threadArray){
+async function createNewThread(authorId, threadArray, openai){
     const newThread = await openai.beta.threads.create();
-    const newEntry = { userId: authorId, threadId: newThread.id };
-    threadArray.push(newEntry) //log the pair into memory
+    const newEntry = { userId: authorId, threadId: newThread.id, isActive: false };
+    threadArray.push(newEntry) //log the pair into memory TODO: save this somewhere so it doesn't refresh every time you restart the bot
     return newThread;
 }
 
 //Add discord message to a thread
-async function addMessagesToThread(contentText, threadId, openai) {
-  // add conversation to a thread
-  try {
-    const run = await openai.beta.threads.messages.create(threadId, {
-      role: "user",
-      content: contentText,
-    });
-  } catch (error) {
-    console.error(
-      "Error adding message to thread, if the bot just started this is expected."
-    );
-  }
+async function addUserMessageToThread(message, thread, openai, threadArray) {
+    const threadPair = threadArray.find(item => item.threadId === thread.id);
+    if(!threadPair){
+        return;
+    }
+    if(threadPair.isActive === true){
+        console.log(`${Date.now()} Retrying message add...`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        await addUserMessageToThread(message, thread, openai, threadArray);
+    }else{
+        try {
+            const run = await openai.beta.threads.messages.create(thread.id, {
+              role: "user",
+              content: message.content,
+            });
+          } catch (error) {
+            console.error(`Error adding a message to a thread1: ${error}`)
+          }
+    }
 }
+
+//Add discord message to a thread
+async function addUserMessageToThreadAndRun(message, thread, openai, client, threadArray) {
+    // add conversation to a thread
+    const threadPair = threadArray.find(item => item.threadId === thread.id);
+    threadPair.isActive = true;
+    try {
+      await openai.beta.threads.messages.create(thread.id, {
+        role: "user",
+        content: message.content,
+      });
+      await runThread(message, thread, openai, client, null, threadPair);
+    } catch (error) {
+        console.error(`Error adding and running a thread: ${error}`)
+    }
+  }
 
 //a tool and/or Function Call
 async function addResultsToRun(contentText, openai, threadId, toolId, runId) {
@@ -129,7 +152,7 @@ async function addResultsToRun(contentText, openai, threadId, toolId, runId) {
   }
 }
 
-async function runThread(message, thread, openai, client, mentionedUser) {
+async function runThread(message, thread, openai, client, mentionedUser, threadPair) {
     // Run the thread
     let run = await openai.beta.threads.runs.createAndPoll(thread.id, {
         assistant_id: myAssistant.id,
@@ -139,7 +162,9 @@ async function runThread(message, thread, openai, client, mentionedUser) {
     if (run.status === "requires_action") {
         await handleRequiresAction(message, run, openai, client);
     } else if (run.status === "completed") {
-        await handleCompletedRun(message, run, client, openai, mentionedUser);
+        message.channel.sendTyping();
+        await sendResponse(message, run.thread_id, openai, client, mentionedUser, threadPair);
+        // await handleCompletedRun(message, run, client, openai, mentionedUser);
     }
 }
 
@@ -156,16 +181,16 @@ async function handleRequiresAction(message, run, openai, client) {
     }
 }
 
-async function handleCompletedRun(message, run, client, openai, mentionedUser) {
-    message.channel.sendTyping();
-    await sendResponse(message, run.thread_id, openai, client, mentionedUser);
-}
+// async function handleCompletedRun(message, run, client, openai, mentionedUser) {
+//     message.channel.sendTyping();
+//     await sendResponse(message, run.thread_id, openai, client, mentionedUser);
+// }
 
-async function sendResponse(message, threadId, openai, client, mentionedUser) {
+async function sendResponse(message, threadId, openai, client, mentionedUser, threadPair) {
     try {
         const messages = await openai.beta.threads.messages.list(threadId);
         let response = messages.data[0].content[0].text.value;
-        response = response.replace(client.user.username + ": ", "")
+        response = response.replace(client.user.username + ": ", "") //replace some common bot-isms
                            .replace(/【.*?】/gs, "")
                            .replace("Ah, ", "")
                            .replace(/<.*?>/gs, "");
@@ -175,8 +200,10 @@ async function sendResponse(message, threadId, openai, client, mentionedUser) {
 
         if (mentionedUser && mentionedUser.username !== undefined) {
             await message.channel.send(`<@${mentionedUser.userId}>! ${finalFormatedResponse}`);
+            threadPair.isActive = false;
         } else {
             await message.reply(finalFormatedResponse);
+            threadPair.isActive = false;
         }
     } catch (error) {
         console.error("Error running the thread: ", error);
@@ -186,9 +213,9 @@ async function sendResponse(message, threadId, openai, client, mentionedUser) {
 
 module.exports = {
   formatMessage,
-  processMessageToSend,
-  addMessagesToThread,
+  addUserMessageToThread,
   runThread,
   processPreviosConvo,
   findExistingThread,
+  addUserMessageToThreadAndRun,
 };

@@ -1,6 +1,6 @@
 const vectorHandler = require("./vector-handler.js");
 
-async function routineFunctions(userCache){
+async function routineFunctions(userCache, channelIdAndName, openai, client){
     setInterval(() => vectorHandler.refreshChatLogs(channelIdAndName, openai, client),
         10800000 //every 3 hours
       );
