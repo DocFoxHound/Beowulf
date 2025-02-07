@@ -66,6 +66,27 @@ function processPreviosConvo(messageArray, message) {
     return contentText;
 }
 
+async function findExistingThread(authorId, threadArray){
+    //check if there is a thread that exists that's already paired with the userID
+    try{
+        const threadPair = threadArray.find(item => item.userId === authorId);
+        const myThread = await openai.beta.threads.retrieve(
+            threadPair.threadId
+        );
+        return myThread
+    }catch{ //if not, create a new thread and log the threadId - userId pair
+        console.log("Thread does not exist, creating new Thread.")
+        return createNewThread(authorId, threadArray);
+    }
+}
+
+async function createNewThread(authorId, threadArray){
+    const newThread = await openai.beta.threads.create();
+    const newEntry = { userId: authorId, threadId: newThread.id };
+    threadArray.push(newEntry) //log the pair into memory
+    return newThread;
+}
+
 //Add discord message to a thread
 async function addMessagesToThread(contentText, threadId, openai) {
   // add conversation to a thread
@@ -148,11 +169,14 @@ async function sendResponse(message, threadId, openai, client, mentionedUser) {
                            .replace(/【.*?】/gs, "")
                            .replace("Ah, ", "")
                            .replace(/<.*?>/gs, "");
+        const index = response.indexOf(":");
+        response.slice(index + 1);
+        finalFormatedResponse = response.charAt(0).toUpperCase() + response.slice(1);
 
         if (mentionedUser && mentionedUser.username !== undefined) {
-            await message.channel.send(`<@${mentionedUser.userId}>! ${response}`);
+            await message.channel.send(`<@${mentionedUser.userId}>! ${finalFormatedResponse}`);
         } else {
-            await message.reply(response);
+            await message.reply(finalFormatedResponse);
         }
     } catch (error) {
         console.error("Error running the thread: ", error);
@@ -166,4 +190,5 @@ module.exports = {
   addMessagesToThread,
   runThread,
   processPreviosConvo,
+  findExistingThread,
 };

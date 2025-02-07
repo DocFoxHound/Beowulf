@@ -40,8 +40,8 @@ const mentionRegex = /<@!?(\d+)>/g;
 channelIds = process.env?.CHANNELS?.split(",");
 channelIdAndName = [];
 
-//array of threads (one made per channel)
-threadArray = [];
+//array of threads (one made per user)
+threadArray = [{userId: "", threadId: ""}];
 
 //array of stored messages to be processed
 messageArray = [];
@@ -71,7 +71,6 @@ async function retrieveAssistant() {
 retrieveAssistant();
 
 //run the vector checker to see if we need to update the vector store for the bot's background knowledge
-generalPurpose.routineFunctions(userCache);
 
 //Event Listener: login
 client.on("ready", async () => {
@@ -84,61 +83,8 @@ client.on("ready", async () => {
     channelId: channel?.id
   })).filter(channel => channel.channelId);
   console.log(`Logged in as ${client.user.tag}!`);
+  generalPurpose.routineFunctions(userCache, channelIdAndName, openai, client);
 });
-
-// //Event Listener: Waiting for messages and actioning them
-// client.on("messageCreate", async (message) => {
-//   //ignore if the message channel is not one that's being listened to
-//   if (channelIds.includes(message.channelId)) {
-//     // Ignore DMs
-//     if (!message.guild) {
-//       return;
-//     }
-
-//     // Don't reply to system messages
-//     if (message.system) {
-//       return;
-//     }
-
-//     //if the user mentions the bot or replies to the bot
-//     if (message.mentions.users.has(client.user.id)) {
-//       //send a typing status
-//       message.channel.sendTyping();
-
-//       //process the message so that it comes out nice and neat for use
-//       const newMessage = threadHandler.processMessageToSend(
-//         message,
-//         mentionRegex
-//       );
-
-//       //combine the convo
-//       const previosConvo = threadHandler.processPreviosConvo(
-//         messageArray,
-//         message
-//       );
-
-//       //put the conversation and the latest message in an array
-//       const combinedMessages = [previosConvo, newMessage];
-
-//       //create a thread
-//       const thread = await openai.beta.threads.create();
-
-//       //add the message to the thread
-//       for (const message of combinedMessages) {
-//         await threadHandler.addMessagesToThread(message, thread, openai);
-//       }
-
-//       //poll, run, get response, and send it to the discord channel
-//       await threadHandler.runThread(message, thread, openai, client);
-//       return;
-//     } else {
-//       //FOR ALL OTHER MESSAGES
-//       threadHandler.formatMessage(message, messageArray, mentionRegex);
-//     }
-//   } else {
-//     return;
-//   }
-// });
 
 client.on("messageCreate", async (message) => {
   // Check for conditions to ignore the message early
@@ -156,11 +102,12 @@ client.on("messageCreate", async (message) => {
 
     // Handle thread creation and message processing
     try {
-      const thread = await openai.beta.threads.create();
-      for (const message of combinedMessages) {
-        await threadHandler.addMessagesToThread(message, thread.id, openai);
-      }
-      await threadHandler.runThread(message, thread, openai, client);
+      // const thread = await openai.beta.threads.create();
+      const thread = threadHandler.findExistingThread(message.author.id, threadArray)
+      // for (const message of combinedMessages) {
+      //   await threadHandler.addMessagesToThread(message, thread.id, openai);
+      // }
+      // await threadHandler.runThread(message, thread, openai, client);
     } catch (error) {
       console.error("Failed to process thread:", error);
       message.channel.send("ERROR.");
