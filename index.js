@@ -41,7 +41,10 @@ channelIds = process.env?.CHANNELS?.split(",");
 channelIdAndName = [];
 
 //array of threads (one made per user)
-threadArray = [{userId: "", threadId: "", isActive: Boolean}];
+threadArray = [{channelId: "", threadId: "", isActive: Boolean, isRetrying: Boolean}];
+
+//list of messages we need to add, queued
+const messageAddQueue = [];
 
 //array of stored messages to be processed
 messageArray = [];
@@ -70,8 +73,6 @@ async function retrieveAssistant() {
 //retrieve the chatGPT assistant
 retrieveAssistant();
 
-//run the vector checker to see if we need to update the vector store for the bot's background knowledge
-
 //Event Listener: login
 client.on("ready", async () => {
   //fetch channels on a promise, reducing startup time
@@ -83,7 +84,17 @@ client.on("ready", async () => {
     channelId: channel?.id
   })).filter(channel => channel.channelId);
   console.log(`Logged in as ${client.user.tag}!`);
-  generalPurpose.routineFunctions(userCache, channelIdAndName, openai, client);
+  
+  setInterval(() => vectorHandler.refreshChatLogs(channelIdAndName, openai, client),
+  10800000 //every 3 hours
+    );
+  setInterval(() => vectorHandler.refreshUserList(openai, client),
+    43200000 //every 12 hours
+  );
+  setInterval(() => {
+    userCache.clear();
+    console.log('User cache cleared');
+  }, 3600000); // Clear cache every hour, avoids excessive memory bloat
 });
 
 client.on("messageCreate", async (message) => {
@@ -94,23 +105,74 @@ client.on("messageCreate", async (message) => {
 
   // Check if the bot is mentioned or if the message is a reply to the bot
   if (message.mentions.users.has(client.user.id)) {
-    message.channel.sendTyping();  // Send typing indicator once we know we need to process
     const thread = await threadHandler.findExistingThread(message.author.id, threadArray, openai);
-    try { //TODO: work on adding message to thread
-      await threadHandler.addUserMessageToThreadAndRun(message, thread, openai, client, threadArray);
-      // await threadHandler.runThread(message, thread, openai, client);
-    } catch (error) {
-      console.error("Failed to process thread:", error);
-      message.channel.send("ERROR.");
+    const threadPair = threadArray.find(item => item.threadId === thread.id);
+
+    //if the thread isn't busy, we'll take the thread for this channel, format the message, add to the thread, and run it
+    if(threadPair.isActive === false){
+      threadPair.isActive = true; //mark the thread as being active
+      const formattedMessage = await threadHandler.formatMessage(message, mentionRegex, userCache); //format the message for processing
+      await threadHandler.addMessageToThread(thread, openai, formattedMessage, false); //add the message to the thread
+      message.channel.sendTyping();  // Send typing indicator once we know we need to process
+      formattedResponse = await threadHandler.runThread(message, thread, openai, threadPair, client); //this both runs and formats the message so we don't lose the place in the returned thread array and retrieve the wrong message to format
+      await threadHandler.sendResponse(message, formattedResponse, true);
+      threadPair.isActive = false; //make sure to mark the thread as inactive
+
+    //If the thread is busy, take the message and retry it on a new thread
+    }else{ 
+      console.log("Waiting on Thread")
+      messageHistory = await message.channel.messages.fetch({ limit: 5, before: message.id }); //get the last 10 messages from the channel
+      const newThread = await openai.beta.threads.create(); //make a new short-term thread to use and lose
+      for (const message of messageHistory.values()) { //iterate and add messages to a thread
+        // const isBot = (message.id === client.user.id) ? true : false; //check if the message is from the bot or from a user
+        const isBot = (message.id === client.user.id); //check if the message is from the bot or from a user
+        const newFormattedMessage = await threadHandler.formatMessage(message, mentionRegex, userCache); //format the message for processing
+        messageAddQueue.push(newFormattedMessage);
+        if(threadPair.isRetrying === false){ //make sure we mitigate collision by only doing this if a retry isn't already active
+          await threadHandler.retryMessageAdd(newThread, openai, messageAddQueue, threadPair, isBot);
+        }
+      };
+      message.channel.sendTyping();  // Send typing indicator once we know we need to process
+      formattedResponse = await threadHandler.runThread(message, thread, openai, threadPair, client); //this both runs and formats the message so we don't lose the place in the returned thread array and retrieve the wrong message to format
+      await threadHandler.sendResponse(message, finalFormatedResponse, true);
     }
+
+  // Handle all other non-response or mentions messages
   } else {
-    // Handle all other messages
-    if(message.author.id !== client.user.id){ //if this is the bot replying to someone
-      try{
-        const thread = await threadHandler.findExistingThread(message.author.id, threadArray, openai);
-        await threadHandler.addUserMessageToThread(message, thread, openai, threadArray);
-      }catch(error){
-        console.log(`Error adding a message to a thread2: ${error}`);
+    if(message.author.id !== client.user.id){ //make sure this isn't a bot
+      const thread = await threadHandler.findExistingThread(message.channel.id, threadArray, openai); //get or make the thread for this channel
+      const threadPair = threadArray.find(item => item.threadId === thread.id);
+      const isBot = (message.author.id === client.user.id);
+
+      //if the thread isn't busy, add the message
+      if(threadPair.isActive === false){ 
+        const formattedMessage = await threadHandler.formatMessage(message, mentionRegex, userCache); //format the message for processing
+        await threadHandler.addMessageToThread(thread, openai, formattedMessage, false, isBot); 
+
+      //if the thread is busy
+      }else{ 
+        const formattedMessage = await threadHandler.formatMessage(message, mentionRegex, userCache); //format the message for processing
+        messageAddQueue.push(formattedMessage);
+        if(threadPair.isRetrying === false){ //make sure we mitigate collision by only doing this if a retry isn't already active
+          await threadHandler.retryMessageAdd(thread, openai, messageAddQueue, threadPair, isBot);
+        }    
+      }
+
+      //random chance that the bot sends a message to discord anyway
+      const randomNumber = Math.floor(Math.random() * 25);
+      if (randomNumber === 1){
+        console.log("Random Interaction")
+        messageHistory = await message.channel.messages.fetch({ limit: 10, before: message.id }); //get the last 10 messages from the channel
+        const newThread = await openai.beta.threads.create(); //make a new short-term thread to use and lose
+        for (const message of messageHistory.values()) { //iterate and add messages to a thread
+          // const isBot = (message.id === client.user.id) ? true : false; //check if the message is from the bot or from a user
+          const isBot = (message.id === client.user.id); //check if the message is from the bot or from a user
+          const newFormattedMessage = await threadHandler.formatMessage(message, mentionRegex, userCache); //format the message for processing
+          messageAddQueue.push(newFormattedMessage);
+          await threadHandler.addMessageToThread(newThread, openai, formattedMessage, false, isBot); 
+        };
+        formattedResponse = await threadHandler.runThread(message, thread, openai, threadPair, client); //this both runs and formats the message so we don't lose the place in the returned thread array and retrieve the wrong message to format
+        await threadHandler.sendResponse(message, finalFormatedResponse, false);
       }
     }
   }
@@ -129,6 +191,3 @@ client.on("disconnect", () => {
 
 //logs the bot in
 client.login(process.env.CLIENT_TOKEN);
-
-//TODO
-//see active users, see user roles

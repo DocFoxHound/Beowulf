@@ -2,128 +2,67 @@ const functionHandler = require("./function-handler");
 const generalPurpose = require("./general-purpose-functions")
 
 //convert the message into something we'll store to use for later
-function formatMessage(message, messageArray, mentionRegex, userCache) {
-    const readableMessage = message.content.replace(mentionRegex, (match, userId) => {
-        const user = generalPurpose.getCachedUser(message.guild, userId, userCache);
-        const displayName = user ? `@${user.displayName}` : "@unknown-user";
-        return displayName;
-    });
-    const channelConvoPair = messageArray.find(c => c.channelId === message.channel.id);
-    if (channelConvoPair) {
-        const maxEntries = process.env.MESSAGE_AMOUNT; 
-        // Efficiently manage the conversation array to avoid memory overflow
-        if (channelConvoPair.conversation.length >= maxEntries) {
-            channelConvoPair.conversation.shift(); // Remove the oldest message
-        }
-        try {
-            channelConvoPair.conversation.push(
-                `<${message.createdTimestamp}> ${message.member.displayName || 'Unknown User'}: ${readableMessage}`
-            );
-        } catch (error) {
-            console.error(`Error adding message to the ConvoPair array: ${error}`);
-        }
-    } else {
-        console.error("No matching conversation pair found for the channel");
+function formatMessage(message, mentionRegex, userCache) {
+    try{
+        const readableMessage = message.content.replace(mentionRegex, (match, userId) => {
+            const user = generalPurpose.getCachedUser(message.guild, userId, userCache);
+            const displayName = user ? `@${user.displayName}` : "@unknown-user";
+            return displayName;
+        });
+        return `${message.member.nickname}: ${readableMessage}`
+    }catch(error){
+        console.error(`Error formatting the message: ${error}`)
     }
 }
 
-//Convert the input text to something the bot can use
-// function processMessageToSend(message, mentionRegex, userCache) {
-//     const readableMessage = message.content.replace(mentionRegex, (match, userId) => {
-//         const user = generalPurpose.getCachedUser(message.guild, userId, userCache);
-//         const displayName = user ? `@${user.displayName}` : "@unknown-user";
-//         return displayName;
-//     });
-//     // Format the message, adding metadata
-//     const contentText = `<${message.createdTimestamp}> ${message.member.displayName || "Unknown Member"}: ${readableMessage}`;
-//     // Ensure the message length does not exceed Discord's limit of 2000 characters
-//     if (contentText.length > 2000) {
-//         // Return only the last 2000 characters of the message
-//         return contentText.slice(-2000);
-//     }
-//     return contentText;
-// }
-
-function processPreviosConvo(messageArray, message) {
-    const maxEntries = process.env.MESSAGE_AMOUNT; // Default and fallback
-    const maxLength = 2000; // Maximum length for a Discord message
-    // Find the conversation pair for the current channel
-    const channelConvoPair = messageArray.find(c => c.channelId === message.channel.id);
-    if (!channelConvoPair) {
-        console.error(`No conversation pair found for channel: ${message.channel.id}`);
-        return ''; // Early return if no conversation pair exists
-    }
-    // Manage conversation size
-    if (channelConvoPair.conversation.length >= maxEntries) {
-        channelConvoPair.conversation.shift(); // Remove the oldest message
-    }
-    // Prepare the conversation text
-    let contentText = channelConvoPair.conversation.join("\n");
-    // Ensure the content text does not exceed the Discord message limit
-    if (contentText.length > maxLength) {
-        contentText = contentText.slice(-maxLength);
-    }
-    return contentText;
-}
-
-async function findExistingThread(authorId, threadArray, openai){
+async function findExistingThread(channelId, threadArray, openai){
     //check if there is a thread that exists that's already paired with the userID
     try{
-        const threadPair = threadArray.find(item => item.userId === authorId);
+        const threadPair = threadArray.find(item => item.channelId === channelId);
         const myThread = await openai.beta.threads.retrieve(
             threadPair.threadId
         );
         return myThread
     }catch{ //if not, create a new thread and log the threadId - userId pair
-        console.log(`Created thread for ${authorId}`)
-        return createNewThread(authorId, threadArray, openai);
+        console.log(`Created thread for ${channelId}`)
+        return createNewThread(channelId, threadArray, openai);
     }
 }
 
-async function createNewThread(authorId, threadArray, openai){
+async function createNewThread(channelId, threadArray, openai){
     const newThread = await openai.beta.threads.create();
-    const newEntry = { userId: authorId, threadId: newThread.id, isActive: false };
+    const newEntry = { channelId: channelId, threadId: newThread.id, isActive: false, isRetrying: false };
     threadArray.push(newEntry) //log the pair into memory TODO: save this somewhere so it doesn't refresh every time you restart the bot
     return newThread;
 }
 
-//Add discord message to a thread
-async function addUserMessageToThread(message, thread, openai, threadArray) {
-    const threadPair = threadArray.find(item => item.threadId === thread.id);
-    if(!threadPair){
-        return;
-    }
-    if(threadPair.isActive === true){
-        console.log(`${Date.now()} Retrying message add...`);
+async function retryMessageAdd(thread, openai, messageAddQueue, threadPair, isBot){
+    threadPair.isRetrying = true;
+    while(threadPair.isActive === true){
         await new Promise(resolve => setTimeout(resolve, 1000));
-        await addUserMessageToThread(message, thread, openai, threadArray);
-    }else{
-        try {
-            const run = await openai.beta.threads.messages.create(thread.id, {
-              role: "user",
-              content: message.content,
-            });
-          } catch (error) {
-            console.error(`Error adding a message to a thread1: ${error}`)
-          }
+    }
+    try{
+        while (messageAddQueue.length > 0) { //this is a safe way to remove the front message after its processed
+            const frontMessage = messageAddQueue.shift();
+            await addMessageToThread(thread, openai, frontMessage, isBot);
+        }
+        threadPair.isRetrying = false;
+    }catch(error){
+        console.log(`Error retrying message: ${error}`)
     }
 }
 
 //Add discord message to a thread
-async function addUserMessageToThreadAndRun(message, thread, openai, client, threadArray) {
-    // add conversation to a thread
-    const threadPair = threadArray.find(item => item.threadId === thread.id);
-    threadPair.isActive = true;
+async function addMessageToThread(thread, openai, formattedMessage, isBot) {
     try {
-      await openai.beta.threads.messages.create(thread.id, {
-        role: "user",
-        content: message.content,
-      });
-      await runThread(message, thread, openai, client, null, threadPair);
-    } catch (error) {
-        console.error(`Error adding and running a thread: ${error}`)
+        await openai.beta.threads.messages.create(thread.id, {
+            role: (isBot ? "assistant" : "user"),
+            content: formattedMessage,
+    });
+    }catch(error){
+        console.error(`Error adding message to thread: ${error}`);
     }
-  }
+}
 
 //a tool and/or Function Call
 async function addResultsToRun(contentText, openai, threadId, toolId, runId) {
@@ -152,19 +91,20 @@ async function addResultsToRun(contentText, openai, threadId, toolId, runId) {
   }
 }
 
-async function runThread(message, thread, openai, client, mentionedUser, threadPair) {
-    // Run the thread
-    let run = await openai.beta.threads.runs.createAndPoll(thread.id, {
-        assistant_id: myAssistant.id,
-        additional_instructions: process.env.BOT_INSTRUCTIONS,
-    });
-
-    if (run.status === "requires_action") {
-        await handleRequiresAction(message, run, openai, client);
-    } else if (run.status === "completed") {
-        message.channel.sendTyping();
-        await sendResponse(message, run.thread_id, openai, client, mentionedUser, threadPair);
-        // await handleCompletedRun(message, run, client, openai, mentionedUser);
+async function runThread(message, thread, openai, threadPair, client) {
+    console.log("Responding")
+    try{
+        let run = await openai.beta.threads.runs.createAndPoll(thread.id, {
+            assistant_id: myAssistant.id,
+            additional_instructions: process.env.BOT_INSTRUCTIONS,
+        });
+        if (run.status === "requires_action") {
+            await handleRequiresAction(message, run, openai, client);
+        } else if (run.status === "completed") {
+            return await formatResponse(message, threadPair, openai, client);
+        }
+    }catch(error){
+        console.error(`Error running thread: ${error}`);
     }
 }
 
@@ -181,14 +121,10 @@ async function handleRequiresAction(message, run, openai, client) {
     }
 }
 
-// async function handleCompletedRun(message, run, client, openai, mentionedUser) {
-//     message.channel.sendTyping();
-//     await sendResponse(message, run.thread_id, openai, client, mentionedUser);
-// }
-
-async function sendResponse(message, threadId, openai, client, mentionedUser, threadPair) {
+async function formatResponse(message, threadPair, openai, client) {
+    threadPair.isActive = false;
     try {
-        const messages = await openai.beta.threads.messages.list(threadId);
+        const messages = await openai.beta.threads.messages.list(threadPair.threadId);
         let response = messages.data[0].content[0].text.value;
         response = response.replace(client.user.username + ": ", "") //replace some common bot-isms
                            .replace(/【.*?】/gs, "")
@@ -197,25 +133,32 @@ async function sendResponse(message, threadId, openai, client, mentionedUser, th
         const index = response.indexOf(":");
         response.slice(index + 1);
         finalFormatedResponse = response.charAt(0).toUpperCase() + response.slice(1);
-
-        if (mentionedUser && mentionedUser.username !== undefined) {
-            await message.channel.send(`<@${mentionedUser.userId}>! ${finalFormatedResponse}`);
-            threadPair.isActive = false;
-        } else {
-            await message.reply(finalFormatedResponse);
-            threadPair.isActive = false;
-        }
+        return finalFormatedResponse;
     } catch (error) {
         console.error("Error running the thread: ", error);
         await message.reply("Sorry, there was an error processing your request.");
     }
 }
 
+async function sendResponse(message, finalFormatedResponse, isReply) {
+    try{
+        if(isReply === true){
+            await message.reply(finalFormatedResponse);
+        }else{
+            await message.channel.send(finalFormatedResponse);
+        }
+    }catch(error){
+        console.error("Error running the thread: ", error);
+        await message.reply("Sorry, there was an error processing your request.");
+    }
+}
+
 module.exports = {
-  formatMessage,
-  addUserMessageToThread,
-  runThread,
-  processPreviosConvo,
-  findExistingThread,
-  addUserMessageToThreadAndRun,
+    formatMessage,
+    addMessageToThread,
+    runThread,
+    findExistingThread,
+    sendResponse,
+    retryMessageAdd,
+    formatResponse,
 };
