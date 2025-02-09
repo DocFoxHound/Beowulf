@@ -84,9 +84,15 @@ client.on("ready", async () => {
     channelId: channel?.id
   })).filter(channel => channel.channelId);
   console.log(`Logged in as ${client.user.tag}!`);
-  
+
+  //start off with a fresh reload of the online files
+  await vectorHandler.refreshChatLogs(channelIdAndName, openai, client)
+  await vectorHandler.refreshUserList(openai, client)
+
+  //routine tasks
   setInterval(() => vectorHandler.refreshChatLogs(channelIdAndName, openai, client),
-  10800000 //every 3 hours
+    // 300000 // every 5 minutes
+    10800000 //every 3 hours
     );
   setInterval(() => vectorHandler.refreshUserList(openai, client),
     43200000 //every 12 hours
@@ -94,7 +100,7 @@ client.on("ready", async () => {
   setInterval(() => {
     userCache.clear();
     console.log('User cache cleared');
-  }, 216000000); // Clear cache every 6 hours, avoids excessive memory bloat
+  }, 21600000); // Clear cache every 6 hours, avoids excessive memory bloat
 });
 
 client.on("messageCreate", async (message) => {
@@ -160,6 +166,7 @@ client.on("messageCreate", async (message) => {
 
       //random chance that the bot sends a message to discord anyway
       const randomNumber = Math.floor(Math.random() * 25);
+      console.log(randomNumber)
       if (randomNumber === 1){
         console.log("Random Interaction")
         messageHistory = await message.channel.messages.fetch({ limit: 10, before: message.id }); //get the last 10 messages from the channel
@@ -169,7 +176,7 @@ client.on("messageCreate", async (message) => {
           const isBot = (message.id === client.user.id); //check if the message is from the bot or from a user
           const newFormattedMessage = await threadHandler.formatMessage(message, mentionRegex, userCache); //format the message for processing
           messageAddQueue.push(newFormattedMessage);
-          await threadHandler.addMessageToThread(newThread, openai, formattedMessage, false, isBot); 
+          await threadHandler.addMessageToThread(newThread, openai, newFormattedMessage, false, isBot); 
         };
         formattedResponse = await threadHandler.runThread(message, thread, openai, threadPair, client); //this both runs and formats the message so we don't lose the place in the returned thread array and retrieve the wrong message to format
         await threadHandler.sendResponse(message, finalFormatedResponse, false);

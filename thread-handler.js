@@ -108,6 +108,7 @@ async function runThread(message, thread, openai, threadPair, client) {
     }
 }
 
+//this is called if a thread comes back with "Requires Action" instead of completed, meaning its a tool/function call from the bot
 async function handleRequiresAction(message, run, openai, client) {
     console.log("Requires Action");
     message.channel.sendTyping();

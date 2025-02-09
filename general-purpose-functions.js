@@ -1,18 +1,5 @@
 const vectorHandler = require("./vector-handler.js");
 
-async function routineFunctions(userCache, channelIdAndName, openai, client){
-    setInterval(() => vectorHandler.refreshChatLogs(channelIdAndName, openai, client),
-        10800000 //every 3 hours
-      );
-    setInterval(() => vectorHandler.refreshUserList(openai, client),
-        43200000 //every 12 hours
-      );
-    setInterval(() => {
-        userCache.clear();
-        console.log('User cache cleared');
-    }, 3600000); // Clear cache every hour, avoids excessive memory bloat
-}
-
 async function getCachedUser(guild, userId, userCache) {
     // Check if the user is already in cache
     if (userCache.has(userId)) {
@@ -34,6 +21,5 @@ async function getCachedUser(guild, userId, userCache) {
 }
 
 module.exports = {
-  routineFunctions,
   getCachedUser
 };
