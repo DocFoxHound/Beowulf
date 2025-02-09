@@ -94,7 +94,7 @@ client.on("ready", async () => {
   setInterval(() => {
     userCache.clear();
     console.log('User cache cleared');
-  }, 3600000); // Clear cache every hour, avoids excessive memory bloat
+  }, 216000000); // Clear cache every 6 hours, avoids excessive memory bloat
 });
 
 client.on("messageCreate", async (message) => {
