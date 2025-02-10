@@ -86,22 +86,25 @@ client.on("ready", async () => {
   console.log(`Logged in as ${client.user.tag}!`);
 
   //start off with a fresh reload of the online files
-  await vectorHandler.refreshChatLogs(channelIdAndName, openai, client)
-  await vectorHandler.refreshUserList(openai, client)
+  // await vectorHandler.refreshChatLogs(channelIdAndName, openai, client)
+  // await vectorHandler.refreshUserList(openai, client)
+  // generalPurpose.downloadUEXData(); //do NOT await this, it takes forever
 
   //routine tasks
   setInterval(() => vectorHandler.refreshChatLogs(channelIdAndName, openai, client),
     // 300000 // every 5 minutes
     10800000 //every 3 hours
-    );
+  );
   setInterval(() => vectorHandler.refreshUserList(openai, client),
     43200000 //every 12 hours
   );
-  setInterval(() => {
-    userCache.clear();
-    console.log('User cache cleared');
-  }, 21600000); // Clear cache every 6 hours, avoids excessive memory bloat
-});
+  setInterval(() => userCache.clear(),
+    21600000 // Clear cache every 6 hours, avoids excessive memory bloat
+  );
+  setInterval(() => generalPurpose.downloadUEXData(), //do NOT await this, it takes forever
+    86400000 //every 24 hours
+  );
+}),
 
 client.on("messageCreate", async (message) => {
   // Check for conditions to ignore the message early
@@ -165,8 +168,7 @@ client.on("messageCreate", async (message) => {
       }
 
       //random chance that the bot sends a message to discord anyway
-      const randomNumber = Math.floor(Math.random() * 25);
-      console.log(randomNumber)
+      const randomNumber = Math.floor(Math.random() * 50);
       if (randomNumber === 1){
         console.log("Random Interaction")
         messageHistory = await message.channel.messages.fetch({ limit: 10, before: message.id }); //get the last 10 messages from the channel
