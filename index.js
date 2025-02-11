@@ -40,6 +40,9 @@ const mentionRegex = /<@!?(\d+)>/g;
 channelIds = process.env?.CHANNELS?.split(",");
 channelIdAndName = [];
 
+//json things to hold in memory
+let jsonData;
+
 //array of threads (one made per user)
 threadArray = [{channelId: "", threadId: "", isActive: Boolean, isRetrying: Boolean}];
 
@@ -90,6 +93,8 @@ client.on("ready", async () => {
   // await vectorHandler.refreshUserList(openai, client)
   // generalPurpose.downloadUEXData(); //do NOT await this, it takes forever
 
+  jsonData = await generalPurpose.preloadFromJsons();
+
   //routine tasks
   setInterval(() => vectorHandler.refreshChatLogs(channelIdAndName, openai, client),
     // 300000 // every 5 minutes
@@ -123,8 +128,15 @@ client.on("messageCreate", async (message) => {
       const formattedMessage = await threadHandler.formatMessage(message, mentionRegex, userCache); //format the message for processing
       await threadHandler.addMessageToThread(thread, openai, formattedMessage, false); //add the message to the thread
       message.channel.sendTyping();  // Send typing indicator once we know we need to process
-      formattedResponse = await threadHandler.runThread(message, thread, openai, threadPair, client); //this both runs and formats the message so we don't lose the place in the returned thread array and retrieve the wrong message to format
-      await threadHandler.sendResponse(message, formattedResponse, true);
+      let run = await threadHandler.runThread(thread, openai);
+      //check if the run completes or needs action
+      if (run.status === "requires_action") {
+        await threadHandler.handleRequiresAction(message, run, client, jsonData, openai);
+      } else if (run.status === "completed") {
+        console.log("Completed Response")
+        const formattedResponse = await threadHandler.formatResponse(run, threadPair, openai, client);
+        await threadHandler.sendResponse(message, formattedResponse, true);
+      }
       threadPair.isActive = false; //make sure to mark the thread as inactive
 
     //If the thread is busy, take the message and retry it on a new thread
@@ -142,8 +154,15 @@ client.on("messageCreate", async (message) => {
         }
       };
       message.channel.sendTyping();  // Send typing indicator once we know we need to process
-      formattedResponse = await threadHandler.runThread(message, thread, openai, threadPair, client); //this both runs and formats the message so we don't lose the place in the returned thread array and retrieve the wrong message to format
-      await threadHandler.sendResponse(message, finalFormatedResponse, true);
+      const run = await threadHandler.runThread(message, thread, openai, threadPair, client, jsonData);
+      //check if the run completes or needs action
+      if (run.status === "requires_action") {
+        await threadHandler.handleRequiresAction(message, run, client, jsonData, openai);
+      } else if (run.status === "completed") {
+        console.log("Completed Response")
+        const formattedResponse = await threadHandler.formatResponse(run, threadPair, openai, client);
+        await threadHandler.sendResponse(message, formattedResponse, true);
+      }
     }
 
   // Handle all other non-response or mentions messages
@@ -168,21 +187,21 @@ client.on("messageCreate", async (message) => {
       }
 
       //random chance that the bot sends a message to discord anyway
-      const randomNumber = Math.floor(Math.random() * 50);
-      if (randomNumber === 1){
-        console.log("Random Interaction")
-        messageHistory = await message.channel.messages.fetch({ limit: 10, before: message.id }); //get the last 10 messages from the channel
-        const newThread = await openai.beta.threads.create(); //make a new short-term thread to use and lose
-        for (const message of messageHistory.values()) { //iterate and add messages to a thread
-          // const isBot = (message.id === client.user.id) ? true : false; //check if the message is from the bot or from a user
-          const isBot = (message.id === client.user.id); //check if the message is from the bot or from a user
-          const newFormattedMessage = await threadHandler.formatMessage(message, mentionRegex, userCache); //format the message for processing
-          messageAddQueue.push(newFormattedMessage);
-          await threadHandler.addMessageToThread(newThread, openai, newFormattedMessage, false, isBot); 
-        };
-        formattedResponse = await threadHandler.runThread(message, thread, openai, threadPair, client); //this both runs and formats the message so we don't lose the place in the returned thread array and retrieve the wrong message to format
-        await threadHandler.sendResponse(message, finalFormatedResponse, false);
-      }
+      // const randomNumber = Math.floor(Math.random() * 50);
+      // if (randomNumber === 1){
+      //   console.log("Random Interaction")
+      //   messageHistory = await message.channel.messages.fetch({ limit: 10, before: message.id }); //get the last 10 messages from the channel
+      //   const newThread = await openai.beta.threads.create(); //make a new short-term thread to use and lose
+      //   for (const message of messageHistory.values()) { //iterate and add messages to a thread
+      //     // const isBot = (message.id === client.user.id) ? true : false; //check if the message is from the bot or from a user
+      //     const isBot = (message.id === client.user.id); //check if the message is from the bot or from a user
+      //     const newFormattedMessage = await threadHandler.formatMessage(message, mentionRegex, userCache); //format the message for processing
+      //     messageAddQueue.push(newFormattedMessage);
+      //     await threadHandler.addMessageToThread(newThread, openai, newFormattedMessage, false, isBot); 
+      //   };
+      //   formattedResponse = await threadHandler.runThread(message, thread, openai, threadPair, client, jsonData); //this both runs and formats the message so we don't lose the place in the returned thread array and retrieve the wrong message to format
+      //   await threadHandler.sendResponse(message, finalFormatedResponse, false);
+      // }
     }
   }
 });

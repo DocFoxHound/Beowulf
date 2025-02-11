@@ -68,58 +68,57 @@ async function addMessageToThread(thread, openai, formattedMessage, isBot) {
 async function addResultsToRun(contentText, openai, threadId, toolId, runId) {
   // if the toolId is populated, that means this is a tool call and we need
   // to add the results back to the thread
-  const maxLength = 2000; // Maximum length for a Discord message
-  if (contentText.length > maxLength) {
-        contentText = contentText.slice(-maxLength);
+    const maxLength = 2000; // Maximum length for a Discord message
+    if (contentText.length > maxLength) {
+            contentText = contentText.slice(-maxLength);
+        }
+    try {
+        const run = await openai.beta.threads.runs.submitToolOutputsAndPoll(
+        threadId,
+        runId,
+        {
+            tool_outputs: [
+            {
+                tool_call_id: toolId,
+                output: contentText,
+            },
+            ],
+        }
+        );
+        return run;
+    } catch (error) {
+        console.log("Error adding tool/function results to run: " + error);
     }
-  try {
-    const run = await openai.beta.threads.runs.submitToolOutputsAndPoll(
-      threadId,
-      runId,
-      {
-        tool_outputs: [
-          {
-            tool_call_id: toolId,
-            output: contentText,
-          },
-        ],
-      }
-    );
-    return run;
-  } catch (error) {
-    console.log("Error adding tool/function results to run: " + error);
-  }
 }
 
-async function runThread(message, thread, openai, threadPair, client) {
+async function runThread(thread, openai) {
     console.log("Responding")
     try{
         let run = await openai.beta.threads.runs.createAndPoll(thread.id, {
             assistant_id: myAssistant.id,
             additional_instructions: process.env.BOT_INSTRUCTIONS,
         });
-        if (run.status === "requires_action") {
-            await handleRequiresAction(message, run, openai, client);
-        } else if (run.status === "completed") {
-            return await formatResponse(message, threadPair, openai, client);
-        }
+        return run;
     }catch(error){
         console.error(`Error running thread: ${error}`);
     }
 }
 
 //this is called if a thread comes back with "Requires Action" instead of completed, meaning its a tool/function call from the bot
-async function handleRequiresAction(message, run, openai, client) {
+async function handleRequiresAction(message, run, client, jsonData, openai) { 
     console.log("Requires Action");
     // console.log(run.required_action.submit_tool_outputs)
     const toolCall = run.required_action.submit_tool_outputs.tool_calls[0];
-    const contentText = await functionHandler.executeFunction(toolCall, message, client, openai);
-    // const newRun = await addResultsToRun(contentText, openai, run.thread_id, toolCall.id, run.id);
+    const contentText = await functionHandler.executeFunction(run, message, jsonData);
+    run = await addResultsToRun(contentText, openai, run.thread_id, toolCall.id, run.id);
+    // let messages = await client.beta.threads.messages.list(thread.id);
+    let messages = await openai.beta.threads.messages.list(run.thread_id);
+    // console.log(messages.data.content);
 
-    // if (newRun.status === "completed") {
-    //     console.log("Completed Request");
-    //     await sendResponse(message, newRun.thread_id, openai, client);
-    // }
+    if (run.status === "completed") {
+        console.log("Completed Request");
+        await sendResponse(message, messages.data[0].content[0].text.value, openai, client);
+    }
 }
 
 async function formatResponse(message, threadPair, openai, client) {
@@ -162,4 +161,5 @@ module.exports = {
     sendResponse,
     retryMessageAdd,
     formatResponse,
+    handleRequiresAction,
 };
