@@ -103,11 +103,14 @@ client.on("ready", async () => {
   setInterval(() => vectorHandler.refreshUserList(openai, client),
     43200000 //every 12 hours
   );
-  setInterval(() => userCache.clear(),
-    21600000 // Clear cache every 6 hours, avoids excessive memory bloat
-  );
+  // setInterval(() => userCache.clear(),
+  //   21600000 // Clear cache every 6 hours, avoids excessive memory bloat
+  // );
   setInterval(() => generalPurpose.downloadUEXData(), //do NOT await this, it takes forever
     86400000 //every 24 hours
+  );
+  setInterval(async () => jsonData = await generalPurpose.preloadFromJsons(), //do NOT await this, it takes forever
+  10800000 //every 3 hours
   );
 }),
 

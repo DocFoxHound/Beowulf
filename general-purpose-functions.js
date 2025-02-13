@@ -22,9 +22,9 @@ async function getCachedUser(guild, userId, userCache) {
         }
     } catch (error) {
         console.error(`Could not fetch user: ${userId}`, error);
+        return null; // Return null if user cannot be fetched or does not exist
     }
 
-    return null; // Return null if user cannot be fetched or does not exist
 }
 
 async function downloadUEXData(){
@@ -119,7 +119,16 @@ async function preloadFromJsons(){
     // let reconstructedTerminalUsageList = [{terminal_code: "", terminal_name: "", star_system_name: "", totalSells: "", totalBuys: "", commodities: [{commodity_name: "", commodity_code: "", scu_sell_users_rows: "", scu_buy_users_rows: ""}]}];
     for (const packet of terminalPrices) {
         for (const terminal of packet.data) {
-            let terminalArray = reconstructedTerminalUsageList.find(item => item.terminal_code === terminal.terminal_code);
+            let locationDirect = terminal.outpost_name ? terminal.outpost_name :
+                terminal.city_name ? terminal.city_name :
+                terminal.space_station_name ? terminal.space_station_name : "";
+            let locationHigher = terminal.moon_name ? terminal.moon_name :
+                terminal.planet_name ? terminal.planet_name : "";
+            let terminalArray = reconstructedTerminalUsageList.find(item => (
+                item.location_direct === terminal.outpost_name || 
+                item.location_direct === terminal.city_name ||
+                item.location_direct === terminal.space_station_name
+            ));
             if (terminalArray) {    
                 // Assuming totalSells and totalBuys are integers and scu_sell_users_rows, scu_buy_users_rows are also integers.
                 terminalArray.totalSells += parseInt(terminal.scu_sell_users_rows);
@@ -137,6 +146,8 @@ async function preloadFromJsons(){
                     terminal_code: terminal.terminal_code,
                     terminal_name: terminal.terminal_name,
                     star_system_name: terminal.star_system_name,
+                    location_direct: locationDirect,
+                    location_parent: locationHigher,
                     totalSells: parseInt(terminal.scu_sell_users_rows),
                     totalBuys: parseInt(terminal.scu_buy_users_rows),
                     commodities: terminal.commodity_name ? [{
@@ -191,6 +202,8 @@ async function preloadFromJsons(){
     //     terminal_code: 'MICL1',
     //     terminal_name: 'Admin - MIC-L1',
     //     star_system_name: 'Stanton',
+    //     location_direct: 'some name',
+    //     location_parent: 'some planet',
     //     totalSells: int,
     //     totalBuys: int,
     //     commodities: [ 

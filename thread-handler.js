@@ -9,7 +9,12 @@ function formatMessage(message, mentionRegex, userCache) {
             const displayName = user ? `@${user.displayName}` : "@unknown-user";
             return displayName;
         });
-        return `${message.member.nickname}: ${readableMessage}`
+        return message.member?.nickname 
+    ? `${message.member.nickname} : ${readableMessage}` 
+    : message.author?.username 
+        ? `${message.author.username} : ${readableMessage}` 
+        : `unknown-user: ${readableMessage}`;
+        // console.log(message)
     }catch(error){
         console.error(`Error formatting the message: ${error}`)
     }
