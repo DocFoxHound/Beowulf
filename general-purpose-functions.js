@@ -131,11 +131,13 @@ async function preloadFromJsons(){
             ));
             if (terminalArray) {    
                 // Assuming totalSells and totalBuys are integers and scu_sell_users_rows, scu_buy_users_rows are also integers.
+                terminalArray.totalTransactions += (parseInt(terminal.scu_sell_users_rows) + parseInt(terminal.scu_buy_users_rows)),
                 terminalArray.totalSells += parseInt(terminal.scu_sell_users_rows);
                 terminalArray.totalBuys += parseInt(terminal.scu_buy_users_rows);
                 terminalArray.commodities.push({
                     commodity_name: terminal.commodity_name,
                     commodity_code: terminal.commodity_code,
+                    total_transactions: (parseInt(terminal.scu_sell_users_rows) + parseInt(terminal.scu_buy_users_rows)),
                     scu_sell_users_rows: terminal.scu_sell_users_rows,
                     scu_buy_users_rows: terminal.scu_buy_users_rows
                 });
@@ -148,11 +150,13 @@ async function preloadFromJsons(){
                     star_system_name: terminal.star_system_name,
                     location_direct: locationDirect,
                     location_parent: locationHigher,
+                    totalTransactions: parseInt(terminal.scu_sell_users_rows) + parseInt(terminal.scu_buy_users_rows),
                     totalSells: parseInt(terminal.scu_sell_users_rows),
                     totalBuys: parseInt(terminal.scu_buy_users_rows),
                     commodities: terminal.commodity_name ? [{
                         commodity_name: terminal.commodity_name,
                         commodity_code: terminal.commodity_code,
+                        total_transactions: (parseInt(terminal.scu_sell_users_rows) + parseInt(terminal.scu_buy_users_rows)),
                         scu_sell_users_rows: terminal.scu_sell_users_rows,
                         scu_buy_users_rows: terminal.scu_buy_users_rows
                     }] : [] // Initialize commodities as empty array if no commodity data present
@@ -160,39 +164,54 @@ async function preloadFromJsons(){
             }
         }
     }
-    //split out Stanton and Pyro systems and organize by best sellers
+    //split out Stanton and Pyro systems and organize by best buyers and sellers
     let unorganizatedStantonArray = reconstructedTerminalUsageList.filter(terminal => terminal.star_system_name === "Stanton");
-    let stantonTopBuyers = unorganizatedStantonArray.sort((a, b) => b.totalBuys - a.totalBuys).slice(0, 10);
-    let stantonTopSellers = unorganizatedStantonArray.sort((a, b) => b.totalSells - a.totalSells).slice(0, 10);
+    let stantonTopTransactions = unorganizatedStantonArray.sort((a, b) => b.totalTransactions - a.totalTransactions).slice(0, 10);
+    // let stantonTopBuyers = unorganizatedStantonArray.sort((a, b) => b.totalBuys - a.totalBuys).slice(0, 10);
+    // let stantonTopSellers = unorganizatedStantonArray.sort((a, b) => b.totalSells - a.totalSells).slice(0, 10);
     let unorganizedPyroArray = reconstructedTerminalUsageList.filter(terminal => terminal.star_system_name === "Pyro");
-    let pyroTopBuyers = unorganizedPyroArray.sort((a, b) => b.totalBuys - a.totalBuys).slice(0, 10);
-    let pyroTopSellers = unorganizedPyroArray.sort((a, b) => b.totalSells - a.totalSells).slice(0, 10);
-    let allTopBuyers = reconstructedTerminalUsageList.sort((a, b) => b.totalBuys - a.totalBuys).slice(0, 10);
-    let allTopSellers = reconstructedTerminalUsageList.sort((a, b) => b.totalSells - a.totalSells).slice(0, 10);
+    let pyroTopTransactions = unorganizedPyroArray.sort((a, b) => b.totalTransactions - a.totalTransactions).slice(0, 10);
+    // let pyroTopBuyers = unorganizedPyroArray.sort((a, b) => b.totalBuys - a.totalBuys).slice(0, 10);
+    // let pyroTopSellers = unorganizedPyroArray.sort((a, b) => b.totalSells - a.totalSells).slice(0, 10);
+    let allTopTransactions = reconstructedTerminalUsageList.sort((a, b) => b.totalTransactions - a.totalTransactions).slice(0, 10);
+    // let allTopBuyers = reconstructedTerminalUsageList.sort((a, b) => b.totalBuys - a.totalBuys).slice(0, 10);
+    // let allTopSellers = reconstructedTerminalUsageList.sort((a, b) => b.totalSells - a.totalSells).slice(0, 10);
 
     //sort the commodities in each terminal by the top selling 5
-    stantonTopBuyers.forEach(terminal => {
-        terminal.commodities.sort((a, b) => b.scu_buy_users_rows - a.scu_buy_users_rows);
+    // stantonTopBuyers.forEach(terminal => {
+    //     terminal.commodities.sort((a, b) => b.scu_buy_users_rows - a.scu_buy_users_rows);
+    //     terminal.commodities = terminal.commodities.slice(0, 5);
+    // });
+    // stantonTopSellers.forEach(terminal => {
+    //     terminal.commodities.sort((a, b) => b.scu_sell_users_rows - a.scu_sell_users_rows);
+    //     terminal.commodities = terminal.commodities.slice(0, 5);
+    // });
+    stantonTopTransactions.forEach(terminal => {
+        terminal.commodities.sort((a, b) => b.total_transactions - a.total_transactions);
         terminal.commodities = terminal.commodities.slice(0, 5);
     });
-    stantonTopSellers.forEach(terminal => {
-        terminal.commodities.sort((a, b) => b.scu_sell_users_rows - a.scu_sell_users_rows);
+    // pyroTopBuyers.forEach(terminal => {
+    //     terminal.commodities.sort((a, b) => b.scu_buy_users_rows - a.scu_buy_users_rows);
+    //     terminal.commodities = terminal.commodities.slice(0, 5);
+    // });
+    // pyroTopSellers.forEach(terminal => {
+    //     terminal.commodities.sort((a, b) => b.scu_sell_users_rows - a.scu_sell_users_rows);
+    //     terminal.commodities = terminal.commodities.slice(0, 5);
+    // });
+    pyroTopTransactions.forEach(terminal => {
+        terminal.commodities.sort((a, b) => b.total_transactions - a.total_transactions);
         terminal.commodities = terminal.commodities.slice(0, 5);
     });
-    pyroTopBuyers.forEach(terminal => {
-        terminal.commodities.sort((a, b) => b.scu_buy_users_rows - a.scu_buy_users_rows);
-        terminal.commodities = terminal.commodities.slice(0, 5);
-    });
-    pyroTopSellers.forEach(terminal => {
-        terminal.commodities.sort((a, b) => b.scu_sell_users_rows - a.scu_sell_users_rows);
-        terminal.commodities = terminal.commodities.slice(0, 5);
-    });
-    allTopBuyers.forEach(terminal => {
-        terminal.commodities.sort((a, b) => b.scu_buy_users_rows - a.scu_buy_users_rows);
-        terminal.commodities = terminal.commodities.slice(0, 5);
-    });
-    allTopSellers.forEach(terminal => {
-        terminal.commodities.sort((a, b) => b.scu_sell_users_rows - a.scu_sell_users_rows);
+    // allTopBuyers.forEach(terminal => {
+    //     terminal.commodities.sort((a, b) => b.scu_buy_users_rows - a.scu_buy_users_rows);
+    //     terminal.commodities = terminal.commodities.slice(0, 5);
+    // });
+    // allTopSellers.forEach(terminal => {
+    //     terminal.commodities.sort((a, b) => b.scu_sell_users_rows - a.scu_sell_users_rows);
+    //     terminal.commodities = terminal.commodities.slice(0, 5);
+    // });
+    allTopTransactions.forEach(terminal => {
+        terminal.commodities.sort((a, b) => b.total_transactions - a.total_transactions);
         terminal.commodities = terminal.commodities.slice(0, 5);
     });
 
@@ -204,6 +223,7 @@ async function preloadFromJsons(){
     //     star_system_name: 'Stanton',
     //     location_direct: 'some name',
     //     location_parent: 'some planet',
+    //     totalTransactions: int,
     //     totalSells: int,
     //     totalBuys: int,
     //     commodities: [ 
@@ -223,12 +243,9 @@ async function preloadFromJsons(){
         starSystems,
         terminalPrices,
         terminals,
-        stantonTopBuyers,
-        stantonTopSellers,
-        pyroTopBuyers,
-        pyroTopSellers,
-        allTopBuyers,
-        allTopSellers
+        stantonTopTransactions,
+        pyroTopTransactions,
+        allTopTransactions
     };
 }
 

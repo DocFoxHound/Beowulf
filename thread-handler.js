@@ -14,7 +14,6 @@ function formatMessage(message, mentionRegex, userCache) {
     : message.author?.username 
         ? `${message.author.username} : ${readableMessage}` 
         : `unknown-user: ${readableMessage}`;
-        // console.log(message)
     }catch(error){
         console.error(`Error formatting the message: ${error}`)
     }
@@ -112,13 +111,11 @@ async function runThread(thread, openai) {
 //this is called if a thread comes back with "Requires Action" instead of completed, meaning its a tool/function call from the bot
 async function handleRequiresAction(message, run, client, jsonData, openai) { 
     console.log("Requires Action");
-    // console.log(run.required_action.submit_tool_outputs)
     const toolCall = run.required_action.submit_tool_outputs.tool_calls[0];
     const contentText = await functionHandler.executeFunction(run, message, jsonData);
     run = await addResultsToRun(contentText, openai, run.thread_id, toolCall.id, run.id);
     // let messages = await client.beta.threads.messages.list(thread.id);
     let messages = await openai.beta.threads.messages.list(run.thread_id);
-    // console.log(messages.data.content);
 
     if (run.status === "completed") {
         console.log("Completed Request");
