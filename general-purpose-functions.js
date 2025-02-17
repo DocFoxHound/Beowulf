@@ -79,7 +79,6 @@ async function downloadUEXData(){
                 const response = await axios.get(`${api.url}${terminal.id}${apiKey}`);
                 const data = response.data;
                 individualTerminalData.push(data);
-                // console.log(terminal); // Optionally log each terminal data
             }
             // Save as a JSON file
             const filePath = path.join(`./UEX/${api.title}.json`);
@@ -114,9 +113,37 @@ async function preloadFromJsons(){
     jsonData = await fs.readFile("./UEX/terminals.json", 'utf8');
     terminals = JSON.parse(jsonData);
 
-    //give us a short list of top selling locations
+    const topTerminalTransactions = await getTopTerminalTransactions(terminalPrices);
+    const allTopTransactions = topTerminalTransactions.allTopTransactions;
+    const pyroTopTransactions = topTerminalTransactions.pyroTopTransactions;
+    const stantonTopTransactions = topTerminalTransactions.stantonTopTransactions;
+    const topCommodityBuySellLocations = await getTopCommodityBuySellLocations(terminalPrices);
+    const stantonCommodityBuyList = topCommodityBuySellLocations.stantonCommodityBuyList;
+    const stantonCommoditySellList = topCommodityBuySellLocations.stantonCommoditySellList;
+    const pyroCommodityBuyList = topCommodityBuySellLocations.pyroCommodityBuyList;
+    const pyroCommoditySellList = topCommodityBuySellLocations.pyroCommoditySellList;
+    
+    return { // Optionally return these objects if needed elsewhere
+        cities,
+        commodities,
+        outposts,
+        planets,
+        spaceStations,
+        starSystems,
+        terminalPrices,
+        terminals,
+        stantonTopTransactions,
+        pyroTopTransactions,
+        allTopTransactions,
+        stantonCommodityBuyList,
+        stantonCommoditySellList,
+        pyroCommodityBuyList,
+        pyroCommoditySellList
+    };
+}
+
+async function getTopTerminalTransactions(terminalPrices){
     let reconstructedTerminalUsageList = [];
-    // let reconstructedTerminalUsageList = [{terminal_code: "", terminal_name: "", star_system_name: "", totalSells: "", totalBuys: "", commodities: [{commodity_name: "", commodity_code: "", scu_sell_users_rows: "", scu_buy_users_rows: ""}]}];
     for (const packet of terminalPrices) {
         for (const terminal of packet.data) {
             let locationDirect = terminal.outpost_name ? terminal.outpost_name :
@@ -141,7 +168,6 @@ async function preloadFromJsons(){
                     scu_sell_users_rows: terminal.scu_sell_users_rows,
                     scu_buy_users_rows: terminal.scu_buy_users_rows
                 });
-
             } else {
                 // Properly push a new object into the array
                 reconstructedTerminalUsageList.push({
@@ -158,95 +184,129 @@ async function preloadFromJsons(){
                         commodity_code: terminal.commodity_code,
                         total_transactions: (parseInt(terminal.scu_sell_users_rows) + parseInt(terminal.scu_buy_users_rows)),
                         scu_sell_users_rows: terminal.scu_sell_users_rows,
-                        scu_buy_users_rows: terminal.scu_buy_users_rows
+                        scu_buy_users_rows: terminal.scu_buy_users_rows,
                     }] : [] // Initialize commodities as empty array if no commodity data present
                 });
             }
         }
     }
+
     //split out Stanton and Pyro systems and organize by best buyers and sellers
-    let unorganizatedStantonArray = reconstructedTerminalUsageList.filter(terminal => terminal.star_system_name === "Stanton");
+    let unorganizatedStantonArray = structuredClone(reconstructedTerminalUsageList.filter(terminal => terminal.star_system_name === "Stanton"));
     let stantonTopTransactions = unorganizatedStantonArray.sort((a, b) => b.totalTransactions - a.totalTransactions).slice(0, 10);
-    // let stantonTopBuyers = unorganizatedStantonArray.sort((a, b) => b.totalBuys - a.totalBuys).slice(0, 10);
-    // let stantonTopSellers = unorganizatedStantonArray.sort((a, b) => b.totalSells - a.totalSells).slice(0, 10);
-    let unorganizedPyroArray = reconstructedTerminalUsageList.filter(terminal => terminal.star_system_name === "Pyro");
+    let unorganizedPyroArray = structuredClone(reconstructedTerminalUsageList.filter(terminal => terminal.star_system_name === "Pyro"));
     let pyroTopTransactions = unorganizedPyroArray.sort((a, b) => b.totalTransactions - a.totalTransactions).slice(0, 10);
-    // let pyroTopBuyers = unorganizedPyroArray.sort((a, b) => b.totalBuys - a.totalBuys).slice(0, 10);
-    // let pyroTopSellers = unorganizedPyroArray.sort((a, b) => b.totalSells - a.totalSells).slice(0, 10);
-    let allTopTransactions = reconstructedTerminalUsageList.sort((a, b) => b.totalTransactions - a.totalTransactions).slice(0, 10);
-    // let allTopBuyers = reconstructedTerminalUsageList.sort((a, b) => b.totalBuys - a.totalBuys).slice(0, 10);
-    // let allTopSellers = reconstructedTerminalUsageList.sort((a, b) => b.totalSells - a.totalSells).slice(0, 10);
+    let allTopTransactions = structuredClone(reconstructedTerminalUsageList.sort((a, b) => b.totalTransactions - a.totalTransactions).slice(0, 10));
 
     //sort the commodities in each terminal by the top selling 5
-    // stantonTopBuyers.forEach(terminal => {
-    //     terminal.commodities.sort((a, b) => b.scu_buy_users_rows - a.scu_buy_users_rows);
-    //     terminal.commodities = terminal.commodities.slice(0, 5);
-    // });
-    // stantonTopSellers.forEach(terminal => {
-    //     terminal.commodities.sort((a, b) => b.scu_sell_users_rows - a.scu_sell_users_rows);
-    //     terminal.commodities = terminal.commodities.slice(0, 5);
-    // });
     stantonTopTransactions.forEach(terminal => {
         terminal.commodities.sort((a, b) => b.total_transactions - a.total_transactions);
         terminal.commodities = terminal.commodities.slice(0, 5);
     });
-    // pyroTopBuyers.forEach(terminal => {
-    //     terminal.commodities.sort((a, b) => b.scu_buy_users_rows - a.scu_buy_users_rows);
-    //     terminal.commodities = terminal.commodities.slice(0, 5);
-    // });
-    // pyroTopSellers.forEach(terminal => {
-    //     terminal.commodities.sort((a, b) => b.scu_sell_users_rows - a.scu_sell_users_rows);
-    //     terminal.commodities = terminal.commodities.slice(0, 5);
-    // });
     pyroTopTransactions.forEach(terminal => {
         terminal.commodities.sort((a, b) => b.total_transactions - a.total_transactions);
         terminal.commodities = terminal.commodities.slice(0, 5);
     });
-    // allTopBuyers.forEach(terminal => {
-    //     terminal.commodities.sort((a, b) => b.scu_buy_users_rows - a.scu_buy_users_rows);
-    //     terminal.commodities = terminal.commodities.slice(0, 5);
-    // });
-    // allTopSellers.forEach(terminal => {
-    //     terminal.commodities.sort((a, b) => b.scu_sell_users_rows - a.scu_sell_users_rows);
-    //     terminal.commodities = terminal.commodities.slice(0, 5);
-    // });
     allTopTransactions.forEach(terminal => {
         terminal.commodities.sort((a, b) => b.total_transactions - a.total_transactions);
         terminal.commodities = terminal.commodities.slice(0, 5);
     });
-
-
-    // //ARRAY RETURN FORMAT FOR FUTURE REFERENCE:
-    // {
-    //     terminal_code: 'MICL1',
-    //     terminal_name: 'Admin - MIC-L1',
-    //     star_system_name: 'Stanton',
-    //     location_direct: 'some name',
-    //     location_parent: 'some planet',
-    //     totalTransactions: int,
-    //     totalSells: int,
-    //     totalBuys: int,
-    //     commodities: [ 
-    //         commodity_name: "Agricultural Supplies",
-    //         commodity_code: "AGRS",
-    //         scu_sell_users_rows: int,
-    //         scu_buy_users_rows: int,  
-    //     ]
-    // },
-
-    return { // Optionally return these objects if needed elsewhere
-        cities,
-        commodities,
-        outposts,
-        planets,
-        spaceStations,
-        starSystems,
-        terminalPrices,
-        terminals,
+    return {
         stantonTopTransactions,
         pyroTopTransactions,
         allTopTransactions
-    };
+    }
+}
+
+async function getTopCommodityBuySellLocations(){
+    reconstructedCommodityList = [];
+    for (const packet of terminalPrices) {
+        for (const terminal of packet.data) {
+            let locationDirect = terminal.outpost_name ? terminal.outpost_name :
+                terminal.city_name ? terminal.city_name :
+                terminal.space_station_name ? terminal.space_station_name : "";
+            let locationHigher = terminal.moon_name ? terminal.moon_name :
+                terminal.planet_name ? terminal.planet_name : "";
+            //check if the terminal's commodity name is already stored in the list
+            let foundCommodity = reconstructedCommodityList.find(item => (
+                item.commodity_name.toLowerCase() === terminal.commodity_name.toLowerCase()
+            ));
+
+            //if the commodity item already exists, and it we'll just add this terminal to it
+            if(foundCommodity){
+                //add the terminal to this commodity's list
+                foundCommodity.terminals.push({
+                    star_system_name: terminal.star_system_name,
+                    location_direct: locationDirect,
+                    location_parent: locationHigher,
+                    terminal_name: terminal.terminal_name,
+                    terminal_code: terminal.terminal_code,
+                    price_buy_avg: terminal.price_buy_avg,
+                    price_sell_avg: terminal.price_sell_avg,
+                    scu_buy_avg: terminal.scu_buy_avg, //how much can you buy at once
+                    scu_sell_avg: terminal.scu_sell_avg
+                })
+            //if the commodity doesn't already exist, then we'll add it to the list
+            }else{
+                reconstructedCommodityList.push({
+                    commodity_name: terminal.commodity_name,
+                    commodity_code: terminal.commodity_code,
+                    commodity_slug: terminal.commodity_slug,
+                    terminals: [{
+                        star_system_name: terminal.star_system_name,
+                        location_direct: locationDirect,
+                        location_parent: locationHigher,
+                        terminal_name: terminal.terminal_name,
+                        terminal_code: terminal.terminal_code,
+                        price_buy_avg: terminal.price_buy_avg,
+                        price_sell_avg: terminal.price_sell_avg,
+                        scu_buy_avg: terminal.scu_buy_avg, //how much can you buy at once
+                        scu_sell_avg: terminal.scu_sell_avg
+                    }]
+                })
+            }
+            //TODO: 
+            // 1. build a list of commodities
+            // 2. place terminals with only buy/sell transactions on each commodity (with system parent)
+        }
+    }
+    //sort the mega array into system-specific arrays for buy and sell
+    let stantonBuyListCopy = structuredClone(reconstructedCommodityList);
+    let stantonSellListCopy = structuredClone(reconstructedCommodityList);
+    let pyroBuyListCopy = structuredClone(reconstructedCommodityList);
+    let pyroSellListCopy = structuredClone(reconstructedCommodityList);
+
+    const stantonCommodityBuyList = stantonBuyListCopy.map(commodity => {
+        commodity.terminals = commodity.terminals.filter(terminal => terminal.star_system_name === "Stanton")
+        .filter(terminal => terminal.price_buy_avg > 0)
+        .sort((a, b) => b.price_buy_avg - a.price_buy_avg);;
+        return commodity;
+    })
+    const stantonCommoditySellList = stantonSellListCopy.map(commodity => {
+        commodity.terminals = commodity.terminals.filter(terminal => terminal.star_system_name === "Stanton")
+        .filter(terminal => terminal.price_sell_avg > 0)
+        .sort((a, b) => b.price_sell_avg - a.price_sell_avg);;
+        return commodity;
+    })
+    const pyroCommodityBuyList = pyroBuyListCopy.map(commodity => {
+        commodity.terminals = commodity.terminals.filter(terminal => terminal.star_system_name === "Pyro")
+        .filter(terminal => terminal.price_buy_avg > 0)
+        .sort((a, b) => b.price_buy_avg - a.price_buy_avg);;
+        return commodity;
+    })
+    const pyroCommoditySellList = pyroSellListCopy.map(commodity => {
+        commodity.terminals = commodity.terminals.filter(terminal => terminal.star_system_name === "Pyro")
+        .filter(terminal => terminal.price_sell_avg > 0)
+        .sort((a, b) => b.price_sell_avg - a.price_sell_avg);;
+        return commodity;
+    })
+
+    return {
+        stantonCommodityBuyList,
+        stantonCommoditySellList,
+        pyroCommodityBuyList,
+        pyroCommoditySellList
+    }
 }
 
 module.exports = {

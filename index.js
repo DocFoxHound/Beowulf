@@ -192,7 +192,6 @@ client.on("messageCreate", async (message) => {
       //random chance that the bot sends a message to discord anyway
       // const randomNumber = Math.floor(Math.random() * 50);
       // if (randomNumber === 1){
-      //   console.log("Random Interaction")
       //   messageHistory = await message.channel.messages.fetch({ limit: 10, before: message.id }); //get the last 10 messages from the channel
       //   const newThread = await openai.beta.threads.create(); //make a new short-term thread to use and lose
       //   for (const message of messageHistory.values()) { //iterate and add messages to a thread
