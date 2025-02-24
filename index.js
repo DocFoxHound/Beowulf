@@ -8,6 +8,7 @@ const { OpenAI } = require("openai");
 const vectorHandler = require("./vector-handler.js");
 const threadHandler = require("./thread-handler");
 const generalPurpose = require("./general-purpose-functions.js")
+const queue = require("./api/queue.js")
 
 // Initialize dotenv config file
 const args = process.argv.slice(2);
@@ -20,7 +21,7 @@ dotenv.config({
 });
 
 // Setup OpenAI
-const openai = new OpenAI(process.env.OPENAI_API_KEY);
+const openai = new OpenAI(OPENAI_API_KEY);
 
 // Create a new discord client instance
 const client = new Client({
@@ -94,6 +95,12 @@ client.on("ready", async () => {
   // generalPurpose.downloadUEXData(); //do NOT await this, it takes forever
 
   jsonData = await generalPurpose.preloadFromJsons();
+  // dbResponse = await dbApi.getUserByIdTest();
+  testUserId = 664023164350627843;
+  testUserName = "DocHound"
+  dbResponse = await queue.createUserInQueueCorsair(testUserId, testUserName);
+  // dbResponse = await dbApi.createUserTest(); 
+  // console.log(dbResponse);
 
   //routine tasks
   setInterval(() => vectorHandler.refreshChatLogs(channelIdAndName, openai, client),
