@@ -24,7 +24,6 @@ async function getCachedUser(guild, userId, userCache) {
         console.error(`Could not fetch user: ${userId}`, error);
         return null; // Return null if user cannot be fetched or does not exist
     }
-
 }
 
 async function downloadUEXData(){

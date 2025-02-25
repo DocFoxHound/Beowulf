@@ -8,6 +8,9 @@ const { OpenAI } = require("openai");
 const vectorHandler = require("./vector-handler.js");
 const threadHandler = require("./thread-handler");
 const generalPurpose = require("./general-purpose-functions.js")
+const preloadFromJsons = require("./common/preload-from-jsons.js")
+const downloadUEXData = require("./common/download-UEX-Data.js")
+const testRoute = require("./api/testRoute.js")
 const queue = require("./api/queue.js")
 
 // Initialize dotenv config file
@@ -21,7 +24,7 @@ dotenv.config({
 });
 
 // Setup OpenAI
-const openai = new OpenAI(OPENAI_API_KEY);
+const openai = new OpenAI(process.env.OPENAI_API_KEY);
 
 // Create a new discord client instance
 const client = new Client({
@@ -94,12 +97,29 @@ client.on("ready", async () => {
   // await vectorHandler.refreshUserList(openai, client)
   // generalPurpose.downloadUEXData(); //do NOT await this, it takes forever
 
-  jsonData = await generalPurpose.preloadFromJsons();
-  // dbResponse = await dbApi.getUserByIdTest();
-  testUserId = 664023164350627843;
-  testUserName = "DocHound"
-  dbResponse = await queue.createUserInQueueCorsair(testUserId, testUserName);
-  // dbResponse = await dbApi.createUserTest(); 
+  jsonData = await preloadFromJsons.preloadFromJsons();
+  const newUser = {
+    id: '156924379786117125',
+    username: 'DocHound2',
+    nickname: 'Doc',
+    corsair_level: 1,
+    raptor_level: 1,
+    raider_level: 1,
+    rank: '692444672395706368'
+  };
+  const testFakeUserQueue = {
+    id: '664023164350627843',
+    username: "DocHound",
+    nickname: "Doc",
+    corsair_level: 1,
+    raptor_level: 2,
+    raider_level: 2,
+    queue_help: true,
+    queue_description: "corsair_2",
+    createdAt: new Date()
+  }
+  dbResponse = await queue.createUserInQueueCorsair(testFakeUserQueue);
+  // dbResponse = await testRoute.createUserTest(newUser); 
   // console.log(dbResponse);
 
   //routine tasks
@@ -113,10 +133,10 @@ client.on("ready", async () => {
   // setInterval(() => userCache.clear(),
   //   21600000 // Clear cache every 6 hours, avoids excessive memory bloat
   // );
-  setInterval(() => generalPurpose.downloadUEXData(), //do NOT await this, it takes forever
+  setInterval(() => downloadUEXData.downloadUEXData(), //do NOT await this, it takes forever
     86400000 //every 24 hours
   );
-  setInterval(async () => jsonData = await generalPurpose.preloadFromJsons(), //do NOT await this, it takes forever
+  setInterval(async () => jsonData = await preloadFromJsons.preloadFromJsons(), //do NOT await this, it takes forever
   10800000 //every 3 hours
   );
 }),

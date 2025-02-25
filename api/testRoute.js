@@ -14,16 +14,8 @@ async function getUserByIdTest(){
     });
 }
 
-async function createUserTest() {
-    const apiUrl = 'http://localhost:3000/api/users/';
-    const newUser = {
-        id: '156924379786117120',
-        username: 'Mercurius',
-        nickname: 'Merc',
-        corsair_level: 3,
-        raptor_level: 2,
-        raider_level: 1
-    };
+async function createUserTest(newUser) {
+    const apiUrl = 'http://localhost:3000/api/users/'; 
     try {
         const response = await axios.post(apiUrl, newUser, {
             headers: {

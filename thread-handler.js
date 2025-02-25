@@ -1,11 +1,11 @@
-const functionHandler = require("./function-handler");
-const generalPurpose = require("./general-purpose-functions")
+const functionHandler = require("./functions/function-handler");
+const commonProcesses = require("./common/common-processes")
 
 //convert the message into something we'll store to use for later
 function formatMessage(message, mentionRegex, userCache) {
     try{
         const readableMessage = message.content.replace(mentionRegex, (match, userId) => {
-            const user = generalPurpose.getCachedUser(message.guild, userId, userCache);
+            const user = commonProcesses.getCachedUser(message.guild, userId, userCache);
             const displayName = user ? `@${user.displayName}` : "@unknown-user";
             return displayName;
         });

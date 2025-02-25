@@ -13,15 +13,10 @@ const axios = require('axios');
 //     });
 // }
 
-async function createUserInQueueCorsair(userId, userName) {
-    const apiUrl = `${process.env.SERVER_URL}/api/users/`; //TODO
-    const newUser = {
-        id: userId,
-        date: new Date(),
-        username: userName
-    };
+async function createUserInQueueCorsair(testFakeUser) {
+    const apiUrl = `${process.env.SERVER_URL}/api/queue/`; //TODO
     try {
-        const response = await axios.post(apiUrl, newUser, {
+        const response = await axios.post(apiUrl, testFakeUser, {
             headers: {
                 'Content-Type': 'application/json'
             }
@@ -33,7 +28,7 @@ async function createUserInQueueCorsair(userId, userName) {
 }
 
 async function getUsersInQueueCorsair() {
-    const apiUrl = `${process.env.SERVER_URL}/api/users/by-corsair-level?level=${encodeURIComponent(level)}`; //TODO
+    const apiUrl = `${process.env.SERVER_URL}/api/queue/...`; //TODO
 
     axios.get(apiUrl)
         .then(response => {
