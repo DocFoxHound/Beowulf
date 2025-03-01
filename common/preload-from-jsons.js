@@ -1,3 +1,4 @@
+const fs = require('fs').promises;
 getTopCommodityBuySellLocations = require("./get-top-commodity-buy-sell-locations")
 getTopTerminalTransactions = require("./get-top-terminal-transactions")
 

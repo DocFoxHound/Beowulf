@@ -1,4 +1,3 @@
-const vectorHandler = require("./vector-handler.js");
 const axios = require('axios');
 const path = require('path');
 const fs = require('fs').promises;

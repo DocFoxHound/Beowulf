@@ -1,5 +1,6 @@
 const piracyAdviceLocation = require("./piracy-advice-location");
 const transactCommodityLocation = require("./transact-commodity-location");
+const queueController = require("../queue-functions/queue-controller");
 
 
 async function executeFunction(run, message, jsonData) {
@@ -8,9 +9,7 @@ async function executeFunction(run, message, jsonData) {
   const toolCall = run.required_action.submit_tool_outputs.tool_calls[0];
   switch (toolCall.function.name) {
     case "piracy_advice_location":
-      console.log(`Function: ${toolCall.function.name}`)
       return piracyAdviceLocation.piracy_advice_location(run, jsonData);
-    // Example of additional cases
     case "sell_commodity":
       return transactCommodityLocation.transact_commodity_location(run, jsonData);
     case "sell_item":
@@ -23,7 +22,13 @@ async function executeFunction(run, message, jsonData) {
       return transactCommodityLocation.transact_commodity_location(run, jsonData);
     case "where_to_buy":
       return transactCommodityLocation.transact_commodity_location(run, jsonData);
-    case "yet_another_function_name":
+    case "recognize_promotion_ticket_request":
+      return queueController.queueController(run, message);
+    case "recognize_assessment_ticket_request":
+      return queueController.queueController(run, message);
+    case "recognize_class_ticket_request":
+      return queueController.queueController(run, message);
+    case "yet_another_function_name": //example
       return yet_another_function_name(run, jsonData);
   }
 }

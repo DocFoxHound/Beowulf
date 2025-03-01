@@ -1,45 +1,61 @@
 const axios = require('axios');
 
-// async function getUserByIdTest(){
-//     const apiUrl = 'http://localhost:3000/api/users/664023164350627843';
-//     axios.get(apiUrl)
-//     .then(response => {
-//         nickname = response.data.nickname
-//         console.log('User data:', nickname);
-//         // console.log('User data:', response.data);
-//     })
-//     .catch(error => {
-//         console.error('Error fetching data:', error.message);
-//     });
-// }
-
-async function createUserInQueueCorsair(testFakeUser) {
-    const apiUrl = `${process.env.SERVER_URL}/api/queue/`; //TODO
+async function createUserInQueue(newUser) {
+    console.log("Inserting new user")
+    const apiUrl = `${process.env.SERVER_URL}/api/queue/`; 
     try {
-        const response = await axios.post(apiUrl, testFakeUser, {
+        const response = await axios.post(apiUrl, newUser, {
             headers: {
                 'Content-Type': 'application/json'
             }
         });
-        console.log('User placed in Queue - CORSAIR: ', response.data);
+        return true;
     } catch (error) {
-        console.error('Error placing user in Queue - CORSAIR: ', error.response ? error.response.data : error.message);
+        console.error('Error placing user in Queue: ', error.response ? error.response.data : error.message);
+        return false;
     }
 }
 
-async function getUsersInQueueCorsair() {
-    const apiUrl = `${process.env.SERVER_URL}/api/queue/...`; //TODO
+async function getUsersInQueue() {
+    const apiUrl = `${process.env.SERVER_URL}/api/queue/`;
+    try {
+        const response = await axios.get(apiUrl);
+        return response.data;  // This will be the return value of the function
+    } catch (error) {
+        console.error('Error fetching users in Queue:', error.response ? error.response.data : error.message);
+        return null;  // Return null if there's an error
+    }
+}
 
-    axios.get(apiUrl)
-        .then(response => {
-            console.log('Users in Corsair Queue: ' + response.data);
-        })
-        .catch(error => {
-            console.error('Error fetching users:', error.response ? error.response.data : error.message);
+async function getUserById(userId){
+    const apiUrl = process.env.SERVER_URL;
+    try {
+        const response = await axios.get(`${apiUrl}/api/queue/${userId}`);
+        return response.data;  // This now properly returns the response data to the caller
+    } catch (error) {
+        return null;  // Return null or throw an error, depending on how you want to handle errors
+    }
+}
+
+
+async function editUserInQueue(userId, updatedUserData) {
+    const apiUrl = `${process.env.SERVER_URL}/api/queue/${userId}`; // Assuming this is the correct endpoint
+    try {
+        const response = await axios.put(apiUrl, updatedUserData, {
+            headers: {
+                'Content-Type': 'application/json'
+            }
         });
+        return true;
+    } catch (error) {
+        console.error('Error updating user in Queue: ', error.response ? error.response.data : error.message);
+        return false;
+    }
 }
 
 module.exports = {
-    createUserInQueueCorsair,
-    getUsersInQueueCorsair
+    createUserInQueue,
+    getUsersInQueue,
+    getUserById,
+    editUserInQueue
 };

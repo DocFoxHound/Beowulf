@@ -7,9 +7,9 @@ const { OpenAI } = require("openai");
 // Require global functions
 const vectorHandler = require("./vector-handler.js");
 const threadHandler = require("./thread-handler");
-const generalPurpose = require("./general-purpose-functions.js")
 const preloadFromJsons = require("./common/preload-from-jsons.js")
 const downloadUEXData = require("./common/download-UEX-Data.js")
+const queueCheck = require("./queue-functions/queue-check.js")
 const testRoute = require("./api/testRoute.js")
 const queue = require("./api/queue.js")
 
@@ -95,32 +95,10 @@ client.on("ready", async () => {
   //start off with a fresh reload of the online files
   // await vectorHandler.refreshChatLogs(channelIdAndName, openai, client)
   // await vectorHandler.refreshUserList(openai, client)
-  // generalPurpose.downloadUEXData(); //do NOT await this, it takes forever
-
+  // downloadUEXData.downloadUEXData(); //do NOT await this, it takes forever
   jsonData = await preloadFromJsons.preloadFromJsons();
-  const newUser = {
-    id: '156924379786117125',
-    username: 'DocHound2',
-    nickname: 'Doc',
-    corsair_level: 1,
-    raptor_level: 1,
-    raider_level: 1,
-    rank: '692444672395706368'
-  };
-  const testFakeUserQueue = {
-    id: '664023164350627843',
-    username: "DocHound",
-    nickname: "Doc",
-    corsair_level: 1,
-    raptor_level: 2,
-    raider_level: 2,
-    queue_help: true,
-    queue_description: "corsair_2",
-    createdAt: new Date()
-  }
-  dbResponse = await queue.createUserInQueueCorsair(testFakeUserQueue);
-  // dbResponse = await testRoute.createUserTest(newUser); 
-  // console.log(dbResponse);
+  queueCheck.queueCheck();
+
 
   //routine tasks
   setInterval(() => vectorHandler.refreshChatLogs(channelIdAndName, openai, client),

@@ -1,9 +1,9 @@
 const axios = require('axios');
 
-const apiUrl = process.env.SERVER_URL;
-
-async function getUserByIdTest(){
-    axios.get(`${apiUrl}/api/users/664023164350627843`)
+async function getUserByIdTest(userId){
+    const apiUrl = process.env.SERVER_URL;
+    axios.get(`${apiUrl}/api/users/${userId}`)
+    //http://localhost:3000
     .then(response => {
         nickname = response.data.nickname
         console.log('User data:', nickname);
@@ -15,7 +15,7 @@ async function getUserByIdTest(){
 }
 
 async function createUserTest(newUser) {
-    const apiUrl = 'http://localhost:3000/api/users/'; 
+    const apiUrl = process.env.SERVER_URL; 
     try {
         const response = await axios.post(apiUrl, newUser, {
             headers: {
