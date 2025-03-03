@@ -1,9 +1,12 @@
 const piracyAdviceLocation = require("./piracy-advice-location");
 const transactCommodityLocation = require("./transact-commodity-location");
-const queueController = require("../queue-functions/queue-controller");
+const queueReminderCheck = require("../queue-functions/queue-controller").queueReminderCheck;
+const queueController = require("../queue-functions/queue-controller").queueController;
+// const queueCheck = require("../queue-functions/queue-check")
+const botNotify = require("../common/bot-notify")
 
 
-async function executeFunction(run, message, jsonData) {
+async function executeFunction(run, message, jsonData, openai, client) {
   message.channel.sendTyping();  // Send typing indicator once we know we need to process
   //if the function is something that requires getting a list of users...
   const toolCall = run.required_action.submit_tool_outputs.tool_calls[0];
@@ -23,13 +26,17 @@ async function executeFunction(run, message, jsonData) {
     case "where_to_buy":
       return transactCommodityLocation.transact_commodity_location(run, jsonData);
     case "recognize_promotion_ticket_request":
-      return queueController.queueController(run, message);
+      return queueController(run, message, openai, client);
     case "recognize_assessment_ticket_request":
-      return queueController.queueController(run, message);
+      return queueController(run, message, openai, client);
     case "recognize_class_ticket_request":
-      return queueController.queueController(run, message);
-    case "yet_another_function_name": //example
-      return yet_another_function_name(run, jsonData);
+      return queueController(run, message, openai, client);
+    case "notify_queue_entry":
+      return botNotify.notifyNewQueueThreadResponse(run);
+    case "get_users_in_queue":
+      return queueReminderCheck(openai, client, run, message);
+    // case "remove_player_from_queue":
+    //   return botNotify.notifyNewQueueThreadResponse(run);
   }
 }
 
