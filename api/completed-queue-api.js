@@ -1,10 +1,10 @@
 const axios = require('axios');
 
-async function createUserInQueue(newUser) {
+async function createEntry(newEntry) {
     console.log("Inserting new user")
     const apiUrl = `${process.env.SERVER_URL}/api/queue/`; 
     try {
-        const response = await axios.post(apiUrl, newUser, {
+        const response = await axios.post(apiUrl, newEntry, {
             headers: {
                 'Content-Type': 'application/json'
             }
@@ -16,7 +16,7 @@ async function createUserInQueue(newUser) {
     }
 }
 
-async function deleteUserInQueue(user) {
+async function deleteUser(user) {
     console.log("Inserting new user")
     const apiUrl = `${process.env.SERVER_URL}/api/queue/`; 
     try {
@@ -32,7 +32,7 @@ async function deleteUserInQueue(user) {
     }
 }
 
-async function getUsersInQueue() {
+async function getEntries() {
     const apiUrl = `${process.env.SERVER_URL}/api/queue/`;
     try {
         const response = await axios.get(apiUrl);
@@ -54,7 +54,7 @@ async function getUserById(userId){
 }
 
 
-async function editUserInQueue(userId, updatedUserData) {
+async function editUser(userId, updatedUserData) {
     const apiUrl = `${process.env.SERVER_URL}/api/queue/${userId}`; // Assuming this is the correct endpoint
     try {
         const response = await axios.put(apiUrl, updatedUserData, {
@@ -70,9 +70,9 @@ async function editUserInQueue(userId, updatedUserData) {
 }
 
 module.exports = {
-    createUserInQueue,
-    getUsersInQueue,
+    createEntry,
+    getEntries,
     getUserById,
-    editUserInQueue,
-    deleteUserInQueue
+    editUser,
+    deleteUser
 };

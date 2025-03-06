@@ -65,8 +65,13 @@ async function notifyOldQueue(queue, requestedText, openai, client){
     }
 }
 
+async function notifyRemovalFromQueue(){
+    //YOU NEED TO DO THIS
+}
+
 module.exports = {
     notifyNewQueue,
     notifyOldQueue,
+    notifyRemovalFromQueue,
     // notifyNewQueueThreadResponse,
 }

@@ -1,8 +1,8 @@
 const axios = require('axios');
 
-async function createUserInQueue(newUser) {
+async function createUser(newUser) {
     console.log("Inserting new user")
-    const apiUrl = `${process.env.SERVER_URL}/api/queue/`; 
+    const apiUrl = `${process.env.SERVER_URL}/api/users/`; 
     try {
         const response = await axios.post(apiUrl, newUser, {
             headers: {
@@ -16,24 +16,8 @@ async function createUserInQueue(newUser) {
     }
 }
 
-async function deleteUserInQueue(user) {
-    console.log("Inserting new user")
-    const apiUrl = `${process.env.SERVER_URL}/api/queue/`; 
-    try {
-        const response = await axios.delete(apiUrl, user, {
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-        return true;
-    } catch (error) {
-        console.error('Error placing user in Queue: ', error.response ? error.response.data : error.message);
-        return false;
-    }
-}
-
-async function getUsersInQueue() {
-    const apiUrl = `${process.env.SERVER_URL}/api/queue/`;
+async function getUsers() {
+    const apiUrl = `${process.env.SERVER_URL}/api/users/`;
     try {
         const response = await axios.get(apiUrl);
         return response.data;  // This will be the return value of the function
@@ -46,7 +30,7 @@ async function getUsersInQueue() {
 async function getUserById(userId){
     const apiUrl = process.env.SERVER_URL;
     try {
-        const response = await axios.get(`${apiUrl}/api/queue/${userId}`);
+        const response = await axios.get(`${apiUrl}/api/users/${userId}`);
         return response.data;  // This now properly returns the response data to the caller
     } catch (error) {
         return null;  // Return null or throw an error, depending on how you want to handle errors
@@ -54,8 +38,8 @@ async function getUserById(userId){
 }
 
 
-async function editUserInQueue(userId, updatedUserData) {
-    const apiUrl = `${process.env.SERVER_URL}/api/queue/${userId}`; // Assuming this is the correct endpoint
+async function editUser(userId, updatedUserData) {
+    const apiUrl = `${process.env.SERVER_URL}/api/users/${userId}`; // Assuming this is the correct endpoint
     try {
         const response = await axios.put(apiUrl, updatedUserData, {
             headers: {
@@ -70,9 +54,8 @@ async function editUserInQueue(userId, updatedUserData) {
 }
 
 module.exports = {
-    createUserInQueue,
-    getUsersInQueue,
+    createUser,
+    getUsers,
     getUserById,
-    editUserInQueue,
-    deleteUserInQueue
+    editUser
 };
