@@ -32,11 +32,13 @@ const assessmentMap = {
 
 async function queueController(run, message, openai, client, addToQueue){
     console.log("Add user to Queue: " + addToQueue)
+    console.log(run.required_action.submit_tool_outputs.tool_calls[0])
     const author = message.author;
     const toolCall = run.required_action.submit_tool_outputs.tool_calls[0];
     const parsedArgs = JSON.parse(toolCall.function.arguments);
     const requestedClass = parsedArgs.queue_class;
-    const player = parsedArgs.player_id || null; //if we are removing someone from a queue we need their name
+    const player = parsedArgs.player_name_or_id || null; //if we are removing someone from a queue we need their name
+    console.log("Player: " + player)
 
     userData = null;
     if(player){
@@ -47,7 +49,7 @@ async function queueController(run, message, openai, client, addToQueue){
     if(addToQueue === true && userData !== null){
         console.log("Editing User in Queue")
         const addOrRemove = true; //this means to add the user, false means to remove them
-        const editQueueSuccess = await editQueue(requestedClass, userData, message, openai, client, addOrRemove, null, true);
+        const editQueueSuccess = await editQueue(requestedClass, userData, message, openai, client, addToQueue, null, true);
         if(editQueueSuccess === true){
             //notify proper channel of queue addition
             return `${author.username} was added to ${requestedClass}`;
@@ -62,9 +64,8 @@ async function queueController(run, message, openai, client, addToQueue){
             return "There was an error adding to the queue"
         }
     }else if(addToQueue === false){
-        const playerName = parsedArgs.player_id;
         const completionStatus = parsedArgs.status;
-        return removeFromQueue(playerName, requestedClass, completionStatus, message, client, openai);
+        return removeFromQueue(player.toLowerCase(), requestedClass, completionStatus, message, client, openai);
     }
 }
 
@@ -198,133 +199,135 @@ async function editQueue(requestedText, userData, message, openai, client, addOr
     switch (requestedText){
         case "dogfighting":
             userData.raptor_1_solo = addOrRemove;
-            if(addOrRemove){
+            if(addOrRemove === true){
+                console.log(addOrRemove)
                 notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "dogfighting 101":
             userData.raptor_1_solo = addOrRemove;
-            if(addOrRemove){
+            if(addOrRemove === true){
+                console.log(addOrRemove)
                 notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "teamfighting":
             userData.raptor_1_team = addOrRemove;
-            if(addOrRemove){
+            if(addOrRemove === true){
                 notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "teamfighting 101":
             userData.raptor_1_team = addOrRemove;
-            if(addOrRemove){
+            if(addOrRemove === true){
                 notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "solo2":
             userData.raptor_2_solo = addOrRemove;
-            if(addOrRemove){
+            if(addOrRemove === true){
                 notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "team2":
             userData.raptor_2_team = addOrRemove;
-            if(addOrRemove){
+            if(addOrRemove === true){
                 notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;    
         case "solo3":
             userData.raptor_3_solo = addOrRemove;
-            if(addOrRemove){
+            if(addOrRemove === true){
                 notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "team3":
             userData.raptor_3_team = addOrRemove;
-            if(addOrRemove){
+            if(addOrRemove === true){
                 notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "turret":
             userData.corsair_1_turret = addOrRemove;
-            if(addOrRemove){
+            if(addOrRemove === true){
                 notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "torpedo":
             userData.corsair_1_torpedo = addOrRemove;
-            if(addOrRemove){
+            if(addOrRemove === true){
                 notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "ship commander":
             userData.corsair_2_ship_commander = addOrRemove;
-            if(addOrRemove){
+            if(addOrRemove === true){
                 notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "ship":
             userData.corsair_2_ship_commander = addOrRemove;
-            if(addOrRemove){
+            if(addOrRemove === true){
                 notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "wing commander":
             userData.corsair_2_wing_commander = addOrRemove;
-            if(addOrRemove){
+            if(addOrRemove === true){
                 notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "wing":
             userData.corsair_2_wing_commander = addOrRemove;
-            if(addOrRemove){
+            if(addOrRemove === true){
                 notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "fleet commander":
             userData.corsair_3_fleet_commander = addOrRemove;
-            if(addOrRemove){
+            if(addOrRemove === true){
                 notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "fleet":
             userData.corsair_3_fleet_commander = addOrRemove;
-            if(addOrRemove){
+            if(addOrRemove === true){
                 notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "swabbie":
             userData.raider_1_swabbie = addOrRemove;
-            if(addOrRemove){
+            if(addOrRemove === true){
                 notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "line master":
             userData.raider_1_linemaster = addOrRemove;
-            if(addOrRemove){
+            if(addOrRemove === true){
                 notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "boarder":
             userData.raider_1_boarder = addOrRemove;
-            if(addOrRemove){
+            if(addOrRemove === true){
                 notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "powder monkey":
             userData.raider_2_powdermonkey = addOrRemove;
-            if(addOrRemove){
+            if(addOrRemove === true){
                 notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "mate":
             userData.raider_2_mate = addOrRemove;
-            if(addOrRemove){
+            if(addOrRemove === true){
                 notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "sail master":
             userData.raider_3_sailmaster = addOrRemove;
-            if(addOrRemove){
+            if(addOrRemove === true){
                 notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
@@ -335,7 +338,21 @@ async function editQueue(requestedText, userData, message, openai, client, addOr
             break;
     }
     if(forQueue === true){ //do this for normal queue editing situations
-        return await queueApi.editUserInQueue(userData.id, userData);
+        // List of fields to check
+        const fieldsToCheck = [
+            'raptor_1_solo', 'raptor_1_team', 'raptor_2_solo', 'raptor_2_team',
+            'raptor_3_solo', 'raptor_3_team', 'corsair_1_torpedo', 'corsair_1_turret',
+            'corsair_2_ship_commander', 'corsair_2_wing_commander', 'corsair_3_fleet_commander'
+        ];
+
+        // Check if all specified fields are false
+        const allFieldsAreFalse = fieldsToCheck.every(field => userData[field] === false);
+
+        if (allFieldsAreFalse) {
+            return await queueApi.deleteUserInQueue(userData.id);
+        } else {
+            return await queueApi.editUserInQueue(userData.id, userData);
+        }
     }else if (forQueue === false){ //do this if this is for editing the userList to mark a class as complete
         return await userlistApi.editUser(userData.id, userData);
     }
@@ -437,8 +454,8 @@ async function addQueue(requestedText, message){
     return await queueApi.createUserInQueue(newUser);
 }
 
-async function removeFromQueue(playerName, requestedClass, completionStatus, message, client, openai){
-    console.log(`Remove ${playerName} from ${requestedClass}`)
+async function removeFromQueue(player, requestedClass, completionStatus, message, client, openai){
+    console.log(`Remove ${player} from ${requestedClass}`)
     //check rank of person doing action
     const userId = message.author.id;
     const guild = await client.guilds.fetch(message.guildId); // Fetch the guild
@@ -453,29 +470,27 @@ async function removeFromQueue(playerName, requestedClass, completionStatus, mes
         //get the one user
         userData;
         for (const element of users) {
-            if(element.id === playerName || element.username === playerName || element.nickname === playerName){
+            if (element.id === player || element.username?.toLowerCase() === player || element.nickname?.toLowerCase() === player) {
                 userData = element;
             }
         }
 
         //if we get a match, we perform the required action
         if(userData && requestedClass !== "all"){
+            console.log("Remove from specific queue: ", requestedClass)
             //remove him from that specific queue
-            const addOrRemove = false; //false means remove the class
             const completedTask = (completionStatus === "completed");
 
-            const editQueueSuccess = await editQueue(requestedClass, userData, message, openai, client, addOrRemove, completedTask, true);
+            const editQueueSuccess = await editQueue(requestedClass, userData, message, openai, client, false, completedTask, true);
             //if successful, mark it in the player list
             if(editQueueSuccess && completedTask === true){
-                const addForComplete = true;
                 userDataForUserList = await userlist.checkUserListForUser(userData); //get the user object from the userlist so we can mark something as complete
-                console.log("userDataForUserList")
-                console.log(userDataForUserList)
-                if(!userDataForUserList){//if the user doesn't exist for some reason, let's make him
-                    await userlist.createNewUser(userData);
+                if(userDataForUserList === null){//if the user doesn't exist for some reason, let's make him
+                    console.log("User isn't on UserList")
+                    await userlist.createNewUser(userData, client, message.guildId);
                     userDataForUserList = await userlist.checkUserListForUser(userData);
                 }
-                const editQueueSuccess = editQueue(requestedClass, userDataForUserList, message, openai, client, addForComplete, completedTask, false);
+                const editQueueSuccess = editQueue(requestedClass, userDataForUserList, message, openai, client, false, completedTask, false);
                 await logHandler(userData, message, requestedClass);
                 if(editQueueSuccess && logHandler){
                     return `${userData.nickname || userData.username} was marked as complete for ${requestedClass} and ${message.author.username} completed the ticket.`
@@ -492,15 +507,21 @@ async function removeFromQueue(playerName, requestedClass, completionStatus, mes
             //check if the player has no more queue's and then remove if they don't
             
         }else if(userData && requestedClass === "all"){
-            //remove the user from the list
+            console.log(`Remove ${userData.id} from all queues.`)
+            const deleteSuccess = await queueApi.deleteUserInQueue(userData.id);
+            if(deleteSuccess === true){
+                return true;
+            }else{
+                return false;
+            }
         }else{
+            console.log("Error occurred.");
             return "The user could not be found in the queue. Please us the Username, Nickname, or UserID to search."
         }
         //return a response
     }else{
         return "The user who requested this action does not have sufficient rank to do so."
     }
-
 }
 
 module.exports = {

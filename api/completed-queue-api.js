@@ -1,8 +1,8 @@
 const axios = require('axios');
 
 async function createEntry(newEntry) {
-    console.log("Inserting new user")
-    const apiUrl = `${process.env.SERVER_URL}/api/queue/`; 
+    console.log("Inserting new Completed Entry")
+    const apiUrl = `${process.env.SERVER_URL}/api/completedEntry/`; 
     try {
         const response = await axios.post(apiUrl, newEntry, {
             headers: {
@@ -11,14 +11,14 @@ async function createEntry(newEntry) {
         });
         return true;
     } catch (error) {
-        console.error('Error placing user in Queue: ', error.response ? error.response.data : error.message);
+        console.error('Error placing user in CompletedQueue: ', error.response ? error.response.data : error.message);
         return false;
     }
 }
 
-async function deleteUser(user) {
-    console.log("Inserting new user")
-    const apiUrl = `${process.env.SERVER_URL}/api/queue/`; 
+async function deleteEntry(user) {
+    console.log("Deleting user from CompletedQueue")
+    const apiUrl = `${process.env.SERVER_URL}/api/completedEntry/`; 
     try {
         const response = await axios.delete(apiUrl, user, {
             headers: {
@@ -27,13 +27,13 @@ async function deleteUser(user) {
         });
         return true;
     } catch (error) {
-        console.error('Error placing user in Queue: ', error.response ? error.response.data : error.message);
+        console.error('Error placing user in CompletedQueue: ', error.response ? error.response.data : error.message);
         return false;
     }
 }
 
 async function getEntries() {
-    const apiUrl = `${process.env.SERVER_URL}/api/queue/`;
+    const apiUrl = `${process.env.SERVER_URL}/api/completedEntry/`;
     try {
         const response = await axios.get(apiUrl);
         return response.data;  // This will be the return value of the function
@@ -43,10 +43,10 @@ async function getEntries() {
     }
 }
 
-async function getUserById(userId){
+async function getEntryById(userId){
     const apiUrl = process.env.SERVER_URL;
     try {
-        const response = await axios.get(`${apiUrl}/api/queue/${userId}`);
+        const response = await axios.get(`${apiUrl}/api/completedEntry/${userId}`);
         return response.data;  // This now properly returns the response data to the caller
     } catch (error) {
         return null;  // Return null or throw an error, depending on how you want to handle errors
@@ -54,8 +54,8 @@ async function getUserById(userId){
 }
 
 
-async function editUser(userId, updatedUserData) {
-    const apiUrl = `${process.env.SERVER_URL}/api/queue/${userId}`; // Assuming this is the correct endpoint
+async function editEntry(userId, updatedUserData) {
+    const apiUrl = `${process.env.SERVER_URL}/api/completedEntry/${userId}`; // Assuming this is the correct endpoint
     try {
         const response = await axios.put(apiUrl, updatedUserData, {
             headers: {
@@ -64,7 +64,7 @@ async function editUser(userId, updatedUserData) {
         });
         return true;
     } catch (error) {
-        console.error('Error updating user in Queue: ', error.response ? error.response.data : error.message);
+        console.error('Error updating user in CompletedQueue: ', error.response ? error.response.data : error.message);
         return false;
     }
 }
@@ -72,7 +72,7 @@ async function editUser(userId, updatedUserData) {
 module.exports = {
     createEntry,
     getEntries,
-    getUserById,
-    editUser,
-    deleteUser
+    getEntryById,
+    editEntry,
+    deleteEntry
 };

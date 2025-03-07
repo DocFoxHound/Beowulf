@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 async function createUser(newUser) {
-    console.log("Inserting new user")
+    console.log("Inserting new user into UserList")
     const apiUrl = `${process.env.SERVER_URL}/api/users/`; 
     try {
         const response = await axios.post(apiUrl, newUser, {
@@ -11,7 +11,7 @@ async function createUser(newUser) {
         });
         return true;
     } catch (error) {
-        console.error('Error placing user in Queue: ', error.response ? error.response.data : error.message);
+        console.error('Error placing user in UserList: ', error.response ? error.response.data : error.message);
         return false;
     }
 }
@@ -22,7 +22,7 @@ async function getUsers() {
         const response = await axios.get(apiUrl);
         return response.data;  // This will be the return value of the function
     } catch (error) {
-        console.error('Error fetching users in Queue:', error.response ? error.response.data : error.message);
+        console.error('Error fetching users in UserList:', error.response ? error.response.data : error.message);
         return null;  // Return null if there's an error
     }
 }
@@ -48,7 +48,7 @@ async function editUser(userId, updatedUserData) {
         });
         return true;
     } catch (error) {
-        console.error('Error updating user in Queue: ', error.response ? error.response.data : error.message);
+        console.error('Error updating user in UserList: ', error.response ? error.response.data : error.message);
         return false;
     }
 }

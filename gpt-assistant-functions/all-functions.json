@@ -1,0 +1,326 @@
+{
+    "name": "piracy_advice_location",
+    "description": "Provides advice on where to pirate content",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "required": [
+        "system"
+      ],
+      "properties": {
+        "system": {
+          "type": "string",
+          "description": "The system they want to pirate in."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+
+  {
+    "name": "sell_commodity",
+    "description": "Determines where the best place to buy or sell a commodity is in Star Citizen",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "required": [
+        "commodity",
+        "system",
+        "buy_or_sell"
+      ],
+      "properties": {
+        "commodity": {
+          "type": "string",
+          "description": "Name of the commodity to transact"
+        },
+        "system": {
+          "type": "string",
+          "description": "Name of the star system they are looking to do transactions in"
+        },
+        "buy_or_sell": {
+          "type": "string",
+          "description": "Buy or Sell variable"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+
+  {
+    "name": "sell_item",
+    "description": "Determines where the best place to buy or sell a commodity is in Star Citizen",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "required": [
+        "commodity",
+        "system",
+        "buy_or_sell"
+      ],
+      "properties": {
+        "commodity": {
+          "type": "string",
+          "description": "Name of the commodity to transact"
+        },
+        "system": {
+          "type": "string",
+          "description": "Name of the star system they are looking to do transactions in"
+        },
+        "buy_or_sell": {
+          "type": "string",
+          "description": "Buy or Sell variable"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+
+  {
+    "name": "where_to_sell",
+    "description": "Determines where the best place to buy or sell a commodity is in Star Citizen",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "required": [
+        "commodity",
+        "system",
+        "buy_or_sell"
+      ],
+      "properties": {
+        "commodity": {
+          "type": "string",
+          "description": "Name of the commodity to transact"
+        },
+        "system": {
+          "type": "string",
+          "description": "Name of the star system they are looking to do transactions in"
+        },
+        "buy_or_sell": {
+          "type": "string",
+          "description": "Buy or Sell variable"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+
+  {
+    "name": "buy_commodity",
+    "description": "Determines where the best place to buy or sell a commodity is in Star Citizen",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "required": [
+        "commodity",
+        "system",
+        "buy_or_sell"
+      ],
+      "properties": {
+        "commodity": {
+          "type": "string",
+          "description": "Name of the commodity to transact"
+        },
+        "system": {
+          "type": "string",
+          "description": "Name of the star system they are looking to do transactions in"
+        },
+        "buy_or_sell": {
+          "type": "string",
+          "description": "Buy or Sell variable"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+
+  {
+    "name": "buy_item",
+    "description": "Determines where the best place to buy or sell a commodity is in Star Citizen",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "required": [
+        "commodity",
+        "system",
+        "buy_or_sell"
+      ],
+      "properties": {
+        "commodity": {
+          "type": "string",
+          "description": "Name of the commodity to transact"
+        },
+        "system": {
+          "type": "string",
+          "description": "Name of the star system they are looking to do transactions in"
+        },
+        "buy_or_sell": {
+          "type": "string",
+          "description": "Buy or Sell variable"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+
+  {
+    "name": "where_to_buy",
+    "description": "Determines where the best place to buy or sell a commodity is in Star Citizen",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "required": [
+        "commodity",
+        "system",
+        "buy_or_sell"
+      ],
+      "properties": {
+        "commodity": {
+          "type": "string",
+          "description": "Name of the commodity to transact"
+        },
+        "system": {
+          "type": "string",
+          "description": "Name of the star system they are looking to do transactions in"
+        },
+        "buy_or_sell": {
+          "type": "string",
+          "description": "Buy or Sell variable"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+
+  {
+    "name": "get_users_in_queue",
+    "description": "Get the users in a specified queue, either NEW or ALL entries",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "required": [
+        "queue",
+        "entry_type"
+      ],
+      "properties": {
+        "queue": {
+          "type": "string",
+          "description": "The name of the queue from which to retrieve users.",
+          "enum": [
+            "RAPTOR",
+            "RAIDER",
+            "CORSAIR"
+          ]
+        },
+        "entry_type": {
+          "type": "string",
+          "description": "Indicates whether to retrieve NEW or ALL entries.",
+          "enum": [
+            "NEW",
+            "ALL"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+
+  {
+    "name": "remove_player_from_queue",
+    "description": "Remove a player from a queue. This can either be because the user completed the class they were queued for or they did not complete it.",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "required": [
+        "player_name_or_id",
+        "queue_class",
+        "status"
+      ],
+      "properties": {
+        "player_name_or_id": {
+          "type": "string",
+          "description": "The player Username, Nickname, or ID"
+        },
+        "queue_class": {
+          "type": "string",
+          "description": "Name of the queue that the player was listed in.",
+          "enum": [
+            "dogfighting",
+            "dogfighting 101",
+            "teamfighting",
+            "teamfighting 101",
+            "solo2",
+            "team2",
+            "solo3",
+            "team3",
+            "turret",
+            "torpedo",
+            "ship commander",
+            "ship",
+            "wing commander",
+            "wing",
+            "fleet commander",
+            "fleet",
+            "swabbie",
+            "line master",
+            "boarder",
+            "powder monkey",
+            "mate",
+            "sail master",
+            "all"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "description": "Status indicating whether the player completed the class or not, defaults to 'not_completed' unless otherwise specified.",
+          "enum": [
+            "not_completed",
+            "completed"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+
+  {
+    "name": "add_player_to_queue",
+    "description": "Recognizes when a player is requesting to open a ticket for a class or an assessment",
+    "strict": true,
+    "parameters": {
+      "type": "object",
+      "required": [
+        "queue_class"
+      ],
+      "properties": {
+        "queue_class": {
+          "type": "string",
+          "description": "The name of the requested class or assessment.",
+          "enum": [
+            "dogfighting",
+            "dogfighting 101",
+            "teamfighting",
+            "teamfighting 101",
+            "solo2",
+            "team2",
+            "solo3",
+            "team3",
+            "turret",
+            "torpedo",
+            "ship commander",
+            "ship",
+            "wing commander",
+            "wing",
+            "fleet commander",
+            "fleet",
+            "swabbie",
+            "line master",
+            "boarder",
+            "powder monkey",
+            "mate",
+            "sail master"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  }

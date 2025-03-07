@@ -9,7 +9,7 @@ function hashString(inputString) {
 
 async function logHandler(userData, message, requestedClass){
     newEntry = {
-        ticket_id: userData.id + new Date().now,
+        ticket_id: Date.now(),
         user_id: userData.id,
         user_username: userData.username,
         user_nickname: userData.nickname,
