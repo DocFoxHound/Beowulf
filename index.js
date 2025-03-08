@@ -14,6 +14,7 @@ const runThread = require("./threads/run-thread.js")
 const findExistingThread = require("./threads/find-existing-thread.js")
 const formatMessage = require("./threads/format-message.js")
 const addMessageToThread = require("./threads/add-message-to-thread.js")
+const deployCommands = require("./commands/deploy-commands.js")
 // const checkQueue = require("./queue-functions/queue-check.js")
 
 // Initialize dotenv config file
@@ -100,6 +101,7 @@ client.on("ready", async () => {
   // await vectorHandler.refreshUserList(openai, client)
   // downloadUEXData.downloadUEXData(); //do NOT await this, it takes forever
   jsonData = await preloadFromJsons.preloadFromJsons();
+  await deployCommands.deploy(client);
 
   //routine tasks
   setInterval(() => vectorHandler.refreshChatLogs(channelIdAndName, openai, client),
@@ -198,6 +200,16 @@ client.on("messageCreate", async (message) => {
         }    
       }
     }
+  }
+});
+
+client.on('interactionCreate', async interaction => {
+  if (!interaction.isCommand()) return;
+
+  const { commandName } = interaction;
+
+  if (commandName === 'ping') {
+    await interaction.reply('Pong!');
   }
 });
 

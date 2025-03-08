@@ -1,0 +1,7 @@
+[
+    {
+      "name": "ping",
+      "description": "Replies with Pong!",
+      "type": 1
+    }
+  ]
