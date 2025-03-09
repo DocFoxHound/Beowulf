@@ -48,9 +48,9 @@ async function createNewUser(userData, client, guildId){
         newUser.id = userData.id;
         newUser.username = userData.username;
         newUser.nickname = userData.nickname || null;
-        newUser.corsair_level = getCorsairRank(memberRoles) || null;
-        newUser.raptor_level = getRaptorRank(memberRoles) || null;
-        newUser.raider_level = getRaiderRank(memberRoles) || null;
+        newUser.corsair_level = getCorsairRank(memberRoles, false) || 0;
+        newUser.raptor_level = getRaptorRank(memberRoles, false) || 0;
+        newUser.raider_level = getRaiderRank(memberRoles, false) || 0;
         newUser.raptor_1_solo = userData.raptor_1_solo;
         newUser.raptor_1_team = userData.raptor_1_team;
         newUser.raptor_2_solo = userData.raptor_2_solo;
@@ -136,7 +136,7 @@ async function getUserRank(memberRoles) {
 }
 
 async function getRaptorRank(memberRoles) {
-    const discordPrestigeRanks = prestigeRoles.getPrestiges();
+    const discordPrestigeRanks = await prestigeRoles.getPrestiges();
     // Create a map of role names to roles for quick lookup
     const roleMap = new Map(discordPrestigeRanks.map(role => [role.name, role]));
     // Define the priority of roles from highest to lowest
@@ -152,7 +152,7 @@ async function getRaptorRank(memberRoles) {
 }
 
 async function getCorsairRank(memberRoles) {
-    const discordPrestigeRanks = prestigeRoles.getPrestiges();
+    const discordPrestigeRanks = await prestigeRoles.getPrestiges();
     // Create a map of role names to roles for quick lookup
     const roleMap = new Map(discordPrestigeRanks.map(role => [role.name, role]));
     // Define the priority of roles from highest to lowest
@@ -165,10 +165,11 @@ async function getCorsairRank(memberRoles) {
         }
     }
     return 0;
+    
 }
 
 async function getRaiderRank(memberRoles) {
-    const discordPrestigeRanks = prestigeRoles.getPrestiges();
+    const discordPrestigeRanks = await prestigeRoles.getPrestiges();
     // Create a map of role names to roles for quick lookup
     const roleMap = new Map(discordPrestigeRanks.map(role => [role.name, role]));
     // Define the priority of roles from highest to lowest
@@ -198,4 +199,7 @@ async function checkUserListForUser(author){
 module.exports = {
     checkUserListForUser,
     createNewUser,
+    getRaptorRank,
+    getCorsairRank,
+    getRaiderRank,
 }

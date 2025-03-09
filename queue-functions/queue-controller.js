@@ -30,15 +30,25 @@ const assessmentMap = {
     'raider_3_sailmaster': `Sailmaster Assessment`
 };
 
-async function queueController(run, message, openai, client, addToQueue){
-    console.log("Add user to Queue: " + addToQueue)
-    console.log(run.required_action.submit_tool_outputs.tool_calls[0])
-    const author = message.author;
-    const toolCall = run.required_action.submit_tool_outputs.tool_calls[0];
-    const parsedArgs = JSON.parse(toolCall.function.arguments);
-    const requestedClass = parsedArgs.queue_class;
-    const player = parsedArgs.player_name_or_id || null; //if we are removing someone from a queue we need their name
-    console.log("Player: " + player)
+async function queueController(runOrClassName, messageOrUser, openai, client, addToQueue, slashCommand){
+    console.log("QueueController")
+    let author = null;
+    let toolCall = null;
+    let parsedArgs = null;
+    let requestedClass = null;
+    let player = null;
+
+    if(slashCommand === true){ //if this is a slash command
+        author = messageOrUser; //it is a user in this case
+        requestedClass = runOrClassName; //it is a class name in this case
+        player = author.nickname || author.username; //if we are removing someone from a queue we need their name
+    }else{ //if this is an interaction with the bot and the bot has proc'd a function
+        author = messageOrUser.author;
+        toolCall = runOrClassName.required_action.submit_tool_outputs.tool_calls[0];
+        parsedArgs = JSON.parse(toolCall.function.arguments);
+        requestedClass = parsedArgs.queue_class;
+        player = parsedArgs.player_name_or_id || null; //if we are removing someone from a queue we need their name
+    }
 
     userData = null;
     if(player){
@@ -49,7 +59,7 @@ async function queueController(run, message, openai, client, addToQueue){
     if(addToQueue === true && userData !== null){
         console.log("Editing User in Queue")
         const addOrRemove = true; //this means to add the user, false means to remove them
-        const editQueueSuccess = await editQueue(requestedClass, userData, message, openai, client, addToQueue, null, true);
+        const editQueueSuccess = await editQueue(requestedClass, userData, openai, client, addToQueue, true);
         if(editQueueSuccess === true){
             //notify proper channel of queue addition
             return `${author.username} was added to ${requestedClass}`;
@@ -57,7 +67,7 @@ async function queueController(run, message, openai, client, addToQueue){
             return "There was an error adding to the queue"
         }
     }else if (addToQueue === true && userData === null){
-        const addQueueSuccess = await addQueue(requestedClass, message);
+        const addQueueSuccess = await addQueue(requestedClass, messageOrUser);
         if(addQueueSuccess === true){
             return `${author.username} was added to ${requestedClass}`;
         }else{
@@ -65,7 +75,7 @@ async function queueController(run, message, openai, client, addToQueue){
         }
     }else if(addToQueue === false){
         const completionStatus = parsedArgs.status;
-        return removeFromQueue(player.toLowerCase(), requestedClass, completionStatus, message, client, openai);
+        return removeFromQueue(player.toLowerCase(), requestedClass, completionStatus, messageOrUser, client, openai);
     }
 }
 
@@ -105,7 +115,7 @@ async function queueReminderCheck(openai, client, run, message){
             requestedText = "queue-reminder"
             if(run === null){ //only reset their times if this is a scheduled queue check
                 const addOrRemove = true; //true means to add the user, false means to remove them
-                const editQueueSuccess = await editQueue(requestedText, element, element, openai, client, addOrRemove, null, true); //this resets the timer so that the bot isnt't just blasting the help channels about the same person over and over again
+                const editQueueSuccess = await editQueue(requestedText, element, openai, client, addOrRemove, true); //this resets the timer so that the bot isnt't just blasting the help channels about the same person over and over again
                 if(editQueueSuccess === true){     
                     console.log(`${element.username}'s timestamp updated after reminder published.`)
                 }else{
@@ -195,139 +205,137 @@ async function queueReminderCheck(openai, client, run, message){
     
 }
 
-async function editQueue(requestedText, userData, message, openai, client, addOrRemove, completedTask, forQueue){
+async function editQueue(requestedText, userData, openai, client, addOrRemove, forQueue){
     switch (requestedText){
         case "dogfighting":
             userData.raptor_1_solo = addOrRemove;
-            if(addOrRemove === true){
-                console.log(addOrRemove)
+            if(addOrRemove === true && openai && client){
                 notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "dogfighting 101":
             userData.raptor_1_solo = addOrRemove;
-            if(addOrRemove === true){
-                console.log(addOrRemove)
+            if(addOrRemove === true && openai && client){
                 notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "teamfighting":
             userData.raptor_1_team = addOrRemove;
-            if(addOrRemove === true){
+            if(addOrRemove === true && openai && client){
                 notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "teamfighting 101":
             userData.raptor_1_team = addOrRemove;
-            if(addOrRemove === true){
+            if(addOrRemove === true && openai && client){
                 notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "solo2":
             userData.raptor_2_solo = addOrRemove;
-            if(addOrRemove === true){
+            if(addOrRemove === true && openai && client){
                 notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "team2":
             userData.raptor_2_team = addOrRemove;
-            if(addOrRemove === true){
+            if(addOrRemove === true && openai && client){
                 notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;    
         case "solo3":
             userData.raptor_3_solo = addOrRemove;
-            if(addOrRemove === true){
+            if(addOrRemove === true && openai && client){
                 notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "team3":
             userData.raptor_3_team = addOrRemove;
-            if(addOrRemove === true){
+            if(addOrRemove === true && openai && client){
                 notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "turret":
             userData.corsair_1_turret = addOrRemove;
-            if(addOrRemove === true){
+            if(addOrRemove === true && openai && client){
                 notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "torpedo":
             userData.corsair_1_torpedo = addOrRemove;
-            if(addOrRemove === true){
+            if(addOrRemove === true && openai && client){
                 notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "ship commander":
             userData.corsair_2_ship_commander = addOrRemove;
-            if(addOrRemove === true){
+            if(addOrRemove === true && openai && client){
                 notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "ship":
             userData.corsair_2_ship_commander = addOrRemove;
-            if(addOrRemove === true){
+            if(addOrRemove === true && openai && client){
                 notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "wing commander":
             userData.corsair_2_wing_commander = addOrRemove;
-            if(addOrRemove === true){
+            if(addOrRemove === true && openai && client){
                 notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "wing":
             userData.corsair_2_wing_commander = addOrRemove;
-            if(addOrRemove === true){
+            if(addOrRemove === true && openai && client){
                 notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "fleet commander":
             userData.corsair_3_fleet_commander = addOrRemove;
-            if(addOrRemove === true){
+            if(addOrRemove === true && openai && client){
                 notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "fleet":
             userData.corsair_3_fleet_commander = addOrRemove;
-            if(addOrRemove === true){
+            if(addOrRemove === true && openai && client){
                 notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "swabbie":
             userData.raider_1_swabbie = addOrRemove;
-            if(addOrRemove === true){
+            if(addOrRemove === true && openai && client){
                 notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "line master":
             userData.raider_1_linemaster = addOrRemove;
-            if(addOrRemove === true){
+            if(addOrRemove === true && openai && client){
                 notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "boarder":
             userData.raider_1_boarder = addOrRemove;
-            if(addOrRemove === true){
+            if(addOrRemove === true && openai && client){
                 notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "powder monkey":
             userData.raider_2_powdermonkey = addOrRemove;
-            if(addOrRemove === true){
+            if(addOrRemove === true && openai && client){
                 notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "mate":
             userData.raider_2_mate = addOrRemove;
-            if(addOrRemove === true){
+            if(addOrRemove === true && openai && client){
                 notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "sail master":
             userData.raider_3_sailmaster = addOrRemove;
-            if(addOrRemove === true){
+            if(addOrRemove === true && openai && client){
                 notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
@@ -481,7 +489,7 @@ async function removeFromQueue(player, requestedClass, completionStatus, message
             //remove him from that specific queue
             const completedTask = (completionStatus === "completed");
 
-            const editQueueSuccess = await editQueue(requestedClass, userData, message, openai, client, false, completedTask, true);
+            const editQueueSuccess = await editQueue(requestedClass, userData, openai, client, false, true);
             //if successful, mark it in the player list
             if(editQueueSuccess && completedTask === true){
                 userDataForUserList = await userlist.checkUserListForUser(userData); //get the user object from the userlist so we can mark something as complete
@@ -490,7 +498,7 @@ async function removeFromQueue(player, requestedClass, completionStatus, message
                     await userlist.createNewUser(userData, client, message.guildId);
                     userDataForUserList = await userlist.checkUserListForUser(userData);
                 }
-                const editQueueSuccess = editQueue(requestedClass, userDataForUserList, message, openai, client, false, completedTask, false);
+                const editQueueSuccess = editQueue(requestedClass, userDataForUserList, openai, client, false, false);
                 await logHandler(userData, message, requestedClass);
                 if(editQueueSuccess && logHandler){
                     return `${userData.nickname || userData.username} was marked as complete for ${requestedClass} and ${message.author.username} completed the ticket.`
@@ -527,5 +535,6 @@ async function removeFromQueue(player, requestedClass, completionStatus, message
 module.exports = {
     queueController,
     queueReminderCheck,
+    checkQueueForUser
     // getQueue,
 };
