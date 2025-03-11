@@ -3,7 +3,7 @@ const dotenv = require("dotenv");
 const { OpenAI } = require("openai");
 const fs = require('node:fs');
 const path = require('node:path');
-const vectorHandler = require("./vector-handler.js");
+const vectorHandler = require("./vector-handling/vector-handler.js");
 // const threadHandler = require("./thread-handler");
 const preloadFromJsons = require("./common/preload-from-jsons.js")
 const downloadUEXData = require("./common/download-UEX-Data.js")
@@ -237,7 +237,7 @@ client.on(Events.InteractionCreate, async interaction => {
 	}
 
 	try {
-		await command.execute(interaction);
+		await command.execute(interaction, client, openai);
 	} catch (error) {
 		console.error(error);
 		if (interaction.replied || interaction.deferred) {

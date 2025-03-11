@@ -4,16 +4,21 @@ const getRaptorRank = require("../userlist-functions/userlist-controller").getRa
 const getCorsairRank = require("../userlist-functions/userlist-controller").getCorsairRank;
 const getRaiderRank = require("../userlist-functions/userlist-controller").getRaiderRank;
 
-async function getAvailableClasses(user, guild) {
+async function getAvailableClasses(user, guild, whichClasses) {
+    console.log("Get Available Classes: ", whichClasses)
     //lookup the classes
-    // const allClasses = ['Math', 'Science', 'History', 'Art'];
-    const allClasses = await getUserClasses(user, guild);
+    let allClasses = [];
+    if(whichClasses === "available"){
+        allClasses = await getAvailableUserClasses(user, guild);
+    }else if(whichClasses === "current"){
+        allClasses = await getCurrentUserClasses(user);
+    }
     // Simulate a lookup for classes the user has already taken:
     // const takenClasses = ['Math']; // This would be dynamic per user
     return allClasses.filter(c => allClasses.includes(c));
 }
 
-async function getUserClasses(user, guild){
+async function getAvailableUserClasses(user, guild){
     const queueData = await checkQueueForUser(user.id)
     const userData = await checkUserListForUser(user)
     const member = await guild.members.fetch(user.id);
@@ -32,18 +37,18 @@ async function getUserClasses(user, guild){
     }
     if(userRaptorLevel === 1){ //all classes a RAPTOR 1 can take
         if(userData.raptor_2_solo === false && queueData.raptor_2_solo === false){
-            classList.push("Dogfighting 101")
+            classList.push("RAPTOR II Solo Assessment")
         }
         if(userData.raptor_2_team === false && queueData.raptor_2_team === false){
-            classList.push("Teamfighting 101")
+            classList.push("RAPTOR II Team Assessment")
         }
     }
     if(userRaptorLevel === 2){ //all classes a RAPTOR 2 can take
         if(userData.raptor_3_solo === false && queueData.raptor_3_solo === false){
-            classList.push("Dogfighting 101")
+            classList.push("RAPTOR III Solo Assessment")
         }
         if(userData.raptor_3_team === false && queueData.raptor_3_team === false){
-            classList.push("Teamfighting 101")
+            classList.push("RAPTOR III Team Assessment")
         }
     }
     if(userCorsairLevel === 0){ //all classes a CORSAIR 0 can take
@@ -92,6 +97,68 @@ async function getUserClasses(user, guild){
         }
     }
     return classList;
+}
+
+async function getCurrentUserClasses(user){
+    const queueData = await checkQueueForUser(user.id)
+    if(queueData){
+        let classList = [];
+        if(queueData.raptor_1_solo === true){
+            classList.push("Dogfighting 101")
+        }
+        if(queueData.raptor_1_team === true){
+            classList.push("Teamfighting 101")
+        }
+        if(queueData.raptor_2_solo === true){
+            classList.push("RAPTOR II Solo Assessment")
+        }
+        if(queueData.raptor_2_team === true){
+            classList.push("RAPTOR II Team Assessment")
+        }
+        if(queueData.raptor_3_solo === true){
+            classList.push("RAPTOR III Solo Assessment")
+        }
+        if(queueData.raptor_3_team === true){
+            classList.push("RAPTOR III Team Assessment")
+        }
+        if(queueData.corsair_1_turret === true){
+            classList.push("Turret Assessment")
+        }
+        if(queueData.corsair_1_torpedo === true){
+            classList.push("Torpedo Assessment")
+        }
+        if(queueData.corsair_2_ship_commander === true){
+            classList.push("Ship Commander Assessment")
+        }
+        if(queueData.corsair_2_wing_commander === true){
+            classList.push("Wing Commander Assessment")
+        }
+        if(queueData.corsair_3_fleet_commander === true){
+            classList.push("Fleet Commander Assessment")
+        }
+        if(queueData.raider_1_swabbie === true){
+            classList.push("Swabbie Assessment")
+        }
+        if(queueData.raider_1_linemaster === true){
+            classList.push("Line Master Assessment")
+        }
+        if(queueData.raider_1_boarder === true){
+            classList.push("Boarding Assessment")
+        }
+        if(queueData.raider_2_powdermonkey === true){
+            classList.push("Powder Monkey Assessment")
+        }
+        if(queueData.raider_2_mate === true){
+            classList.push("Mate Assessment")
+        }
+        if(queueData.raider_3_sailmaster === true){
+            classList.push("Sail Master Assessment")
+        }
+        return classList;
+    }else{
+        return classList.push("Error retrieving classes");
+    }
+    
 }
 
 // raptor_1_solo: null,

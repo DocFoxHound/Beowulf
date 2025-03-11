@@ -206,136 +206,227 @@ async function queueReminderCheck(openai, client, run, message){
 }
 
 async function editQueue(requestedText, userData, openai, client, addOrRemove, forQueue){
-    switch (requestedText){
+    console.log(requestedText)
+    switch (requestedText.toLowerCase()){
         case "dogfighting":
             userData.raptor_1_solo = addOrRemove;
-            if(addOrRemove === true && openai && client){
+            if(addOrRemove === true){
                 notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "dogfighting 101":
             userData.raptor_1_solo = addOrRemove;
-            if(addOrRemove === true && openai && client){
+            if(addOrRemove === true){
                 notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "teamfighting":
             userData.raptor_1_team = addOrRemove;
-            if(addOrRemove === true && openai && client){
+            if(addOrRemove === true){
                 notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "teamfighting 101":
             userData.raptor_1_team = addOrRemove;
-            if(addOrRemove === true && openai && client){
+            if(addOrRemove === true){
                 notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "solo2":
             userData.raptor_2_solo = addOrRemove;
-            if(addOrRemove === true && openai && client){
+            if(addOrRemove === true){
+                notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;
+        case "raptor ii solo assessment":
+            userData.raptor_2_solo = addOrRemove;
+            if(addOrRemove === true){
                 notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "team2":
             userData.raptor_2_team = addOrRemove;
-            if(addOrRemove === true && openai && client){
+            if(addOrRemove === true){
                 notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;    
+        case "raptor ii team assessment":
+            userData.raptor_2_team = addOrRemove;
+            if(addOrRemove === true){
+                notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;   
         case "solo3":
             userData.raptor_3_solo = addOrRemove;
-            if(addOrRemove === true && openai && client){
+            if(addOrRemove === true){
+                notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;
+        case "raptor iii solo assessment":
+            userData.raptor_3_solo = addOrRemove;
+            if(addOrRemove === true){
                 notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "team3":
             userData.raptor_3_team = addOrRemove;
-            if(addOrRemove === true && openai && client){
+            if(addOrRemove === true){
+                notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;
+        case "raptor iii team assessment":
+            userData.raptor_3_team = addOrRemove;
+            if(addOrRemove === true){
                 notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "turret":
             userData.corsair_1_turret = addOrRemove;
-            if(addOrRemove === true && openai && client){
+            if(addOrRemove === true){
+                notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;
+        case "turret assessment":
+            userData.corsair_1_turret = addOrRemove;
+            if(addOrRemove === true){
                 notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "torpedo":
             userData.corsair_1_torpedo = addOrRemove;
-            if(addOrRemove === true && openai && client){
+            if(addOrRemove === true){
+                notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;
+        case "torpedo assessment":
+            userData.corsair_1_torpedo = addOrRemove;
+            if(addOrRemove === true){
                 notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "ship commander":
             userData.corsair_2_ship_commander = addOrRemove;
-            if(addOrRemove === true && openai && client){
+            if(addOrRemove === true){
                 notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "ship":
             userData.corsair_2_ship_commander = addOrRemove;
-            if(addOrRemove === true && openai && client){
+            if(addOrRemove === true){
+                notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;
+        case "ship commander assessment":
+            userData.corsair_2_ship_commander = addOrRemove;
+            if(addOrRemove === true){
                 notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "wing commander":
             userData.corsair_2_wing_commander = addOrRemove;
-            if(addOrRemove === true && openai && client){
+            if(addOrRemove === true){
+                notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;
+        case "wing commander assessment":
+            userData.corsair_2_wing_commander = addOrRemove;
+            if(addOrRemove === true){
                 notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "wing":
             userData.corsair_2_wing_commander = addOrRemove;
-            if(addOrRemove === true && openai && client){
+            if(addOrRemove === true){
                 notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "fleet commander":
             userData.corsair_3_fleet_commander = addOrRemove;
-            if(addOrRemove === true && openai && client){
+            if(addOrRemove === true){
                 notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "fleet":
             userData.corsair_3_fleet_commander = addOrRemove;
-            if(addOrRemove === true && openai && client){
+            if(addOrRemove === true){
+                notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;
+        case "fleet commander assessment":
+            userData.corsair_3_fleet_commander = addOrRemove;
+            if(addOrRemove === true){
                 notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "swabbie":
             userData.raider_1_swabbie = addOrRemove;
-            if(addOrRemove === true && openai && client){
+            if(addOrRemove === true){
+                notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;
+        case "swabbie assessment":
+            userData.raider_1_swabbie = addOrRemove;
+            if(addOrRemove === true){
                 notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "line master":
             userData.raider_1_linemaster = addOrRemove;
-            if(addOrRemove === true && openai && client){
+            if(addOrRemove === true){
+                notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;
+        case "line master assessment":
+            userData.raider_1_linemaster = addOrRemove;
+            if(addOrRemove === true){
                 notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "boarder":
             userData.raider_1_boarder = addOrRemove;
-            if(addOrRemove === true && openai && client){
+            if(addOrRemove === true){
+                notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;
+        case "boarding assessment":
+            userData.raider_1_boarder = addOrRemove;
+            if(addOrRemove === true){
                 notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "powder monkey":
             userData.raider_2_powdermonkey = addOrRemove;
-            if(addOrRemove === true && openai && client){
+            if(addOrRemove === true){
+                notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;
+        case "powder monkey assessment":
+            userData.raider_2_powdermonkey = addOrRemove;
+            if(addOrRemove === true){
                 notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "mate":
             userData.raider_2_mate = addOrRemove;
-            if(addOrRemove === true && openai && client){
+            if(addOrRemove === true){
+                notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;
+        case "mate assessment":
+            userData.raider_2_mate = addOrRemove;
+            if(addOrRemove === true){
                 notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
         case "sail master":
             userData.raider_3_sailmaster = addOrRemove;
-            if(addOrRemove === true && openai && client){
+            if(addOrRemove === true){
+                notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;
+        case "sail master assessment":
+            userData.raider_3_sailmaster = addOrRemove;
+            if(addOrRemove === true){
                 notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
@@ -352,7 +443,6 @@ async function editQueue(requestedText, userData, openai, client, addOrRemove, f
             'raptor_3_solo', 'raptor_3_team', 'corsair_1_torpedo', 'corsair_1_turret',
             'corsair_2_ship_commander', 'corsair_2_wing_commander', 'corsair_3_fleet_commander'
         ];
-
         // Check if all specified fields are false
         const allFieldsAreFalse = fieldsToCheck.every(field => userData[field] === false);
 
@@ -367,6 +457,7 @@ async function editQueue(requestedText, userData, openai, client, addOrRemove, f
 }
 
 async function addQueue(requestedText, message){
+    console.log("Add Queue")
     newUser={
         id: message.author.id,
         username: message.author.username,

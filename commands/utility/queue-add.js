@@ -15,23 +15,23 @@ const command = new SlashCommandBuilder()
 
 module.exports = {
   data: command,
-  async execute(interaction) {
+  async execute(interaction, client, openAi) {
     // Get the chosen class name from the command options
     const className = interaction.options.getString('class');
     // Call your signup logic from the external file
     try {
       // await queueController(interaction.user.id, className);
-      await interaction.reply(await queueController(className, interaction.user, null, null, true, true));
+      await interaction.reply(await queueController(className, interaction.user, openAi, client, true, true));
     } catch (error) {
       console.error(error);
       await interaction.reply({ content: 'There was an error signing you up for the class.', ephemeral: true });
     }
   },
-  async autocomplete(interaction) {
+  async autocomplete(interaction, client, openAi) {
     // Get the user's current input so far
     const focusedValue = interaction.options.getFocused();
     // Get the classes that the user hasn’t taken yet
-    const availableClasses = await getAvailableClasses(interaction.user, interaction.guild);
+    const availableClasses = await getAvailableClasses(interaction.user, interaction.guild, "available");
     // Filter based on the current input
     const filtered = availableClasses.filter(c =>
       c.toLowerCase().startsWith(focusedValue.toLowerCase())
