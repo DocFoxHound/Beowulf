@@ -39,6 +39,7 @@ async function getUserById(userId){
 
 
 async function editUser(userId, updatedUserData) {
+    console.log(userId)
     const apiUrl = `${process.env.SERVER_URL}/api/users/${userId}`; // Assuming this is the correct endpoint
     try {
         const response = await axios.put(apiUrl, updatedUserData, {

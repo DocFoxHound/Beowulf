@@ -9,12 +9,12 @@ async function getAvailableClasses(user, guild, whichClasses) {
     //lookup the classes
     let allClasses = [];
     if(whichClasses === "available"){
+        console.log("Available Classes")
         allClasses = await getAvailableUserClasses(user, guild);
     }else if(whichClasses === "current"){
+        console.log("Current Classes")
         allClasses = await getCurrentUserClasses(user);
     }
-    // Simulate a lookup for classes the user has already taken:
-    // const takenClasses = ['Math']; // This would be dynamic per user
     return allClasses.filter(c => allClasses.includes(c));
 }
 
@@ -101,6 +101,7 @@ async function getAvailableUserClasses(user, guild){
 
 async function getCurrentUserClasses(user){
     const queueData = await checkQueueForUser(user.id)
+    let classList = [];
     if(queueData){
         let classList = [];
         if(queueData.raptor_1_solo === true){
@@ -156,6 +157,7 @@ async function getCurrentUserClasses(user){
         }
         return classList;
     }else{
+        console.log("No classes")
         return classList.push("Error retrieving classes");
     }
     

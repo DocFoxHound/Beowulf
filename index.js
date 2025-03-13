@@ -260,7 +260,7 @@ client.on(Events.InteractionCreate, async interaction => {
 		}
 
 		try {
-			await command.autocomplete(interaction);
+			await command.autocomplete(interaction, client, openai);
 		} catch (error) {
 			console.error(error);
 		}

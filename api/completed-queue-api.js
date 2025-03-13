@@ -1,7 +1,6 @@
 const axios = require('axios');
 
 async function createEntry(newEntry) {
-    console.log("Inserting new Completed Entry")
     const apiUrl = `${process.env.SERVER_URL}/api/completedEntry/`; 
     try {
         const response = await axios.post(apiUrl, newEntry, {

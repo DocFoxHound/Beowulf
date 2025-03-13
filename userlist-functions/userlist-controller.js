@@ -81,43 +81,122 @@ async function createNewUser(userData, client, guildId){
     
 }
 
-// async function getUserRank(client){
-//     const discordUser = await client.users.fetch(userId);
-//     const memberRoles = discordUser.roles.cache.map(role => role.id);
-//     const discordRankRolesApi = rankRoles.getRanks();
-//     // const discordPrestigeRolesApi = prestigeRoles.getPrestiges();
-//     const guest = discordRankRolesApi.find(role => role.name === "Guest");
-//     const friendly = discordRankRolesApi.find(role => role.name === "Friendly");
-//     const prospect = discordRankRolesApi.find(role => role.name === "Prospect");
-//     const crew = discordRankRolesApi.find(role => role.name === "Crew");
-//     const marauder = discordRankRolesApi.find(role => role.name === "Marauder");
-//     const bloodQualified = discordRankRolesApi.find(role => role.name === "Blood Qualified");
-//     const blooded = discordRankRolesApi.find(role => role.name === "Blooded");
-//     const crewChief = discordRankRolesApi.find(role => role.name === "Crew Chief");
-//     const captain = discordRankRolesApi.find(role => role.name === "Captain");
-
-//     for(const element of memberRoles){
-//         if (element === captain.id){
-//             return captain.id;
-//         }else if(element === crewChief.id){
-//             return crewChief.id;
-//         }else if(element === blooded.id){
-//             return blooded.id;
-//         }else if(element === bloodQualified.id){
-//             return bloodQualified.id;
-//         }else if(element === marauder.id){
-//             return marauder.id;
-//         }else if(element === crew.id){
-//             return crew.id;
-//         }else if(element === prospect.id){
-//             return prospect.id;
-//         }else if(element === friendly.id){
-//             return friendly.id;
-//         }else if(element === guest.id){
-//             return guest.id;
-//         }
-//     }
-// }
+async function updateUserClassStatus(userDataForUserList, requestedClass) {
+    console.log("Update User Class Status")
+    switch (requestedClass.toLowerCase()){
+        case "dogfighting":
+            userDataForUserList.raptor_1_solo = true;
+            break;
+        case "dogfighting 101":
+            userDataForUserList.raptor_1_solo = true;
+            break;
+        case "teamfighting":
+            userDataForUserList.raptor_1_team = true;
+            break;
+        case "teamfighting 101":
+            userDataForUserList.raptor_1_team = true;
+            break;
+        case "solo2":
+            userDataForUserList.raptor_2_solo = true;
+            break;
+        case "raptor ii solo assessment":
+            userDataForUserList.raptor_2_solo = true;
+            break;
+        case "team2":
+            userDataForUserList.raptor_2_team = true;
+            break;    
+        case "raptor ii team assessment":
+            userDataForUserList.raptor_2_team = true;
+            break;   
+        case "solo3":
+            userDataForUserList.raptor_3_solo = true;
+            break;
+        case "raptor iii solo assessment":
+            userDataForUserList.raptor_3_solo = true;
+            break;
+        case "team3":
+            userDataForUserList.raptor_3_team = true;
+            break;
+        case "raptor iii team assessment":
+            userDataForUserList.raptor_3_team = true;
+            break;
+        case "turret":
+            userData.corsair_1_turret = true;
+        case "turret assessment":
+            userDataForUserList.corsair_1_turret = true;
+            break;
+        case "torpedo":
+            userDataForUserList.corsair_1_torpedo = true;
+            break;
+        case "torpedo assessment":
+            userDataForUserList.corsair_1_torpedo = true;
+            break;
+        case "ship commander":
+            userDataForUserList.corsair_2_ship_commander = true;
+            break;
+        case "ship":
+            userDataForUserList.corsair_2_ship_commander = true;
+            break;
+        case "ship commander assessment":
+            userDataForUserList.corsair_2_ship_commander = true;
+            break;
+        case "wing commander":
+            userDataForUserList.corsair_2_wing_commander = true;
+            break;
+        case "wing commander assessment":
+            userDataForUserList.corsair_2_wing_commander = true;
+            break;
+        case "wing":
+            userDataForUserList.corsair_2_wing_commander = true;
+            break;
+        case "fleet commander":
+            userDataForUserList.corsair_3_fleet_commander = true;
+            break;
+        case "fleet":
+            userDataForUserList.corsair_3_fleet_commander = true;
+            break;
+        case "fleet commander assessment":
+            userDataForUserList.corsair_3_fleet_commander = true;
+            break;
+        case "swabbie":
+            userDataForUserList.raider_1_swabbie = true;
+            break;
+        case "swabbie assessment":
+            userDataForUserList.raider_1_swabbie = true;
+            break;
+        case "line master":
+            userDataForUserList.raider_1_linemaster = true;
+            break;
+        case "line master assessment":
+            userData.raider_1_linemaster = true;
+            break;
+        case "boarder":
+            userDataForUserList.raider_1_boarder = true;
+            break;
+        case "boarding assessment":
+            userDataForUserList.raider_1_boarder = true;
+            break;
+        case "powder monkey":
+            userDataForUserList.raider_2_powdermonkey = true;
+            break;
+        case "powder monkey assessment":
+            userDataForUserList.raider_2_powdermonkey = true;
+            break;
+        case "mate":
+            userDataForUserList.raider_2_mate = true;
+            break;
+        case "mate assessment":
+            userDataForUserList.raider_2_mate = true;
+            break;
+        case "sail master":
+            userDataForUserList.raider_3_sailmaster = true;
+            break;
+        case "sail master assessment":
+            userDataForUserList.raider_3_sailmaster = true;
+            break;
+    }
+    return await userlistApi.editUser(userDataForUserList.id, userDataForUserList);
+}
 
 async function getUserRank(memberRoles) {
     const discordRankRoles = rankRoles.getRanks();
@@ -202,4 +281,5 @@ module.exports = {
     getRaptorRank,
     getCorsairRank,
     getRaiderRank,
+    updateUserClassStatus
 }

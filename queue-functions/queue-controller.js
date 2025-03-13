@@ -3,12 +3,13 @@ const notifyOldQueue = require("../common/bot-notify").notifyOldQueue
 const notifyRemovalFromQueue = require("../common/bot-notify").notifyRemovalFromQueue
 const botNotify = require("../common/bot-notify")
 const queueApi = require("../api/queueApi");
-const userlistApi = require("../api/userlistApi");
+// const userlistApi = require("../api/userlistApi");
 const sendResponse = require("../threads/send-response").sendResponse
 const formatResponse = require("../threads/format-response").formatResponse
 const lodash = require('lodash');
 const userlist = require("../userlist-functions/userlist-controller")
 const logHandler = require("../completed-queue-functions/completed-queue-handler").logHandler
+const updateUserClassStatus = require("../userlist-functions/userlist-controller").updateUserClassStatus
 
 const assessmentMap = {
     'raptor_1_solo': `Dogfighting 101`,
@@ -30,7 +31,7 @@ const assessmentMap = {
     'raider_3_sailmaster': `Sailmaster Assessment`
 };
 
-async function queueController(runOrClassName, messageOrUser, openai, client, addToQueue, slashCommand){
+async function queueController(runOrClassName, messageOrUser, openai, client, addToQueue, slashCommand, classCompletedOrIncomplete, guild){
     console.log("QueueController")
     let author = null;
     let toolCall = null;
@@ -40,6 +41,7 @@ async function queueController(runOrClassName, messageOrUser, openai, client, ad
 
     if(slashCommand === true){ //if this is a slash command
         author = messageOrUser; //it is a user in this case
+        parsedArgs = classCompletedOrIncomplete;
         requestedClass = runOrClassName; //it is a class name in this case
         player = author.nickname || author.username; //if we are removing someone from a queue we need their name
     }else{ //if this is an interaction with the bot and the bot has proc'd a function
@@ -75,7 +77,7 @@ async function queueController(runOrClassName, messageOrUser, openai, client, ad
         }
     }else if(addToQueue === false){
         const completionStatus = parsedArgs.status;
-        return removeFromQueue(player.toLowerCase(), requestedClass, completionStatus, messageOrUser, client, openai);
+        return removeFromQueue(player.toLowerCase(), requestedClass, completionStatus, messageOrUser, client, openai, slashCommand, guild);
     }
 }
 
@@ -452,7 +454,8 @@ async function editQueue(requestedText, userData, openai, client, addOrRemove, f
             return await queueApi.editUserInQueue(userData.id, userData);
         }
     }else if (forQueue === false){ //do this if this is for editing the userList to mark a class as complete
-        return await userlistApi.editUser(userData.id, userData);
+        // return await userlistApi.editUser(userData.id, userData); 
+        return await updateUserClassStatus(userData);
     }
 }
 
@@ -553,16 +556,16 @@ async function addQueue(requestedText, message){
     return await queueApi.createUserInQueue(newUser);
 }
 
-async function removeFromQueue(player, requestedClass, completionStatus, message, client, openai){
+async function removeFromQueue(player, requestedClass, completionStatus, messageOrUser, client, openai, slashCommand, guildObject){
     console.log(`Remove ${player} from ${requestedClass}`)
     //check rank of person doing action
-    const userId = message.author.id;
-    const guild = await client.guilds.fetch(message.guildId); // Fetch the guild
+    const userId = slashCommand ? messageOrUser.id : messageOrUser.author.id;
+    const guild = slashCommand ? guildObject : messageOrUser.guild; // Fetch the guild
+    // const guild = await client.guilds.fetch(process.env.GUILD_ID_TEST); // Fetch the guild
     const member = await guild.members.fetch(userId); // Fetch the member
     const memberRoles = member.roles.cache.map(role => role.id);
-    moderatorRanks = process.env?.MODERATOR_ROLES?.split(",");
+    const moderatorRanks = process.env?.MODERATOR_ROLES?.split(",");
     const isModerator = memberRoles.some(element => moderatorRanks.includes(element)); //check if the user has one of the moderator roles
-
     if(isModerator){
         //get the queue'd users
         const users = await queueApi.getUsersInQueue();
@@ -577,22 +580,23 @@ async function removeFromQueue(player, requestedClass, completionStatus, message
         //if we get a match, we perform the required action
         if(userData && requestedClass !== "all"){
             console.log("Remove from specific queue: ", requestedClass)
-            //remove him from that specific queue
-            const completedTask = (completionStatus === "completed");
-
-            const editQueueSuccess = await editQueue(requestedClass, userData, openai, client, false, true);
+            const editQueueSuccess = await editQueue(requestedClass, userData, openai, client, false, true); //flase = remove from queue
             //if successful, mark it in the player list
-            if(editQueueSuccess && completedTask === true){
+            if(editQueueSuccess && completionStatus === "completed"){
                 userDataForUserList = await userlist.checkUserListForUser(userData); //get the user object from the userlist so we can mark something as complete
                 if(userDataForUserList === null){//if the user doesn't exist for some reason, let's make him
                     console.log("User isn't on UserList")
-                    await userlist.createNewUser(userData, client, message.guildId);
+                    await userlist.createNewUser(userData, client, messageOrUser.guildId);
                     userDataForUserList = await userlist.checkUserListForUser(userData);
                 }
-                const editQueueSuccess = editQueue(requestedClass, userDataForUserList, openai, client, false, false);
-                await logHandler(userData, message, requestedClass);
-                if(editQueueSuccess && logHandler){
-                    return `${userData.nickname || userData.username} was marked as complete for ${requestedClass} and ${message.author.username} completed the ticket.`
+                //edit the userList user for completion, log it in the logHandler
+                // const editQueueSuccess = editQueue(requestedClass, userDataForUserList, openai, client, false, false);
+                const editUserListStatusSuccess = await updateUserClassStatus(userDataForUserList, requestedClass);
+                await logHandler(userData, messageOrUser, requestedClass, slashCommand);
+
+                //if both are successful, return a success message
+                if(editQueueSuccess && logHandler && editUserListStatusSuccess){
+                    return `${userData.nickname || userData.username} was marked as complete for ${requestedClass} and ${slashCommand ? messageOrUser.username : messageOrUser.author.username} completed the ticket.`
                 }else{
                     return `${userData.nickname || userData.username} was removed from the ${requestedClass} queue but there was an error in logging the course.`
                 }
