@@ -14,6 +14,10 @@ async function getAvailableClasses(user, guild, whichClasses) {
     }else if(whichClasses === "current"){
         console.log("Current Classes")
         allClasses = await getCurrentUserClasses(user);
+    }else if(whichClasses === "all"){
+        console.log("All Classes")
+        // allClasses = await getCurrentUserClasses(user);
+        //add a way to retrieve all classes
     }
     return allClasses.filter(c => allClasses.includes(c));
 }
