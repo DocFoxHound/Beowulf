@@ -49,7 +49,7 @@ async function queueController(runOrClassName, messageOrUser, openai, client, ad
         toolCall = runOrClassName.required_action.submit_tool_outputs.tool_calls[0];
         parsedArgs = JSON.parse(toolCall.function.arguments);
         requestedClass = parsedArgs.queue_class;
-        player = parsedArgs.player_name_or_id || null; //if we are removing someone from a queue we need their name
+        player = parsedArgs.player_name_or_id || parsedArgs; //if we are removing someone from a queue we need their name
     }
 
     userData = null;
@@ -76,7 +76,7 @@ async function queueController(runOrClassName, messageOrUser, openai, client, ad
             return "There was an error adding to the queue"
         }
     }else if(addToQueue === false){
-        const completionStatus = parsedArgs.status;
+        const completionStatus = parsedArgs.status || parsedArgs;
         return removeFromQueue(player.toLowerCase(), requestedClass, completionStatus, messageOrUser, client, openai, slashCommand, guild);
     }
 }
@@ -210,6 +210,12 @@ async function queueReminderCheck(openai, client, run, message){
 async function editQueue(requestedText, userData, openai, client, addOrRemove, forQueue){
     console.log(requestedText)
     switch (requestedText.toLowerCase()){
+        case "raptor_1_solo":
+            userData.raptor_1_solo = addOrRemove;
+            if(addOrRemove === true){
+                notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;
         case "dogfighting":
             userData.raptor_1_solo = addOrRemove;
             if(addOrRemove === true){
@@ -218,6 +224,12 @@ async function editQueue(requestedText, userData, openai, client, addOrRemove, f
             break;
         case "dogfighting 101":
             userData.raptor_1_solo = addOrRemove;
+            if(addOrRemove === true){
+                notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;
+        case "raptor_1_team":
+            userData.raptor_1_team = addOrRemove;
             if(addOrRemove === true){
                 notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
             }
@@ -234,6 +246,12 @@ async function editQueue(requestedText, userData, openai, client, addOrRemove, f
                 notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
+        case "raptor_2_solo":
+            userData.raptor_2_solo = addOrRemove;
+            if(addOrRemove === true){
+                notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;    
         case "solo2":
             userData.raptor_2_solo = addOrRemove;
             if(addOrRemove === true){
@@ -246,6 +264,12 @@ async function editQueue(requestedText, userData, openai, client, addOrRemove, f
                 notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
+        case "raptor_2_team":
+            userData.raptor_2_team = addOrRemove;
+            if(addOrRemove === true){
+                notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break; 
         case "team2":
             userData.raptor_2_team = addOrRemove;
             if(addOrRemove === true){
@@ -258,6 +282,12 @@ async function editQueue(requestedText, userData, openai, client, addOrRemove, f
                 notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;   
+        case "raptor_3_solo":
+            userData.raptor_3_solo = addOrRemove;
+            if(addOrRemove === true){
+                notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;
         case "solo3":
             userData.raptor_3_solo = addOrRemove;
             if(addOrRemove === true){
@@ -266,6 +296,12 @@ async function editQueue(requestedText, userData, openai, client, addOrRemove, f
             break;
         case "raptor iii solo assessment":
             userData.raptor_3_solo = addOrRemove;
+            if(addOrRemove === true){
+                notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;
+        case "raptor_3_team":
+            userData.raptor_3_team = addOrRemove;
             if(addOrRemove === true){
                 notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
             }
@@ -282,6 +318,12 @@ async function editQueue(requestedText, userData, openai, client, addOrRemove, f
                 notifyNewQueue("RAPTOR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
+        case "corsair_1_turret":
+            userData.corsair_1_turret = addOrRemove;
+            if(addOrRemove === true){
+                notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;
         case "turret":
             userData.corsair_1_turret = addOrRemove;
             if(addOrRemove === true){
@@ -294,6 +336,12 @@ async function editQueue(requestedText, userData, openai, client, addOrRemove, f
                 notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
+        case "corsair_1_torpedo":
+            userData.corsair_1_torpedo = addOrRemove;
+            if(addOrRemove === true){
+                notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;
         case "torpedo":
             userData.corsair_1_torpedo = addOrRemove;
             if(addOrRemove === true){
@@ -302,6 +350,12 @@ async function editQueue(requestedText, userData, openai, client, addOrRemove, f
             break;
         case "torpedo assessment":
             userData.corsair_1_torpedo = addOrRemove;
+            if(addOrRemove === true){
+                notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;
+        case "corsair_2_ship_commander":
+            userData.corsair_2_ship_commander = addOrRemove;
             if(addOrRemove === true){
                 notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
             }
@@ -324,6 +378,12 @@ async function editQueue(requestedText, userData, openai, client, addOrRemove, f
                 notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
+        case "corsair_2_wing_commander":
+            userData.corsair_2_wing_commander = addOrRemove;
+            if(addOrRemove === true){
+                notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;
         case "wing commander":
             userData.corsair_2_wing_commander = addOrRemove;
             if(addOrRemove === true){
@@ -338,6 +398,12 @@ async function editQueue(requestedText, userData, openai, client, addOrRemove, f
             break;
         case "wing":
             userData.corsair_2_wing_commander = addOrRemove;
+            if(addOrRemove === true){
+                notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;
+        case "corsair_3_fleet_commander":
+            userData.corsair_3_fleet_commander = addOrRemove;
             if(addOrRemove === true){
                 notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
             }
@@ -360,6 +426,12 @@ async function editQueue(requestedText, userData, openai, client, addOrRemove, f
                 notifyNewQueue("CORSAIR", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
+        case "raider_1_swabbie":
+            userData.raider_1_swabbie = addOrRemove;
+            if(addOrRemove === true){
+                notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;
         case "swabbie":
             userData.raider_1_swabbie = addOrRemove;
             if(addOrRemove === true){
@@ -368,6 +440,12 @@ async function editQueue(requestedText, userData, openai, client, addOrRemove, f
             break;
         case "swabbie assessment":
             userData.raider_1_swabbie = addOrRemove;
+            if(addOrRemove === true){
+                notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;
+        case "raider_1_linemaster":
+            userData.raider_1_linemaster = addOrRemove;
             if(addOrRemove === true){
                 notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
             }
@@ -384,6 +462,12 @@ async function editQueue(requestedText, userData, openai, client, addOrRemove, f
                 notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
+        case "raider_1_boarder":
+            userData.raider_1_boarder = addOrRemove;
+            if(addOrRemove === true){
+                notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;
         case "boarder":
             userData.raider_1_boarder = addOrRemove;
             if(addOrRemove === true){
@@ -392,6 +476,12 @@ async function editQueue(requestedText, userData, openai, client, addOrRemove, f
             break;
         case "boarding assessment":
             userData.raider_1_boarder = addOrRemove;
+            if(addOrRemove === true){
+                notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;
+        case "raider_2_powdermonkey":
+            userData.raider_2_powdermonkey = addOrRemove;
             if(addOrRemove === true){
                 notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
             }
@@ -408,6 +498,12 @@ async function editQueue(requestedText, userData, openai, client, addOrRemove, f
                 notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
             }
             break;
+        case "raider_2_mate":
+            userData.raider_2_mate = addOrRemove;
+            if(addOrRemove === true){
+                notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;
         case "mate":
             userData.raider_2_mate = addOrRemove;
             if(addOrRemove === true){
@@ -416,6 +512,12 @@ async function editQueue(requestedText, userData, openai, client, addOrRemove, f
             break;
         case "mate assessment":
             userData.raider_2_mate = addOrRemove;
+            if(addOrRemove === true){
+                notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
+            }
+            break;
+        case "raider_3_sailmaster":
+            userData.raider_3_sailmaster = addOrRemove;
             if(addOrRemove === true){
                 notifyNewQueue("RAIDER", requestedText, userData.nickname || userData.username, openai, client);
             }
@@ -455,7 +557,7 @@ async function editQueue(requestedText, userData, openai, client, addOrRemove, f
         }
     }else if (forQueue === false){ //do this if this is for editing the userList to mark a class as complete
         // return await userlistApi.editUser(userData.id, userData); 
-        return await updateUserClassStatus(userData);
+        return await updateUserClassStatus(userData, requestedText, true);
     }
 }
 
@@ -591,7 +693,7 @@ async function removeFromQueue(player, requestedClass, completionStatus, message
                 }
                 //edit the userList user for completion, log it in the logHandler
                 // const editQueueSuccess = editQueue(requestedClass, userDataForUserList, openai, client, false, false);
-                const editUserListStatusSuccess = await updateUserClassStatus(userDataForUserList, requestedClass);
+                const editUserListStatusSuccess = await updateUserClassStatus(userDataForUserList, requestedClass, true);
                 await logHandler(userData, messageOrUser, requestedClass, slashCommand);
 
                 //if both are successful, return a success message

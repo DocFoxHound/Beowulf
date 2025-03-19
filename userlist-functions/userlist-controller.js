@@ -1,5 +1,7 @@
 const userlistApi = require("../api/userlistApi")
 const rankRoles = require("../api/rank-roles-api")
+const getClasses = require("../api/classApi").getClasses;
+const editQueue = require("../api/queueApi").editQueue;
 const prestigeRoles = require("../api/prestige-roles-api")
 const lodash = require('lodash');
 
@@ -81,118 +83,182 @@ async function createNewUser(userData, client, guildId){
     
 }
 
-async function updateUserClassStatus(userDataForUserList, requestedClass) {
+async function updateUserClassStatus(userDataForUserList, requestedClass, classCompleted) {
     console.log("Update User Class Status")
+    // const classList = await getClasses();
+    // let classToEdit;
+    // for(const clss of classList){
+    //     if(clss.name.toLowerCase() === requestedClass.toLowerCase() || clss.aliases.includes(requestedClass.toLowerCase())){
+    //         classToEdit = clss;
+    //         // if(classCompleted){
+    //         //     userDataForUserList.classes[requestedClass] = true;
+    //         // }else{
+    //         //     userDataForUserList.classes[requestedClass] = false;
+    //         // }
+    //     }
+    // }
+    // console.log(userDataForUserList[classToEdit.name]);
+    // userDataForUserList[classToEdit.name] = classCompleted;
     switch (requestedClass.toLowerCase()){
+        case "raptor_1_solo":
+            userDataForUserList.raptor_1_solo = classCompleted;
+            break;
         case "dogfighting":
-            userDataForUserList.raptor_1_solo = true;
+            userDataForUserList.raptor_1_solo = classCompleted;
             break;
         case "dogfighting 101":
-            userDataForUserList.raptor_1_solo = true;
+            userDataForUserList.raptor_1_solo = classCompleted;
+            break;
+        case "raptor_1_team":
+            userDataForUserList.raptor_1_team = classCompleted;
             break;
         case "teamfighting":
-            userDataForUserList.raptor_1_team = true;
+            userDataForUserList.raptor_1_team = classCompleted;
             break;
         case "teamfighting 101":
-            userDataForUserList.raptor_1_team = true;
+            userDataForUserList.raptor_1_team = classCompleted;
+            break;
+        case "raptor_2_solo":
+            userDataForUserList.raptor_2_solo = classCompleted;
             break;
         case "solo2":
-            userDataForUserList.raptor_2_solo = true;
+            userDataForUserList.raptor_2_solo = classCompleted;
             break;
         case "raptor ii solo assessment":
-            userDataForUserList.raptor_2_solo = true;
+            userDataForUserList.raptor_2_solo = classCompleted;
             break;
+        case "raptor_2_team":
+            userDataForUserList.raptor_2_team = classCompleted;
+            break; 
         case "team2":
-            userDataForUserList.raptor_2_team = true;
+            userDataForUserList.raptor_2_team = classCompleted;
             break;    
         case "raptor ii team assessment":
-            userDataForUserList.raptor_2_team = true;
+            userDataForUserList.raptor_2_team = classCompleted;
             break;   
+        case "raptor_3_solo":
+            userDataForUserList.raptor_3_solo = classCompleted;
+            break;
         case "solo3":
-            userDataForUserList.raptor_3_solo = true;
+            userDataForUserList.raptor_3_solo = classCompleted;
             break;
         case "raptor iii solo assessment":
-            userDataForUserList.raptor_3_solo = true;
+            userDataForUserList.raptor_3_solo = classCompleted;
+            break;
+        case "raptor_3_team":
+            userDataForUserList.raptor_3_team = classCompleted;
             break;
         case "team3":
-            userDataForUserList.raptor_3_team = true;
+            userDataForUserList.raptor_3_team = classCompleted;
             break;
         case "raptor iii team assessment":
-            userDataForUserList.raptor_3_team = true;
+            userDataForUserList.raptor_3_team = classCompleted;
             break;
+        case "corsair_1_turret":
+            userData.corsair_1_turret = classCompleted;
         case "turret":
-            userData.corsair_1_turret = true;
+            userData.corsair_1_turret = classCompleted;
         case "turret assessment":
-            userDataForUserList.corsair_1_turret = true;
+            userDataForUserList.corsair_1_turret = classCompleted;
+            break;
+        case "corsair_1_torpedo":
+            userDataForUserList.corsair_1_torpedo = classCompleted;
             break;
         case "torpedo":
-            userDataForUserList.corsair_1_torpedo = true;
+            userDataForUserList.corsair_1_torpedo = classCompleted;
             break;
         case "torpedo assessment":
-            userDataForUserList.corsair_1_torpedo = true;
+            userDataForUserList.corsair_1_torpedo = classCompleted;
+            break;
+        case "corsair_2_ship_commander":
+            userDataForUserList.corsair_2_ship_commander = classCompleted;
             break;
         case "ship commander":
-            userDataForUserList.corsair_2_ship_commander = true;
+            userDataForUserList.corsair_2_ship_commander = classCompleted;
             break;
         case "ship":
-            userDataForUserList.corsair_2_ship_commander = true;
+            userDataForUserList.corsair_2_ship_commander = classCompleted;
             break;
         case "ship commander assessment":
-            userDataForUserList.corsair_2_ship_commander = true;
+            userDataForUserList.corsair_2_ship_commander = classCompleted;
+            break;
+        case "corsair_2_wing_commander":
+            userDataForUserList.corsair_2_wing_commander = classCompleted;
             break;
         case "wing commander":
-            userDataForUserList.corsair_2_wing_commander = true;
+            userDataForUserList.corsair_2_wing_commander = classCompleted;
             break;
         case "wing commander assessment":
-            userDataForUserList.corsair_2_wing_commander = true;
+            userDataForUserList.corsair_2_wing_commander = classCompleted;
             break;
         case "wing":
-            userDataForUserList.corsair_2_wing_commander = true;
+            userDataForUserList.corsair_2_wing_commander = classCompleted;
+            break;
+        case "corsair_3_fleet_commander":
+            userDataForUserList.corsair_3_fleet_commander = classCompleted;
             break;
         case "fleet commander":
-            userDataForUserList.corsair_3_fleet_commander = true;
+            userDataForUserList.corsair_3_fleet_commander = classCompleted;
             break;
         case "fleet":
-            userDataForUserList.corsair_3_fleet_commander = true;
+            userDataForUserList.corsair_3_fleet_commander = classCompleted;
             break;
         case "fleet commander assessment":
-            userDataForUserList.corsair_3_fleet_commander = true;
+            userDataForUserList.corsair_3_fleet_commander = classCompleted;
+            break;
+        case "raider_1_swabbie":
+            userDataForUserList.raider_1_swabbie = classCompleted;
             break;
         case "swabbie":
-            userDataForUserList.raider_1_swabbie = true;
+            userDataForUserList.raider_1_swabbie = classCompleted;
             break;
         case "swabbie assessment":
-            userDataForUserList.raider_1_swabbie = true;
+            userDataForUserList.raider_1_swabbie = classCompleted;
+            break;
+        case "raider_1_linemaster":
+            userDataForUserList.raider_1_linemaster = classCompleted;
             break;
         case "line master":
-            userDataForUserList.raider_1_linemaster = true;
+            userDataForUserList.raider_1_linemaster = classCompleted;
             break;
         case "line master assessment":
-            userData.raider_1_linemaster = true;
+            userData.raider_1_linemaster = classCompleted;
+            break;
+        case "raider_1_boarder":
+            userDataForUserList.raider_1_boarder = classCompleted;
             break;
         case "boarder":
-            userDataForUserList.raider_1_boarder = true;
+            userDataForUserList.raider_1_boarder = classCompleted;
             break;
         case "boarding assessment":
-            userDataForUserList.raider_1_boarder = true;
+            userDataForUserList.raider_1_boarder = classCompleted;
+            break;
+        case "raider_2_powdermonkey":
+            userDataForUserList.raider_2_powdermonkey = classCompleted;
             break;
         case "powder monkey":
-            userDataForUserList.raider_2_powdermonkey = true;
+            userDataForUserList.raider_2_powdermonkey = classCompleted;
             break;
         case "powder monkey assessment":
-            userDataForUserList.raider_2_powdermonkey = true;
+            userDataForUserList.raider_2_powdermonkey = classCompleted;
+            break;
+        case "raider_2_mate":
+            userDataForUserList.raider_2_mate = classCompleted;
             break;
         case "mate":
-            userDataForUserList.raider_2_mate = true;
+            userDataForUserList.raider_2_mate = classCompleted;
             break;
         case "mate assessment":
-            userDataForUserList.raider_2_mate = true;
+            userDataForUserList.raider_2_mate = classCompleted;
+            break;
+        case "raider_3_sailmaster":
+            userDataForUserList.raider_3_sailmaster = classCompleted;
             break;
         case "sail master":
-            userDataForUserList.raider_3_sailmaster = true;
+            userDataForUserList.raider_3_sailmaster = classCompleted;
             break;
         case "sail master assessment":
-            userDataForUserList.raider_3_sailmaster = true;
+            userDataForUserList.raider_3_sailmaster = classCompleted;
             break;
     }
     return await userlistApi.editUser(userDataForUserList.id, userDataForUserList);

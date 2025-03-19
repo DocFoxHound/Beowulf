@@ -37,6 +37,16 @@ async function getUserById(userId){
     }
 }
 
+async function getUserByUsername(username){
+    const apiUrl = process.env.SERVER_URL;
+    try {
+        const response = await axios.get(`${apiUrl}/api/users/${username}`);
+        return response.data;  // This now properly returns the response data to the caller
+    } catch (error) {
+        return null;  // Return null or throw an error, depending on how you want to handle errors
+    }
+}
+
 
 async function editUser(userId, updatedUserData) {
     console.log(userId)
@@ -58,5 +68,6 @@ module.exports = {
     createUser,
     getUsers,
     getUserById,
-    editUser
+    editUser,
+    getUserByUsername
 };

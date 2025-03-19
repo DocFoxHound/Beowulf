@@ -3,6 +3,7 @@ const checkQueueForUser = require("../queue-functions/queue-controller").checkQu
 const getRaptorRank = require("../userlist-functions/userlist-controller").getRaptorRank;
 const getCorsairRank = require("../userlist-functions/userlist-controller").getCorsairRank;
 const getRaiderRank = require("../userlist-functions/userlist-controller").getRaiderRank;
+const getClasses = require("../api/classApi").getClasses;
 
 async function getAvailableClasses(user, guild, whichClasses) {
     console.log("Get Available Classes: ", whichClasses)
@@ -18,6 +19,8 @@ async function getAvailableClasses(user, guild, whichClasses) {
         console.log("All Classes")
         // allClasses = await getCurrentUserClasses(user);
         //add a way to retrieve all classes
+        const classList = await getClasses();
+        allClasses = classList.map(c => c.name);
     }
     return allClasses.filter(c => allClasses.includes(c));
 }

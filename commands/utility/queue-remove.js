@@ -31,7 +31,7 @@ module.exports = {
         try {
             // Check if the user has the required role
             const memberRoles = interaction.member.roles.cache;
-            const moderatorRoles = process.env.MODERATORS_ROLES.split(',');
+            const moderatorRoles = process.env.MODERATOR_ROLES.split(',');
             const hasPermission = moderatorRoles.some(role => memberRoles.has(role));
 
             if (!hasPermission) {
@@ -42,18 +42,25 @@ module.exports = {
             }
 
             // Extract options
-            const targetOption = interaction.options.getUser('target');
-            const targetUser = targetOption || interaction.user;
+            const targetOption = interaction.options.getString('target');
+            //need to convert target (username) into user object
+            const guild = interaction.guild
+            // Now search by username (case-insensitive)
+            const usernameToFind = targetOption;
+            const members = await guild.members.fetch();
+            const foundMember = members.find(
+            member => member.user.username.toLowerCase() === usernameToFind.toLowerCase()
+            );
+            const targetUser = foundMember || interaction.user;
             const className = interaction.options.getString('class');
             const action = interaction.options.getString('action');
             const status = interaction.options.getString('status');
-            const guild = interaction.guild
 
             const parsedArgs = {
                 status: status
             };
             const result = await queueController(className, targetUser, openai, client, false, true, parsedArgs, guild);
-            // const result = await queueController(className, targetUser, parsedArgs, null, false, true);
+            // runOrClassName, messageOrUser, openai, client, addToQueue, slashCommand, classCompletedOrIncomplete, guild
 
             await interaction.reply({
                 content: result,
@@ -74,8 +81,6 @@ module.exports = {
         if (focusedOption.name === 'target') {
             // Get the users that are in the queue
             const queueUsers = await getUsersInQueue();
-            console.log("queueUsers")
-            console.log(queueUsers)
             // Filter based on the current input
             const filteredUsers = queueUsers.filter(user =>
                 user.username.toLowerCase().startsWith(focusedOption.value.toLowerCase())

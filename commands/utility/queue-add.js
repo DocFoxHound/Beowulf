@@ -27,7 +27,7 @@ module.exports = {
       await interaction.reply({ content: 'There was an error signing you up for the class.', ephemeral: true });
     }
   },
-  async autocomplete(interaction, client, openAi) {
+  async autocomplete(interaction) {
     // Get the user's current input so far
     const focusedValue = interaction.options.getFocused();
     // Get the classes that the user hasn’t taken yet
