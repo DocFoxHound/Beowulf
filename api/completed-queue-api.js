@@ -15,22 +15,6 @@ async function createEntry(newEntry) {
     }
 }
 
-async function deleteEntry(user) {
-    console.log("Deleting user from CompletedQueue")
-    const apiUrl = `${process.env.SERVER_URL}/api/completedEntry/`; 
-    try {
-        const response = await axios.delete(apiUrl, user, {
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-        return true;
-    } catch (error) {
-        console.error('Error placing user in CompletedQueue: ', error.response ? error.response.data : error.message);
-        return false;
-    }
-}
-
 async function getEntries() {
     const apiUrl = `${process.env.SERVER_URL}/api/completedEntry/`;
     try {
@@ -42,10 +26,20 @@ async function getEntries() {
     }
 }
 
-async function getEntryById(userId){
+async function getEntryById(entryId){
     const apiUrl = process.env.SERVER_URL;
     try {
-        const response = await axios.get(`${apiUrl}/api/completedEntry/${userId}`);
+        const response = await axios.get(`${apiUrl}/api/completedEntry/${entryId}`);
+        return response.data;  // This now properly returns the response data to the caller
+    } catch (error) {
+        return null;  // Return null or throw an error, depending on how you want to handle errors
+    }
+}
+
+async function getEntryByUserAndClass(userId, classId){
+    const apiUrl = process.env.SERVER_URL;
+    try {
+        const response = await axios.get(`${apiUrl}/api/completedEntry/${userId}/${classId}`);
         return response.data;  // This now properly returns the response data to the caller
     } catch (error) {
         return null;  // Return null or throw an error, depending on how you want to handle errors
@@ -53,17 +47,30 @@ async function getEntryById(userId){
 }
 
 
-async function editEntry(userId, updatedUserData) {
-    const apiUrl = `${process.env.SERVER_URL}/api/completedEntry/${userId}`; // Assuming this is the correct endpoint
+async function editEntry(entryId, updatedEntryData) {
+    const apiUrl = `${process.env.SERVER_URL}/api/completedEntry/${entryId}`; // Assuming this is the correct endpoint
     try {
-        const response = await axios.put(apiUrl, updatedUserData, {
+        const response = await axios.put(apiUrl, updatedEntryData, {
             headers: {
                 'Content-Type': 'application/json'
             }
         });
         return true;
     } catch (error) {
-        console.error('Error updating user in CompletedQueue: ', error.response ? error.response.data : error.message);
+        console.error('Error updating Entry in CompletedQueue: ', error.response ? error.response.data : error.message);
+        return false;
+    }
+}
+
+async function deleteEntry(entryId) {
+    console.log("Deleting Entry from class table")
+    console.log("entryId: ", entryId)
+    const apiUrl = `${process.env.SERVER_URL}/api/completedEntry/${entryId}`; 
+    try {
+        const response = await axios.delete(apiUrl);
+        return true;
+    } catch (error) {
+        console.error('Error deleting entry in completed queue Table: ', error.response ? error.response.data : error.message);
         return false;
     }
 }
@@ -73,5 +80,6 @@ module.exports = {
     getEntries,
     getEntryById,
     editEntry,
-    deleteEntry
+    deleteEntry,
+    getEntryByUserAndClass
 };

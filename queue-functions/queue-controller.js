@@ -10,6 +10,8 @@ const lodash = require('lodash');
 const userlist = require("../userlist-functions/userlist-controller")
 const logHandler = require("../completed-queue-functions/completed-queue-handler").logHandler
 const updateUserClassStatus = require("../userlist-functions/userlist-controller").updateUserClassStatus
+const completedQueueHandler = require("../completed-queue-functions/completed-queue-handler")
+const getClasses = require("../api/classApi").getClasses
 
 const assessmentMap = {
     'raptor_1_solo': `Dogfighting 101`,
@@ -58,6 +60,7 @@ async function queueController(runOrClassName, messageOrUser, openai, client, ad
     }else{
         userData = await checkQueueForUser(author.id);
     }
+
     if(addToQueue === true && userData !== null){
         console.log("Editing User in Queue")
         const addOrRemove = true; //this means to add the user, false means to remove them
@@ -660,6 +663,12 @@ async function addQueue(requestedText, message){
 
 async function removeFromQueue(player, requestedClass, completionStatus, messageOrUser, client, openai, slashCommand, guildObject){
     console.log(`Remove ${player} from ${requestedClass}`)
+    const classes = await getClasses()
+    const classId = classes.find(c => 
+        c.name === requestedClass || 
+        c.alt_name === requestedClass || 
+        (Array.isArray(c.ai_function_class_names) && c.ai_function_class_names.includes(requestedClass))
+    ).id;
     //check rank of person doing action
     const userId = slashCommand ? messageOrUser.id : messageOrUser.author.id;
     const guild = slashCommand ? guildObject : messageOrUser.guild; // Fetch the guild
@@ -692,9 +701,8 @@ async function removeFromQueue(player, requestedClass, completionStatus, message
                     userDataForUserList = await userlist.checkUserListForUser(userData);
                 }
                 //edit the userList user for completion, log it in the logHandler
-                // const editQueueSuccess = editQueue(requestedClass, userDataForUserList, openai, client, false, false);
                 const editUserListStatusSuccess = await updateUserClassStatus(userDataForUserList, requestedClass, true);
-                await logHandler(userData, messageOrUser, requestedClass, slashCommand);
+                await logHandler(userData, messageOrUser, classId, slashCommand);
 
                 //if both are successful, return a success message
                 if(editQueueSuccess && logHandler && editUserListStatusSuccess){

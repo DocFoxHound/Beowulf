@@ -3,6 +3,7 @@ const { getAvailableClasses } = require('../../queue-functions/get-available-cla
 const { updateUserClassStatus, checkUserListForUser, userlistApi } = require('../../userlist-functions/userlist-controller');
 const { queueController } = require('../../queue-functions/queue-controller');
 const { logHandler } = require('../../completed-queue-functions/completed-queue-handler');
+const { getClasses } = require('../../api/classApi');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -54,6 +55,12 @@ module.exports = {
             const status = interaction.options.getString('status');
             const completedBy = interaction.options.getUser('completed_by');
             const guild = interaction.guild
+            const classes = await getClasses()
+            const classId = classes.find(c => 
+                c.name === className || 
+                c.alt_name === className || 
+                (Array.isArray(c.ai_function_class_names) && c.ai_function_class_names.includes(className))
+            ).id;
             
             // Get the user data
             const userData = await checkUserListForUser(targetUser);
@@ -76,7 +83,7 @@ module.exports = {
                 // Set the class status to completed (true)
                 try{
                     await updateUserClassStatus(userData, className, true);
-                    await logHandler(userData, completedBy, className, true);
+                    // await logHandler(userData, completedBy, classId, true);
                     try{
                         await queueController(className, targetUser, openai, client, false, true, "completed", guild);
                     }catch(e){
@@ -96,6 +103,8 @@ module.exports = {
             } else if (status === 'not_completed') {
                 // Set the class status to not completed (false)
                 try{
+                    //find any logs for this user and this class
+                    //delete those logs
                     try{
                         await queueController(className, targetUser, openai, client, false, true, "not_completed", guild);
                     }catch(e){
@@ -117,6 +126,8 @@ module.exports = {
                 await interaction.reply(await queueController(className, interaction.user, openai, client, true, true));
             }else if(status === 'queue_remove'){
                 const guild = interaction.guild
+                //find any logs for this user and this class
+                //delete those logs
                 await interaction.reply(await queueController(className, interaction.user, openai, client, false, true, "not_completed", guild));
                 //runOrClassName, messageOrUser, openai, client, addToQueue, slashCommand, classCompletedOrIncomplete, guild
             }
