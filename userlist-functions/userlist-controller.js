@@ -296,6 +296,16 @@ async function getRaptorRank(memberRoles) {
     return 0;
 }
 
+async function getRaptorRankDb(userId) {
+    const user = await userlistApi.getUserById(userId);
+    if (!user) return 0;
+
+    if (user.raptor_3_solo && user.raptor_3_team) return 3;
+    if (user.raptor_2_solo && user.raptor_2_team) return 2;
+    if (user.raptor_1_solo && user.raptor_1_team) return 1;
+    return 0;
+}
+
 async function getCorsairRank(memberRoles) {
     const discordPrestigeRanks = await prestigeRoles.getPrestiges();
     // Create a map of role names to roles for quick lookup
@@ -313,6 +323,16 @@ async function getCorsairRank(memberRoles) {
     
 }
 
+async function getCorsairRankDb(userId) {
+    const user = await userlistApi.getUserById(userId);
+    if (!user) return 0;
+
+    if (user.corsair_3_fleet_commander) return 3;
+    if (user.corsair_2_ship_commander && user.corsair_2_wing_commander) return 2;
+    if (user.corsair_1_turret && user.corsair_1_torpedo) return 1;
+    return 0;
+}
+
 async function getRaiderRank(memberRoles) {
     const discordPrestigeRanks = await prestigeRoles.getPrestiges();
     // Create a map of role names to roles for quick lookup
@@ -326,6 +346,16 @@ async function getRaiderRank(memberRoles) {
             return role.id;
         }
     }
+    return 0;
+}
+
+async function getRaiderRankDb(userId) {
+    const user = await userlistApi.getUserById(userId);
+    if (!user) return 0;
+
+    if (user.raider_3_sailmaster) return 3;
+    if (user.raider_2_powdermonkey && user.raider_2_mate) return 2;
+    if (user.raider_1_swabbie && user.raider_1_linemaster && user.raider_1_boarder) return 1;
     return 0;
 }
 
@@ -347,5 +377,8 @@ module.exports = {
     getRaptorRank,
     getCorsairRank,
     getRaiderRank,
-    updateUserClassStatus
+    updateUserClassStatus,
+    getRaptorRankDb,
+    getCorsairRankDb,
+    getRaiderRankDb
 }

@@ -2,6 +2,7 @@ const piracyAdviceLocation = require("./piracy-advice-location");
 const transactCommodityLocation = require("./transact-commodity-location");
 const queueReminderCheck = require("../queue-functions/queue-controller").queueReminderCheck;
 const queueController = require("../queue-functions/queue-controller").queueController;
+const progressQuery = require("./progress-query").progressQuery;
 // const queueCheck = require("../queue-functions/queue-check")
 const botNotify = require("../common/bot-notify")
 
@@ -34,6 +35,8 @@ async function executeFunction(run, message, jsonData, openai, client) {
       return queueReminderCheck(openai, client, run, message);
     case "remove_player_from_queue":
       return queueController(run, message, openai, client, false); //false = remove user
+    case "progress":
+      return progressQuery(run, message, openai, client);
   }
 }
 
