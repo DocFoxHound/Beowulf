@@ -2,7 +2,7 @@ const getUsers = require('../api/userlistApi').getUsers;
 const userlistController = require('../userlist-functions/userlist-controller');
 
 
-async function progressQuery(run, message, openai, client){
+async function progressQuery(run, message){
     try{
         toolCall = run.required_action.submit_tool_outputs.tool_calls[0];
         parsedArgs = JSON.parse(toolCall.function.arguments);

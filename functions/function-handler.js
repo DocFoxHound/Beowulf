@@ -36,7 +36,7 @@ async function executeFunction(run, message, jsonData, openai, client) {
     case "remove_player_from_queue":
       return queueController(run, message, openai, client, false); //false = remove user
     case "progress":
-      return progressQuery(run, message, openai, client);
+      return progressQuery(run, message);
   }
 }
 
