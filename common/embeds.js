@@ -154,7 +154,7 @@ async function queueEmbed(interaction, status){
             || user.raider_2_powdermonkey === true
             || user.raider_2_mate === true
             || user.raider_3_sailmaster === true);
-            
+
         let raptorQueueFormatted = '';
         for(const user of raptorQueue){
             raptorQueueFormatted += `• **${user.username}:** ${user.raptor_1_solo ? 'RAPTOR 1 Solo, ' : ''} ${user.raptor_1_team ? 'RAPTOR 1 Team, ' : ''} ${user.raptor_2_solo ? 'RAPTOR 2 Solo, ' : ''} ${user.raptor_2_team ? 'RAPTOR 2 Team, ' : ''} ${user.raptor_3_solo ? 'RAPTOR 3 Solo, ' : ''} ${user.raptor_3_team ? 'RAPTOR 3 Team.' : ''}\n`;
@@ -195,7 +195,7 @@ async function queueEmbed(interaction, status){
                     inline: false 
                 }
             )
-            .setFooter({ text: 'Contact an administrator if you believe there are any errors in your progress tracking.' });
+            .setFooter({ text: 'Contact an administrator if you believe there are any errors.' });
         return embed;
         
     }catch(error){
