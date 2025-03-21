@@ -21,7 +21,7 @@ module.exports = {
     // Call your signup logic from the external file
     try {
       // await queueController(interaction.user.id, className);
-      await interaction.reply(await queueController(className, interaction.user, openAi, client, true, true));
+      await interaction.reply(await queueController(className, interaction.user, openAi, client, true, "slash-queue"));
     } catch (error) {
       console.error(error);
       await interaction.reply({ content: 'There was an error signing you up for the class.', ephemeral: true });
@@ -32,6 +32,7 @@ module.exports = {
     const focusedValue = interaction.options.getFocused();
     // Get the classes that the user hasn’t taken yet
     const availableClasses = await getAvailableClasses(interaction.user, interaction.guild, "available");
+    console.log(availableClasses)
     // Filter based on the current input
     const filtered = availableClasses.filter(c =>
       c.toLowerCase().startsWith(focusedValue.toLowerCase())

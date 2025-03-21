@@ -28,13 +28,13 @@ async function executeFunction(run, message, jsonData, openai, client) {
     case "where_to_buy":
       return transactCommodityLocation.transact_commodity_location(run, jsonData);
     case "add_player_to_queue":
-      return queueController(run, message, openai, client, true); //true = add user
+      return queueController(run, message, openai, client, true, "function-add"); //true = add user
     case "notify_queue_entry":
       return botNotify.notifyNewQueueThreadResponse(run);
     case "get_users_in_queue":
       return queueReminderCheck(openai, client, run, message);
     case "remove_player_from_queue":
-      return queueController(run, message, openai, client, false); //false = remove user
+      return queueController(run, message, openai, client, false, "function-remove"); //false = remove user
     case "progress":
       return progressQuery(run, message);
   }

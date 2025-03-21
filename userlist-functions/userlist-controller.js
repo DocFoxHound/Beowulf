@@ -360,8 +360,8 @@ async function getRaiderRankDb(userId) {
 }
 
 //checks if the user is in a queue already or not
-async function checkUserListForUser(author){
-    const user = await userlistApi.getUserById(author.id);
+async function checkUserListForUser(targetUserData){
+    const user = await userlistApi.getUserById(targetUserData.id);
     //if the user is in the database, we'll return the user data
     if(user){
         return user;

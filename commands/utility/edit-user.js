@@ -53,8 +53,9 @@ module.exports = {
             const targetUser = interaction.options.getUser('target');
             const className = interaction.options.getString('class');
             const status = interaction.options.getString('status');
-            const completedBy = interaction.options.getUser('completed_by');
+            const handler = interaction.options.getUser('completed_by');
             const guild = interaction.guild
+            let response = "";
             const classes = await getClasses()
             const classId = classes.find(c => 
                 c.name === className || 
@@ -74,7 +75,7 @@ module.exports = {
             
             // Update the user's class status
             if (status === 'completed') {
-                if(!completedBy){
+                if(!handler){
                     return interaction.reply({ 
                         content: 'Please include the officer/leader that performed this class or assessment on the player in the "completed_user" field.',
                         ephemeral: true 
@@ -85,19 +86,19 @@ module.exports = {
                     await updateUserClassStatus(userData, className, true);
                     // await logHandler(userData, completedBy, classId, true);
                     try{
-                        await queueController(className, targetUser, openai, client, false, true, "completed", guild);
+                        response = await queueController(className, interaction.user, openai, client, false, "slash-edituser", "completed", guild, targetUser, handler);
                     }catch(e){
-                        console.log(`The user may not be in a queue: `, e.message)
+                        response = `The user may not be in a queue: ${e.message}`
                     }
                 }catch(error){
                     console.log(`Error in edit-user command: ${error.message}`);
                     return interaction.reply({ 
-                        content: 'An error occurred while executing this command. Please try again later.',
+                        content: response,
                         ephemeral: true 
                     });
                 }
                 await interaction.reply({ 
-                    content: `Successfully marked class "${className}" as completed for ${targetUser.username}.`,
+                    content: response,
                     ephemeral: true 
                 });
             } else if (status === 'not_completed') {
@@ -106,35 +107,35 @@ module.exports = {
                     //find any logs for this user and this class
                     //delete those logs
                     try{
-                        await queueController(className, targetUser, openai, client, false, true, "not_completed", guild);
+                        response = await queueController(className, targetUser, openai, client, false, "slash-edituser", "not_completed", guild);
                     }catch(e){
-                        console.log(`The user may not be in a queue: `, e.message)
+                        response = `The user may not be in a queue: , ${e.message}`
                     }
                     await updateUserClassStatus(userData, className, false);
                 }catch(error){
-                    console.log(`Error in edit-user command: ${error.message}`);
+                    response = `Error in edit-user command: ${error.message}`;
                     return interaction.reply({ 
-                        content: 'An error occurred while executing this command. Please try again later.',
+                        content: response,
                         ephemeral: true 
                     });
                 }
                 await interaction.reply({ 
-                    content: `Successfully marked class "${className}" as not completed for ${targetUser.username}.`,
+                    content: response,
                     ephemeral: true 
                 });
             }else if(status === 'queue_add'){
-                await interaction.reply(await queueController(className, interaction.user, openai, client, true, true));
+                await interaction.reply(await queueController(className, interaction.user, openai, client, true, "slash-edituser"));
             }else if(status === 'queue_remove'){
                 const guild = interaction.guild
                 //find any logs for this user and this class
                 //delete those logs
-                await interaction.reply(await queueController(className, interaction.user, openai, client, false, true, "not_completed", guild));
+                await interaction.reply(await queueController(className, interaction.user, openai, client, false, "slash-edituser", "not_completed", guild));
                 //runOrClassName, messageOrUser, openai, client, addToQueue, slashCommand, classCompletedOrIncomplete, guild
             }
         } catch (error) {
-            console.log(`Error in edit-user command: ${error.message}`);
+            response = `Error in edit-user command: ${error.message}`;
             return interaction.reply({ 
-                content: 'An error occurred while executing this command. Please try again later.',
+                content: response,
                 ephemeral: true 
             });
         }

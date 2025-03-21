@@ -9,19 +9,19 @@ function hashString(inputString) {
     return hash.digest('hex'); // Returns the hash in hexadecimal format
 }
 
-async function logHandler(userData, messageOrUser, classId, slashCommand){
+async function logHandler(targetUser, handlerUser, classId, slashCommand){
     console.log("New log entry")
     //check if there's a log for this user and this class
-    await removeLog(userData.id, classId);
+    await removeLog(targetUser.id, classId);
 
     newEntry = {
         ticket_id: Date.now(),
-        user_id: userData.id,
-        user_username: userData.username,
-        user_nickname: userData.nickname,
-        handler_id: slashCommand ? messageOrUser.id : messageOrUser.author.id,
-        handler_username: slashCommand ? messageOrUser.username : messageOrUser.author.username,
-        handler_nickname: slashCommand ? messageOrUser.nickname : messageOrUser.author.nickname,
+        user_id: targetUser.id,
+        user_username: targetUser.username,
+        user_nickname: targetUser.nickname,
+        handler_id: slashCommand ? handlerUser.id : handlerUser.author.id,
+        handler_username: slashCommand ? handlerUser.username : handlerUser.author.username,
+        handler_nickname: slashCommand ? handlerUser.nickname : handlerUser.author.nickname,
         createdAt: new Date(),
         class_id: classId,
     }

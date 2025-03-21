@@ -33,7 +33,7 @@ const assessmentMap = {
     'raider_3_sailmaster': `Sailmaster Assessment`
 };
 
-async function queueController(runOrClassName, messageOrUser, openai, client, addToQueue, slashCommand, classCompletedOrIncomplete, guild){
+async function queueController(runOrClassName, messageOrUser, openai, client, addToQueue, commandOrigin, classCompletedOrIncomplete, guild, optionalTarget, optionalHandler){
     console.log("QueueController")
     let author = null;
     let toolCall = null;
@@ -41,17 +41,32 @@ async function queueController(runOrClassName, messageOrUser, openai, client, ad
     let requestedClass = null;
     let player = null;
 
-    if(slashCommand === true){ //if this is a slash command
+    if(commandOrigin === "slash-queue"){ //if this is a slash command
+        console.log("slash-queue")
         author = messageOrUser; //it is a user in this case
         parsedArgs = classCompletedOrIncomplete;
         requestedClass = runOrClassName; //it is a class name in this case
         player = author.nickname || author.username; //if we are removing someone from a queue we need their name
-    }else{ //if this is an interaction with the bot and the bot has proc'd a function
+    } else if(commandOrigin === "slash-edituser"){
+        console.log("slash-edituser")
+        author = messageOrUser.author; // player who initiated the command
+        parsedArgs = classCompletedOrIncomplete;
+        requestedClass = runOrClassName; 
+        player = optionalTarget.id; // targeted user
+    }else if (commandOrigin === "function-remove"){ 
+        console.log("function-remove")
         author = messageOrUser.author;
         toolCall = runOrClassName.required_action.submit_tool_outputs.tool_calls[0];
         parsedArgs = JSON.parse(toolCall.function.arguments);
         requestedClass = parsedArgs.queue_class;
         player = parsedArgs.player_name_or_id || parsedArgs; //if we are removing someone from a queue we need their name
+    }else if (commandOrigin === "function-add"){ //if this is an interaction with the bot and the bot has proc'd a function
+        console.log("function-add")
+        author = messageOrUser.author;
+        toolCall = runOrClassName.required_action.submit_tool_outputs.tool_calls[0];
+        parsedArgs = JSON.parse(toolCall.function.arguments);
+        requestedClass = parsedArgs.queue_class;
+        player = author.id; //if we are removing someone from a queue we need their name
     }
 
     userData = null;
@@ -80,7 +95,7 @@ async function queueController(runOrClassName, messageOrUser, openai, client, ad
         }
     }else if(addToQueue === false){
         const completionStatus = parsedArgs.status || parsedArgs;
-        return removeFromQueue(player.toLowerCase(), requestedClass, completionStatus, messageOrUser, client, openai, slashCommand, guild);
+        return removeFromQueue(player /*target user*/, requestedClass, completionStatus, messageOrUser /*handler or originator*/, client, openai, commandOrigin, guild, optionalTarget, optionalHandler);
     }
 }
 
@@ -211,7 +226,7 @@ async function queueReminderCheck(openai, client, run, message){
 }
 
 async function editQueue(requestedText, userData, openai, client, addOrRemove, forQueue){
-    console.log(requestedText)
+    console.log("editQueue")
     switch (requestedText.toLowerCase()){
         case "raptor_1_solo":
             userData.raptor_1_solo = addOrRemove;
@@ -661,80 +676,86 @@ async function addQueue(requestedText, message){
     return await queueApi.createUserInQueue(newUser);
 }
 
-async function removeFromQueue(player, requestedClass, completionStatus, messageOrUser, client, openai, slashCommand, guildObject){
-    console.log(`Remove ${player} from ${requestedClass}`)
-    const classes = await getClasses()
-    const classId = classes.find(c => 
-        c.name === requestedClass || 
-        c.alt_name === requestedClass || 
-        (Array.isArray(c.ai_function_class_names) && c.ai_function_class_names.includes(requestedClass))
-    ).id;
-    //check rank of person doing action
-    const userId = slashCommand ? messageOrUser.id : messageOrUser.author.id;
-    const guild = slashCommand ? guildObject : messageOrUser.guild; // Fetch the guild
-    // const guild = await client.guilds.fetch(process.env.GUILD_ID_TEST); // Fetch the guild
-    const member = await guild.members.fetch(userId); // Fetch the member
-    const memberRoles = member.roles.cache.map(role => role.id);
-    const moderatorRanks = process.env?.MODERATOR_ROLES?.split(",");
-    const isModerator = memberRoles.some(element => moderatorRanks.includes(element)); //check if the user has one of the moderator roles
-    if(isModerator){
-        //get the queue'd users
-        const users = await queueApi.getUsersInQueue();
-        //get the one user
-        userData;
-        for (const element of users) {
-            if (element.id === player || element.username?.toLowerCase() === player || element.nickname?.toLowerCase() === player) {
-                userData = element;
-            }
-        }
-
-        //if we get a match, we perform the required action
-        if(userData && requestedClass !== "all"){
-            console.log("Remove from specific queue: ", requestedClass)
-            const editQueueSuccess = await editQueue(requestedClass, userData, openai, client, false, true); //flase = remove from queue
-            //if successful, mark it in the player list
-            if(editQueueSuccess && completionStatus === "completed"){
-                userDataForUserList = await userlist.checkUserListForUser(userData); //get the user object from the userlist so we can mark something as complete
-                if(userDataForUserList === null){//if the user doesn't exist for some reason, let's make him
-                    console.log("User isn't on UserList")
-                    await userlist.createNewUser(userData, client, messageOrUser.guildId);
-                    userDataForUserList = await userlist.checkUserListForUser(userData);
+async function removeFromQueue(targetUser /*targetUser*/, requestedClass, completionStatus, messageOrUser /*handler or originator*/, client, openai, slashCommand, guildObject, optionalTarget, optionalHandler){
+    console.log(`Remove ${targetUser} from ${requestedClass}`)
+    try{
+        const classes = await getClasses()
+        const classId = classes.find(c => 
+            c.name === requestedClass || 
+            c.alt_name === requestedClass || 
+            (Array.isArray(c.ai_function_class_names) && c.ai_function_class_names.includes(requestedClass))
+        ).id;
+        //check rank of person doing action
+        const userId = slashCommand ? messageOrUser.id : messageOrUser.author.id;
+        const guild = slashCommand ? guildObject : messageOrUser.guild; // Fetch the guild
+        // const guild = await client.guilds.fetch(process.env.GUILD_ID_TEST); // Fetch the guild
+        const member = await guild.members.fetch(userId); // Fetch the member
+        const memberRoles = member.roles.cache.map(role => role.id);
+        const moderatorRanks = process.env?.MODERATOR_ROLES?.split(",");
+        const isModerator = memberRoles.some(element => moderatorRanks.includes(element)); //check if the user has one of the moderator roles
+        if(isModerator){
+            //get the queue'd users
+            const users = await queueApi.getUsersInQueue();
+            //get the one user
+            let targetUserData; //not handler, but the target user to be logged
+            for (const element of users) {
+                if (element.id === targetUser || element.username?.toLowerCase() === targetUser.toLowerCase() || element.nickname?.toLowerCase() === targetUser.toLowerCase()) {
+                    targetUserData = element;
                 }
-                //edit the userList user for completion, log it in the logHandler
-                const editUserListStatusSuccess = await updateUserClassStatus(userDataForUserList, requestedClass, true);
-                await logHandler(userData, messageOrUser, classId, slashCommand);
+            }
 
-                //if both are successful, return a success message
-                if(editQueueSuccess && logHandler && editUserListStatusSuccess){
-                    return `${userData.nickname || userData.username} was marked as complete for ${requestedClass} and ${slashCommand ? messageOrUser.username : messageOrUser.author.username} completed the ticket.`
+            //if we get a match, we perform the required action
+            if(targetUserData && requestedClass !== "all"){
+                console.log(`Remove ${targetUserData.username} specific queue: `, requestedClass)
+                const editQueueSuccess = await editQueue(requestedClass, targetUserData, openai, client, false, true); //flase = remove from queue
+                //if successful, mark it in the player list
+                if(editQueueSuccess && completionStatus === "completed"){
+                    userDataForUserList = await userlist.checkUserListForUser(targetUserData); //get the user object from the userlist so we can mark something as complete
+                    if(userDataForUserList === null){//if the user doesn't exist for some reason, let's make him
+                        console.log("User isn't on UserList")
+                        await userlist.createNewUser(targetUserData, client, messageOrUser.guildId);
+                        userDataForUserList = await userlist.checkUserListForUser(targetUserData);
+                    }
+                    //edit the userList user for completion, log it in the logHandler
+                    const editUserListStatusSuccess = await updateUserClassStatus(userDataForUserList, requestedClass, true);
+                    await logHandler(optionalTarget ? optionalTarget : targetUserData, optionalHandler ? optionalHandler : messageOrUser, classId, slashCommand); //messageOrUser is handler
+
+                    //if both are successful, return a success message
+                    if(editQueueSuccess && logHandler && editUserListStatusSuccess){
+                        return `${targetUserData.nickname || targetUserData.username} was marked as complete for ${requestedClass} and ${slashCommand ? messageOrUser.username : messageOrUser.author.username} completed the ticket.`
+                    }else{
+                        return `${targetUserData.nickname || targetUserData.username} was removed from the ${requestedClass} queue but there was an error in logging the course.`
+                    }
+
+                    //mark player as having this complete
+                }else if(editQueueSuccess && completionStatus === "not_completed"){
+                    return `${targetUserData.nickname || targetUserData.username} was removed from the ${requestedClass} queue.`
                 }else{
-                    return `${userData.nickname || userData.username} was removed from the ${requestedClass} queue but there was an error in logging the course.`
+                    return `There was an error editing ${targetUserData.nickname || targetUserData.username}'s ${requestedClass} queue status.`
                 }
-
-                //mark player as having this complete
-            }else if(editQueueSuccess && completionStatus === "not_completed"){
-                return `${userData.nickname || userData.username} was removed from the ${requestedClass} queue.`
+                //check if the player has no more queue's and then remove if they don't
+                
+            }else if(targetUserData && requestedClass === "all"){
+                console.log(`Remove ${targetUserData.id} from all queues.`)
+                const deleteSuccess = await queueApi.deleteUserInQueue(targetUserData.id);
+                if(deleteSuccess === true){
+                    return true;
+                }else{
+                    return false;
+                }
             }else{
-                return `There was an error editing ${userData.nickname || userData.username}'s ${requestedClass} queue status.`
+                console.log("Error occurred while removing player from queue.");
+                return "The user could not be found in the queue. Please us the Username, Nickname, or UserID to search."
             }
-            //check if the player has no more queue's and then remove if they don't
-            
-        }else if(userData && requestedClass === "all"){
-            console.log(`Remove ${userData.id} from all queues.`)
-            const deleteSuccess = await queueApi.deleteUserInQueue(userData.id);
-            if(deleteSuccess === true){
-                return true;
-            }else{
-                return false;
-            }
+            //return a response
         }else{
-            console.log("Error occurred.");
-            return "The user could not be found in the queue. Please us the Username, Nickname, or UserID to search."
+            console.log("The user who requested this action does not have sufficient rank to do so.")
+            return "The user who requested this action does not have sufficient rank to do so."
         }
-        //return a response
-    }else{
-        return "The user who requested this action does not have sufficient rank to do so."
+    }catch(error){
+        console.log("Error in removeFromQueue: ", error)
     }
+    
 }
 
 module.exports = {

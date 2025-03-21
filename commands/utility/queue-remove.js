@@ -59,7 +59,7 @@ module.exports = {
             const parsedArgs = {
                 status: status
             };
-            const result = await queueController(className, targetUser, openai, client, false, true, parsedArgs, guild);
+            const result = await queueController(className, targetUser, openai, client, false, "slash-queue", parsedArgs, guild);
             // runOrClassName, messageOrUser, openai, client, addToQueue, slashCommand, classCompletedOrIncomplete, guild
 
             await interaction.reply({
