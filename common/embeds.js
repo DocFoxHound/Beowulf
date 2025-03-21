@@ -2,6 +2,7 @@ const { EmbedBuilder } = require('discord.js');
 const userlistController = require('../userlist-functions/userlist-controller.js');
 const { progressBar } = require('./progress-bar.js');
 const { getUsersInQueue } = require('../api/queueApi')
+const { getEntriesBetweenDates } = require('../api/completed-queue-api.js')
 
 async function progressEmbed(targetUser, userData){    
     try{
@@ -203,8 +204,101 @@ async function queueEmbed(interaction, status){
     }   
 }
 
+async function topHandlers(client, interaction, timeframe){
+    try{
+        let quarterDescription = '';
+        let entries = null;
+        let year = null;
+
+        if(timeframe === 'all'){
+            // Fetch all entries
+            entries = await getEntriesBetweenDates(new Date(0), new Date());
+        }else{
+            const date = new Date();
+            let startDate;
+            let endDate;
+            let quarterOneStart = new Date(date.getFullYear(), 0, 1);
+            let quarterOneEnd = new Date(date.getFullYear(), 2, 31);
+            let quarterTwoStart = new Date(date.getFullYear(), 3, 1);
+            let quarterTwoEnd = new Date(date.getFullYear(), 5, 30);
+            let quarterThreeStart = new Date(date.getFullYear(), 6, 1);
+            let quarterThreeEnd = new Date(date.getFullYear(), 8, 30);
+            let quarterFourStart = new Date(date.getFullYear(), 9, 1);
+            let quarterFourEnd = new Date(date.getFullYear(), 11, 31);
+            const now = new Date();
+            const currentYear = now.getFullYear();
+            year = currentYear;
+            if(timeframe === "this-quarter"){
+                if(date >= quarterOneStart && date <= quarterOneEnd){
+                    quarterDescription = "Quarter 1";
+                    startDate = new Date(`${currentYear}-01-01`);
+                    endDate = new Date(`${currentYear}-03-31`);
+                }else if(date >= quarterTwoStart && date <= quarterTwoEnd){
+                    quarterDescription = "Quarter 2";
+                    startDate = new Date(`${currentYear}-04-01`);
+                    endDate = new Date(`${currentYear}-06-30`);
+                }else if(date >= quarterThreeStart && date <= quarterThreeEnd){
+                    quarterDescription = "Quarter 3";
+                    startDate = new Date(`${currentYear}-07-01`);
+                    endDate = new Date(`${currentYear}-09-30`);
+                }else if(date >= quarterFourStart && date <= quarterFourEnd){
+                    quarterDescription = "Quarter 4";
+                    startDate = new Date(`${currentYear}-10-01`);
+                    endDate = new Date(`${currentYear}-12-31`);
+                }else{
+                    return 'Invalid date range';
+                }
+                entries = await getEntriesBetweenDates(startDate, endDate);
+            }else if(timeframe === "last-quarter"){
+
+            }
+        }
+
+        // Group entries by handler_id and count total entries for each handler
+        const handlerCounts = entries.reduce((acc, entry) => {
+            acc[entry.handler_id] = (acc[entry.handler_id] || 0) + 1;
+            return acc;
+        }, {});
+
+        // Convert the handlerCounts object to an array of [handler_id, count] pairs
+        const sortedHandlers = Object.entries(handlerCounts).sort((a, b) => b[1] - a[1]);
+
+        // Format the sorted handlers for the embed
+        // const handlerList = sortedHandlers.map(([handler_id, count]) => `• **<@${handler_id}>**: ${count} entries`)
+
+        // Fetch usernames for each handler_id
+        const handlerList = await Promise.all(sortedHandlers.map(async ([handler_id, count]) => {
+            const user = await client.users.fetch(handler_id);
+            return `• **${user.username}**: ${count} entries`;
+        }));
+
+        const guildIconUrl = interaction.guild.iconURL({
+            dynamic: true,  // true -> animated icon if available
+            size: 512      // specify size e.g. 128, 256, 512, 1024, 2048
+        });
+
+        const embed = new EmbedBuilder()
+            .setTitle(`Top Handlers`)
+            .setDescription(`${quarterDescription}, ${year}`)
+            .setColor('#ff0000')
+            .setThumbnail(guildIconUrl)
+            .setTimestamp()
+            .addFields(
+                { 
+                    name: `__Top Handlers__`, 
+                    value: handlerList.join('\n'),
+                    inline: false 
+                }
+            )
+            .setFooter({ text: 'Contact an administrator if you believe there are any errors.' });
+        return embed;
+    }catch(error){
+        console.error(error);
+    }   
+}
 
 module.exports = {
     progressEmbed,
     queueEmbed,
+    topHandlers,
 };

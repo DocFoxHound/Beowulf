@@ -26,6 +26,22 @@ async function getEntries() {
     }
 }
 
+async function getEntriesBetweenDates(startDate, endDate) {
+    const apiUrl = `${process.env.SERVER_URL}/api/completedEntry/betweendates`;
+    try {
+        const response = await axios.get(apiUrl, {
+            params: {
+                startdate: startDate.toISOString(),
+                enddate: endDate.toISOString()
+            }
+        });
+        return response.data;  // This will be the return value of the function
+    } catch (error) {
+        console.error('Error fetching users in Queue:', error.response ? error.response.data : error.message);
+        return null;  // Return null if there's an error
+    }
+}
+
 async function getEntryById(entryId){
     const apiUrl = process.env.SERVER_URL;
     try {
@@ -39,7 +55,7 @@ async function getEntryById(entryId){
 async function getEntryByUserAndClass(userId, classId){
     const apiUrl = process.env.SERVER_URL;
     try {
-        const response = await axios.get(`${apiUrl}/api/completedEntry/${userId}/${classId}`);
+        const response = await axios.get(`${apiUrl}/api/completedEntry/user/${userId}/class/${classId}`);
         return response.data;  // This now properly returns the response data to the caller
     } catch (error) {
         return null;  // Return null or throw an error, depending on how you want to handle errors
@@ -81,5 +97,6 @@ module.exports = {
     getEntryById,
     editEntry,
     deleteEntry,
-    getEntryByUserAndClass
+    getEntryByUserAndClass,
+    getEntriesBetweenDates
 };
