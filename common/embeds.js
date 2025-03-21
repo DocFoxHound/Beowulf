@@ -30,6 +30,38 @@ async function progressEmbed(targetUser, userData){
         'RAIDER 2 Mate': userData.raider_2_mate || false,
         'RAIDER 3 Sailmaster': userData.raider_3_sailmaster || false
     };
+
+    //calculate tier eligibility
+    let raptorEligibility = 0;
+    let corsairEligibility = 0;
+    let raiderEligibility = 0;
+    if(userData.raptor_1_solo === true && userData.raptor_1_team === true){
+        raptorEligibility++;
+    }
+    if(userData.raptor_2_solo === true && userData.raptor_2_team === true){
+        raptorEligibility++;
+    }
+    if(userData.raptor_3_solo === true && userData.raptor_3_team === true){
+        raptorEligibility++;
+    }
+    if(userData.corsair_1_torpedo === true && userData.corsair_1_turret === true){
+        corsairEligibility++;
+    }
+    if(userData.corsair_2_ship_commander === true && userData.corsair_2_wing_commander === true){
+        corsairEligibility++;
+    }
+    if(userData.corsair_3_fleet_commander === true){
+        corsairEligibility++;
+    }
+    if(userData.raider_1_boarder === true && userData.raider_1_linemaster === true && userData.raider_1_swabbie === true){
+        raiderEligibility++;
+    }
+    if(userData.raider_2_mate === true && userData.raider_2_powdermonkey === true){
+        raiderEligibility++;
+    }
+    if(userData.raider_3_sailmaster === true){
+        raiderEligibility++;
+    }
     
     // Helper function to format assessment status
     const formatAssessments = (assessments) => {
@@ -71,7 +103,7 @@ async function progressEmbed(targetUser, userData){
         .setDescription(`**Overall Completion: __${overallCompletion}%__** ${totalProgressBar}
             \n**Crew Progress: __${crewCompletion}%__** (earn 3 total prestige levels)
             ${crewProgressBar}
-            \n**Marauder Progress: __${marauderCompletion}%__**  (earn 3 prestige levels in one area)
+            \n**Marauder Progress: __${marauderCompletion}%__**  (TIER 3 in at least one Prestige)
             ${marauderProgressBar}\n
             `)
         .setColor('#0099ff')
@@ -79,18 +111,18 @@ async function progressEmbed(targetUser, userData){
         .setTimestamp()
         .addFields(
             { 
-                name: `RAPTOR Assessments (${raptorCompletion}%)`, 
-                value: formatAssessments(raptorFields), 
+                name: `__RAPTOR Assessments (${raptorCompletion}%)__`, 
+                value: `Prestige Eligibility: **TIER ${raptorEligibility}**` + `\n` + formatAssessments(raptorFields), 
                 inline: false 
             },
             { 
-                name: `CORSAIR Assessments (${corsairCompletion}%)`, 
-                value: formatAssessments(corsairFields), 
+                name: `__CORSAIR Assessments (${corsairCompletion}%)__`, 
+                value: `Prestige Eligibility: **TIER ${corsairEligibility}**` + `\n` + formatAssessments(corsairFields), 
                 inline: false 
             },
             { 
-                name: `RAIDER Assessments (${raiderCompletion}%)`, 
-                value: formatAssessments(raiderFields), 
+                name: `__RAIDER Assessments (${raiderCompletion}%)__`, 
+                value: `Prestige Eligibility: **TIER ${raiderEligibility}**` + `\n` + formatAssessments(raiderFields), 
                 inline: false 
             }
         )
