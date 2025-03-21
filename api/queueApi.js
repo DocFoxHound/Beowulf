@@ -83,7 +83,6 @@ async function getUserById(userId){
     }
 }
 
-
 async function editUserInQueue(userId, updatedUserData) {
     const apiUrl = `${process.env.SERVER_URL}/api/queue/${userId}`; // Assuming this is the correct endpoint
     try {
