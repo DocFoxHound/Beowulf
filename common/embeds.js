@@ -229,8 +229,6 @@ async function topHandlers(client, interaction, timeframe){
             const now = new Date();
             const currentYear = now.getFullYear();
             year = currentYear;
-            console.log("Year: ", year)
-            console.log(`Year: ${year-1}`)
             if(timeframe === "this-quarter"){
                 if(date >= quarterOneStart && date <= quarterOneEnd){
                     quarterDescription = "Quarter 1";

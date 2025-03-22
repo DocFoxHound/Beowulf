@@ -3,6 +3,7 @@ const transactCommodityLocation = require("./transact-commodity-location");
 const queueReminderCheck = require("../queue-functions/queue-controller").queueReminderCheck;
 const queueController = require("../queue-functions/queue-controller").queueController;
 const progressQuery = require("./progress-query").progressQuery;
+const handlerQuery = require("./handler-query").handlerQuery;
 // const queueCheck = require("../queue-functions/queue-check")
 const botNotify = require("../common/bot-notify")
 
@@ -37,6 +38,8 @@ async function executeFunction(run, message, jsonData, openai, client) {
       return queueController(run, message, openai, client, false, "function-remove"); //false = remove user
     case "progress":
       return progressQuery(run, message);
+    case "top_ticket_handlers":
+      return handlerQuery(run, client);
   }
 }
 
