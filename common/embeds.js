@@ -209,6 +209,7 @@ async function topHandlers(client, interaction, timeframe){
         let quarterDescription = '';
         let entries = null;
         let year = null;
+        let endDescription = null;
 
         if(timeframe === 'all'){
             // Fetch all entries
@@ -228,70 +229,123 @@ async function topHandlers(client, interaction, timeframe){
             const now = new Date();
             const currentYear = now.getFullYear();
             year = currentYear;
+            console.log("Year: ", year)
+            console.log(`Year: ${year-1}`)
             if(timeframe === "this-quarter"){
                 if(date >= quarterOneStart && date <= quarterOneEnd){
                     quarterDescription = "Quarter 1";
-                    startDate = new Date(`${currentYear}-01-01`);
-                    endDate = new Date(`${currentYear}-03-31`);
+                    startDate = new Date(`${year}-01-01`);
+                    endDate = new Date(`${year}-03-31`);
+                    endDescription = `${year}-03-31`;
                 }else if(date >= quarterTwoStart && date <= quarterTwoEnd){
                     quarterDescription = "Quarter 2";
-                    startDate = new Date(`${currentYear}-04-01`);
-                    endDate = new Date(`${currentYear}-06-30`);
+                    startDate = new Date(`${year}-04-01`);
+                    endDate = new Date(`${year}-06-30`);
+                    endDescription = `${year}-06-30`;
                 }else if(date >= quarterThreeStart && date <= quarterThreeEnd){
                     quarterDescription = "Quarter 3";
-                    startDate = new Date(`${currentYear}-07-01`);
-                    endDate = new Date(`${currentYear}-09-30`);
+                    startDate = new Date(`${year}-07-01`);
+                    endDate = new Date(`${year}-09-30`);
+                    endDescription = `${year}-09-30`;
                 }else if(date >= quarterFourStart && date <= quarterFourEnd){
                     quarterDescription = "Quarter 4";
-                    startDate = new Date(`${currentYear}-10-01`);
-                    endDate = new Date(`${currentYear}-12-31`);
+                    startDate = new Date(`${year}-10-01`);
+                    endDate = new Date(`${year}-12-31`);
+                    endDescription = `${year}-12-31`;
                 }else{
                     return 'Invalid date range';
                 }
                 entries = await getEntriesBetweenDates(startDate, endDate);
             }else if(timeframe === "last-quarter"){
-
+                if(date >= quarterOneStart && date <= quarterOneEnd){
+                    year = year-1;
+                    quarterDescription = "Quarter 4";
+                    startDate = new Date(`${year}-10-01`);
+                    endDate = new Date(`${year}-12-31`);
+                    endDescription = `${year}-12-31`;
+                }else if(date >= quarterTwoStart && date <= quarterTwoEnd){
+                    quarterDescription = "Quarter 1";
+                    startDate = new Date(`${year}-01-011`);
+                    endDate = new Date(`${year}-03-31`);
+                    endDescription = `${year}-03-31`;
+                }else if(date >= quarterThreeStart && date <= quarterThreeEnd){
+                    quarterDescription = "Quarter 2";
+                    startDate = new Date(`${year}-04-01`);
+                    endDate = new Date(`${year}-06-30`);
+                    endDescription = `${year}-06-30`;
+                }else if(date >= quarterFourStart && date <= quarterFourEnd){
+                    quarterDescription = "Quarter 3";
+                    startDate = new Date(`${year}-07-01`);
+                    endDate = new Date(`${year}-09-30`);
+                    endDescription = `${year}-09-30`;
+                }else{
+                    return 'Invalid date range';
+                }
             }
         }
 
-        // Group entries by handler_id and count total entries for each handler
-        const handlerCounts = entries.reduce((acc, entry) => {
-            acc[entry.handler_id] = (acc[entry.handler_id] || 0) + 1;
-            return acc;
-        }, {});
+        if(entries !== null){
+            // Group entries by handler_id and count total entries for each handler
+            const handlerCounts = entries.reduce((acc, entry) => {
+                acc[entry.handler_id] = (acc[entry.handler_id] || 0) + 1;
+                return acc;
+            }, {});
 
-        // Convert the handlerCounts object to an array of [handler_id, count] pairs
-        const sortedHandlers = Object.entries(handlerCounts).sort((a, b) => b[1] - a[1]);
+            // Convert the handlerCounts object to an array of [handler_id, count] pairs
+            const sortedHandlers = Object.entries(handlerCounts).sort((a, b) => b[1] - a[1]);
 
-        // Format the sorted handlers for the embed
-        // const handlerList = sortedHandlers.map(([handler_id, count]) => `• **<@${handler_id}>**: ${count} entries`)
+            // Format the sorted handlers for the embed
+            // const handlerList = sortedHandlers.map(([handler_id, count]) => `• **<@${handler_id}>**: ${count} entries`)
 
-        // Fetch usernames for each handler_id
-        const handlerList = await Promise.all(sortedHandlers.map(async ([handler_id, count]) => {
-            const user = await client.users.fetch(handler_id);
-            return `• **${user.username}**: ${count} entries`;
-        }));
+            // Fetch usernames for each handler_id
+            const handlerList = await Promise.all(sortedHandlers.map(async ([handler_id, count]) => {
+                const user = await client.users.fetch(handler_id);
+                return `• **${user.username}**: ${count} entries`;
+            }));
 
-        const guildIconUrl = interaction.guild.iconURL({
-            dynamic: true,  // true -> animated icon if available
-            size: 512      // specify size e.g. 128, 256, 512, 1024, 2048
-        });
+            const guildIconUrl = interaction.guild.iconURL({
+                dynamic: true,  // true -> animated icon if available
+                size: 512      // specify size e.g. 128, 256, 512, 1024, 2048
+            });
 
-        const embed = new EmbedBuilder()
-            .setTitle(`Top Handlers`)
-            .setDescription(`${quarterDescription}, ${year}`)
-            .setColor('#ff0000')
-            .setThumbnail(guildIconUrl)
-            .setTimestamp()
-            .addFields(
-                { 
-                    name: `__Top Handlers__`, 
-                    value: handlerList.join('\n'),
-                    inline: false 
-                }
-            )
-            .setFooter({ text: 'Contact an administrator if you believe there are any errors.' });
-        return embed;
+            const embed = new EmbedBuilder()
+                .setTitle(`Top Handlers`)
+                .setDescription(`${quarterDescription ? quarterDescription : "All time"}, ${year ? year : ""} \nEnding: ${endDescription ? endDescription : "Today"}`)
+                .setColor('#ff0000')
+                .setThumbnail(guildIconUrl)
+                .setTimestamp()
+                .addFields(
+                    { 
+                        name: `__Top Handlers__`, 
+                        value: handlerList.join('\n'),
+                        inline: false 
+                    }
+                )
+                .setFooter({ text: 'Contact an administrator if you believe there are any errors.' });
+            return embed;
+        }else{
+            const guildIconUrl = interaction.guild.iconURL({
+                dynamic: true,  // true -> animated icon if available
+                size: 512      // specify size e.g. 128, 256, 512, 1024, 2048
+            });
+
+            const embed = new EmbedBuilder()
+                .setTitle(`Top Handlers`)
+                .setDescription(`${quarterDescription ? quarterDescription : "All time"}, ${year ? year : ""} \nEnding: ${endDescription ? endDescription : "Today"}`)
+                .setColor('#ff0000')
+                .setThumbnail(guildIconUrl)
+                .setTimestamp()
+                .addFields(
+                    { 
+                        name: `__Top Handlers__`, 
+                        value: "There were no entries in this timeframe.",
+                        inline: false 
+                    }
+                )
+                .setFooter({ text: 'Contact an administrator if you believe there are any errors.' });
+            return embed;
+        }
+        
     }catch(error){
         console.error(error);
     }   
