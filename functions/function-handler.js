@@ -4,6 +4,7 @@ const queueReminderCheck = require("../queue-functions/queue-controller").queueR
 const queueController = require("../queue-functions/queue-controller").queueController;
 const progressQuery = require("./progress-query").progressQuery;
 const handlerQuery = require("./handler-query").handlerQuery;
+const badgeQuery = require("./badge-query").badgeQuery;
 // const queueCheck = require("../queue-functions/queue-check")
 const botNotify = require("../common/bot-notify")
 
@@ -40,6 +41,8 @@ async function executeFunction(run, message, jsonData, openai, client) {
       return progressQuery(run, message);
     case "top_ticket_handlers":
       return handlerQuery(run, client);
+    case "recognize_badges_request":
+      return badgeQuery(run, message);
   }
 }
 
