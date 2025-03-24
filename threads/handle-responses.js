@@ -1,6 +1,6 @@
 
 
-async function handleReplyToUser(openai, client, message, thread, threadPair, mentionRegex, userCache, jsonData, ){
+async function handleReplyToUser(openai, client, message, thread, threadPair, mentionRegex, userCache, preloadedDbTables, ){
 
 }
 

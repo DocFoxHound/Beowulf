@@ -1,21 +1,37 @@
-async function getTopCommodityBuySellLocations(){
+async function getTopCommodityBuySellLocations(terminalPrices){
     reconstructedCommodityList = [];
-    for (const packet of terminalPrices) {
-        for (const terminal of packet.data) {
-            let locationDirect = terminal.outpost_name ? terminal.outpost_name :
-                terminal.city_name ? terminal.city_name :
-                terminal.space_station_name ? terminal.space_station_name : "";
-            let locationHigher = terminal.moon_name ? terminal.moon_name :
-                terminal.planet_name ? terminal.planet_name : "";
-            //check if the terminal's commodity name is already stored in the list
-            let foundCommodity = reconstructedCommodityList.find(item => (
-                item.commodity_name.toLowerCase() === terminal.commodity_name.toLowerCase()
-            ));
+    for (const terminal of terminalPrices) {
+        let locationDirect = terminal.outpost_name ? terminal.outpost_name :
+            terminal.city_name ? terminal.city_name :
+            terminal.space_station_name ? terminal.space_station_name : "";
+        let locationHigher = terminal.moon_name ? terminal.moon_name :
+            terminal.planet_name ? terminal.planet_name : "";
+        //check if the terminal's commodity name is already stored in the list
+        let foundCommodity = reconstructedCommodityList.find(item => (
+            item.commodity_name.toLowerCase() === terminal.commodity_name.toLowerCase()
+        ));
 
-            //if the commodity item already exists, and it we'll just add this terminal to it
-            if(foundCommodity){
-                //add the terminal to this commodity's list
-                foundCommodity.terminals.push({
+        //if the commodity item already exists, and it we'll just add this terminal to it
+        if(foundCommodity){
+            //add the terminal to this commodity's list
+            foundCommodity.terminals.push({
+                star_system_name: terminal.star_system_name,
+                location_direct: locationDirect,
+                location_parent: locationHigher,
+                terminal_name: terminal.terminal_name,
+                terminal_code: terminal.terminal_code,
+                price_buy_avg: terminal.price_buy_avg,
+                price_sell_avg: terminal.price_sell_avg,
+                scu_buy_avg: terminal.scu_buy_avg, //how much can you buy at once
+                scu_sell_avg: terminal.scu_sell_avg
+            })
+        //if the commodity doesn't already exist, then we'll add it to the list
+        }else{
+            reconstructedCommodityList.push({
+                commodity_name: terminal.commodity_name,
+                commodity_code: terminal.commodity_code,
+                commodity_slug: terminal.commodity_slug,
+                terminals: [{
                     star_system_name: terminal.star_system_name,
                     location_direct: locationDirect,
                     location_parent: locationHigher,
@@ -25,29 +41,8 @@ async function getTopCommodityBuySellLocations(){
                     price_sell_avg: terminal.price_sell_avg,
                     scu_buy_avg: terminal.scu_buy_avg, //how much can you buy at once
                     scu_sell_avg: terminal.scu_sell_avg
-                })
-            //if the commodity doesn't already exist, then we'll add it to the list
-            }else{
-                reconstructedCommodityList.push({
-                    commodity_name: terminal.commodity_name,
-                    commodity_code: terminal.commodity_code,
-                    commodity_slug: terminal.commodity_slug,
-                    terminals: [{
-                        star_system_name: terminal.star_system_name,
-                        location_direct: locationDirect,
-                        location_parent: locationHigher,
-                        terminal_name: terminal.terminal_name,
-                        terminal_code: terminal.terminal_code,
-                        price_buy_avg: terminal.price_buy_avg,
-                        price_sell_avg: terminal.price_sell_avg,
-                        scu_buy_avg: terminal.scu_buy_avg, //how much can you buy at once
-                        scu_sell_avg: terminal.scu_sell_avg
-                    }]
-                })
-            }
-            //TODO: 
-            // 1. build a list of commodities
-            // 2. place terminals with only buy/sell transactions on each commodity (with system parent)
+                }]
+            })
         }
     }
     //sort the mega array into system-specific arrays for buy and sell

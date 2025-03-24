@@ -9,26 +9,26 @@ const badgeQuery = require("./badge-query").badgeQuery;
 const botNotify = require("../common/bot-notify")
 
 
-async function executeFunction(run, message, jsonData, openai, client) {
+async function executeFunction(run, message, preloadedDbTables, openai, client) {
   message.channel.sendTyping();  // Send typing indicator once we know we need to process
   //if the function is something that requires getting a list of users...
   const toolCall = run.required_action.submit_tool_outputs.tool_calls[0];
   console.log(toolCall.function.name)
   switch (toolCall.function.name) {
     case "piracy_advice_location":
-      return piracyAdviceLocation.piracy_advice_location(run, jsonData);
+      return piracyAdviceLocation.piracy_advice_location(run, preloadedDbTables);
     case "sell_commodity":
-      return transactCommodityLocation.transact_commodity_location(run, jsonData);
+      return transactCommodityLocation.transact_commodity_location(run, preloadedDbTables);
     case "sell_item":
-      return transactCommodityLocation.transact_commodity_location(run, jsonData);
+      return transactCommodityLocation.transact_commodity_location(run, preloadedDbTables);
     case "where_to_sell":
-      return transactCommodityLocation.transact_commodity_location(run, jsonData);
+      return transactCommodityLocation.transact_commodity_location(run, preloadedDbTables);
     case "buy_commodity":
-      return transactCommodityLocation.transact_commodity_location(run, jsonData);
+      return transactCommodityLocation.transact_commodity_location(run, preloadedDbTables);
     case "buy_item":
-      return transactCommodityLocation.transact_commodity_location(run, jsonData);
+      return transactCommodityLocation.transact_commodity_location(run, preloadedDbTables);
     case "where_to_buy":
-      return transactCommodityLocation.transact_commodity_location(run, jsonData);
+      return transactCommodityLocation.transact_commodity_location(run, preloadedDbTables);
     case "add_player_to_queue":
       return queueController(run, message, openai, client, true, "function-add"); //true = add user
     case "notify_queue_entry":

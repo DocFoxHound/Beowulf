@@ -1,4 +1,4 @@
-async function transact_commodity_location(run, jsonData){
+async function transact_commodity_location(run, preloadedDbTables){
     try{
       // stantonCommodityBuyList, //terminals buying this commodity from player
       // stantonCommoditySellList, //terminals selling this commodity to the player
@@ -20,13 +20,13 @@ async function transact_commodity_location(run, jsonData){
         let commodityTerminalArray;
         if(buyOrSell === "sell"){
           console.log("Sell");
-          commodityTerminalArray = jsonData.stantonCommodityBuyList.filter(commodity => commodity.commodity_name.toLowerCase() === commoditySearched.toLowerCase());
+          commodityTerminalArray = preloadedDbTables.stantonCommodityBuyList.filter(commodity => commodity.commodity_name.toLowerCase() === commoditySearched.toLowerCase());
           commodityTerminalArray[0].terminals.forEach(terminal => {
             resultArray.push(`**LOCATION NAME:** ${terminal.location_direct}, **AT/ON:** ${terminal.location_parent},  **BUYS FOR:** ${terminal.price_buy_avg}, **DEMAND:** ${(terminal.scu_buy_avg > 0) ? terminal.scu_buy_avg : 'unknown'}scu per purchase.`);
           });
         }else{
           console.log("Buy");
-          commodityTerminalArray = jsonData.stantonCommoditySellList.filter(commodity => commodity.commodity_name.toLowerCase() === commoditySearched.toLowerCase());
+          commodityTerminalArray = preloadedDbTables.stantonCommoditySellList.filter(commodity => commodity.commodity_name.toLowerCase() === commoditySearched.toLowerCase());
           commodityTerminalArray[0].terminals.forEach(terminal => {
             resultArray.push(`**LOCATION NAME:** ${terminal.location_direct}, **AT/ON:** ${terminal.location_parent},  **SELLS FOR:** ${terminal.price_sell_avg}, **SUPPLY:** ${(terminal.scu_sell_avg > 0) ? terminal.scu_sell_avg : 'unknown'}scu per sale.`);
           });
@@ -38,13 +38,13 @@ async function transact_commodity_location(run, jsonData){
         let commodityTerminalArray;
         if(buyOrSell === "sell"){
           console.log("Sell");
-          commodityTerminalArray = jsonData.pyroCommodityBuyList.filter(commodity => commodity.commodity_name.toLowerCase() === commoditySearched.toLowerCase());
+          commodityTerminalArray = preloadedDbTables.pyroCommodityBuyList.filter(commodity => commodity.commodity_name.toLowerCase() === commoditySearched.toLowerCase());
           commodityTerminalArray[0].terminals.forEach(terminal => {
             resultArray.push(`**LOCATION NAME:** ${terminal.location_direct}, **AT/ON:** ${terminal.location_parent},  **BUYS FOR:** ${terminal.price_buy_avg}, **DEMAND:** ${(terminal.scu_buy_avg > 0) ? terminal.scu_buy_avg : 'unknown'}scu per purchase.`);
           });
         }else{
           console.log("Buy");
-          commodityTerminalArray = jsonData.pyroCommoditySellList.filter(commodity => commodity.commodity_name.toLowerCase() === commoditySearched.toLowerCase());
+          commodityTerminalArray = preloadedDbTables.pyroCommoditySellList.filter(commodity => commodity.commodity_name.toLowerCase() === commoditySearched.toLowerCase());
           commodityTerminalArray[0].terminals.forEach(terminal => {
             resultArray.push(`**LOCATION NAME:** ${terminal.location_direct}, **AT/ON:** ${terminal.location_parent},  **SELLS FOR:** ${terminal.price_sell_avg}, **SUPPLY:** ${(terminal.scu_sell_avg > 0) ? terminal.scu_sell_avg : 'unknown'}scu per sale.`);
           });

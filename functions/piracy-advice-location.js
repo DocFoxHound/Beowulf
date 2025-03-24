@@ -1,4 +1,4 @@
-async function piracy_advice_location(run, jsonData){
+async function piracy_advice_location(run, preloadedDbTables){
     try{
       const toolCall = run.required_action.submit_tool_outputs.tool_calls[0];
       let starSystemSearched = toolCall.function.arguments;
@@ -7,19 +7,19 @@ async function piracy_advice_location(run, jsonData){
       if(starSystemSearched.toString().toLowerCase().includes("stanton")){
         console.log("Stanton");
         resultArray.push(`*## List the top locations for transaction activity in the Stanton system:`)
-        for(const terminal of jsonData.stantonTopTransactions){
+        for(const terminal of preloadedDbTables.stantonTopTransactions){
           resultArray.push(`**LOCATION NAME**: ${terminal.location_direct}, **AT LOCATION**: ${terminal.location_parent}, **TOTAL TRANSACTIONS:** ${terminal.totalTransactions}, **TOTAL PURCHASES:** ${terminal.totalBuys}, **TOTAL SALES:** ${terminal.totalSells}, **COMMODITIES:** ${terminal.commodities[0].commodity_name}, ${terminal.commodities[1] ? terminal.commodities[1].commodity_name : null}, ${terminal.commodities[2] ? terminal.commodities[2].commodity_name : null}`);
         }
       //if the user specifies pyro
       }else if(starSystemSearched.toString().toLowerCase().includes("pyro")){
         console.log("Pyro")
         resultArray.push(`*## List the top locations for transaction activity in the Stanton system:`)
-        for(const terminal of jsonData.pyroTopTransactions){
+        for(const terminal of preloadedDbTables.pyroTopTransactions){
           resultArray.push(`**LOCATION NAME**: ${terminal.location_direct}, **AT LOCATION**: ${terminal.location_parent}, **TOTAL TRANSACTIONS:** ${terminal.totalTransactions}, **TOTAL PURCHASES:** ${terminal.totalBuys}, **TOTAL SALES:** ${terminal.totalSells}, **COMMODITIES:** ${terminal.commodities[0].commodity_name}, ${terminal.commodities[1] ? terminal.commodities[1].commodity_name : null}, ${terminal.commodities[2] ? terminal.commodities[2].commodity_name : null}`);
         }
       //if the user doesn't specify location or things are just unrecognized
       }else{
-        for(const terminal of jsonData.allTopTransactions){
+        for(const terminal of preloadedDbTables.allTopTransactions){
           resultArray.push(`**LOCATION NAME**: ${terminal.location_direct}, **AT LOCATION**: ${terminal.location_parent}, **TOTAL TRANSACTIONS:** ${terminal.totalTransactions}, **TOTAL PURCHASES:** ${terminal.totalBuys}, **TOTAL SALES:** ${terminal.totalSells}, **COMMODITIES:** ${terminal.commodities[0].commodity_name}, ${terminal.commodities[1] ? terminal.commodities[1].commodity_name : null}, ${terminal.commodities[2] ? terminal.commodities[2].commodity_name : null}`);
         }
       }

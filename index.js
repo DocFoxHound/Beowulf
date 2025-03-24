@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vectorHandler = require("./vector-handling/vector-handler.js");
 // const threadHandler = require("./thread-handler");
-const preloadFromJsons = require("./common/preload-from-jsons.js")
+const { preloadFromDb } = require("./common/preload-from-db.js");
 const downloadUEXData = require("./common/download-UEX-Data.js")
 const queueReminderCheck = require("./queue-functions/queue-controller.js").queueReminderCheck
 const retryMessageAdd = require("./threads/retry-message-add.js")
@@ -17,6 +17,7 @@ const findExistingThread = require("./threads/find-existing-thread.js")
 const formatMessage = require("./threads/format-message.js")
 const addMessageToThread = require("./threads/add-message-to-thread.js")
 const deployCommands = require("./deploy-commands.js")
+const { processUEXData } = require("./common/process-uex-data.js")
 // const checkQueue = require("./queue-functions/queue-check.js")
 
 // Initialize dotenv config file
@@ -73,7 +74,7 @@ channelIds = process.env?.CHANNELS?.split(",");
 channelIdAndName = [];
 
 //json things to hold in memory
-let jsonData;
+let preloadedDbTables;
 
 //array of threads (one made per user)
 threadArray = [{channelId: "", threadId: "", isActive: Boolean, isRetrying: Boolean}];
@@ -123,8 +124,8 @@ client.on("ready", async () => {
   //start off with a fresh reload of the online files
   // await vectorHandler.refreshChatLogs(channelIdAndName, openai, client)
   // await vectorHandler.refreshUserList(openai, client)
-  // downloadUEXData.downloadUEXData(); //do NOT await this, it takes forever
-  jsonData = await preloadFromJsons.preloadFromJsons();
+  // processUEXData("all"); //do NOT await this, it takes forever
+  preloadedDbTables = await preloadFromDb();
 
   //routine tasks
   setInterval(() => vectorHandler.refreshChatLogs(channelIdAndName, openai, client),
@@ -137,14 +138,17 @@ client.on("ready", async () => {
   // setInterval(() => userCache.clear(),
   //   21600000 // Clear cache every 6 hours, avoids excessive memory bloat
   // );
-  setInterval(() => downloadUEXData.downloadUEXData(), //do NOT await this, it takes forever
+  setInterval(() => processUEXData("terminal_prices"), //do NOT await this, it takes forever
     86400000 //every 24 hours
   );
-  setInterval(async () => jsonData = await preloadFromJsons.preloadFromJsons(), //do NOT await this, it takes forever
-  10800000 //every 3 hours
+  setInterval(() => processUEXData("other_tables"), //do NOT await this, it takes forever
+    674800000 //every 7 days
+  );
+  setInterval(async () => preloadedDbTables = await preloadFromDb(), //do NOT await this, it takes forever
+    21600000 //every 6 hours
   );
   setInterval(() => queueReminderCheck(openai, client, null, null),
-  1800000 //every 30 minutes
+    43200000 //every 12 hours
   );
 }),
 
@@ -168,7 +172,7 @@ client.on("messageCreate", async (message) => {
       let run = await runThread.runThread(thread, openai);
       //check if the run completes or needs action
       if (run.status === "requires_action") {
-        await handleRequiresAction.handleRequiresAction(message, run, client, jsonData, openai, false, threadPair);
+        await handleRequiresAction.handleRequiresAction(message, run, client, preloadedDbTables, openai, false, threadPair);
       } else if (run.status === "completed") {
         console.log("Completed Response")
         const formattedResponse = await formatResponse.formatResponse(run, threadPair, openai, client);
@@ -191,10 +195,10 @@ client.on("messageCreate", async (message) => {
         }
       };
       message.channel.sendTyping();  // Send typing indicator once we know we need to process
-      const run = await runThread.runThread(message, thread, openai, threadPair, client, jsonData);
+      const run = await runThread.runThread(message, thread, openai, threadPair, client, preloadedDbTables);
       //check if the run completes or needs action
       if (run.status === "requires_action") {
-        await handleRequiresAction.handleRequiresAction(message, run, client, jsonData, openai, false, threadPair);
+        await handleRequiresAction.handleRequiresAction(message, run, client, preloadedDbTables, openai, false, threadPair);
       } else if (run.status === "completed") {
         console.log("Completed Response")
         const formattedResponse = await formatResponse.formatResponse(run, threadPair, openai, client);

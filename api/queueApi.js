@@ -27,41 +27,6 @@ async function deleteUserInQueue(userId){
     }
 }
 
-// async function deleteUserInQueue(user) {
-//     console.log("Deleting user from queue:", user)
-//     const apiUrl = `${process.env.SERVER_URL}/api/queue/`; 
-//     try {
-//         const response = await axios.delete(apiUrl, user, {
-//             headers: {
-//                 'Content-Type': 'application/json'
-//             }
-//         });
-//         return true;
-//     } catch (error) {
-//         console.error('Error removing user from Queue: ', error.response ? error.response.data : error.message);
-//         return false;
-//     }
-// }
-
-// async function deleteUserInQueue(user) {
-//     console.log("Deleting user from queue:", user)
-//     const apiUrl = `${process.env.SERVER_URL}/api/queue/${user}`; // Assuming user ID is required to delete
-
-//     try {
-//         const response = await axios.delete(apiUrl, {
-//             headers: {
-//                 'Content-Type': 'application/json'
-//             },
-//             data: user // Some APIs may require details in the request body even for DELETE requests
-//         });
-//         console.log('User successfully removed from queue:', response.data);
-//         return true;
-//     } catch (error) {
-//         console.error('Error removing user from Queue:', error.response ? error.response.data : error.message);
-//         return false;
-//     }
-// }
-
 async function getUsersInQueue() {
     const apiUrl = `${process.env.SERVER_URL}/api/queue/`;
     try {

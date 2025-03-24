@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs').promises;
 
 async function downloadUEXData(){
-    console.log("Updating Commodities")
+    console.log("Updating UEX Items")
     let apiUrls = [];
     let apiCallCounter = 0;
     let allTerminals;
@@ -39,7 +39,6 @@ async function downloadUEXData(){
             }catch(error){
                 console.log(`Error in getting UEX data: ${error}`)
             }
-            
         }
         else if (api.title === "terminal_prices"){
             totalTerminals = allTerminals.data.length;
@@ -66,7 +65,7 @@ async function downloadUEXData(){
             });      
         }
     }
-    console.log("Finished updating commodities.")
+    console.log("Finished updating UEX Items.")
 }
 
 function delay(ms) {
