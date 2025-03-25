@@ -1,9 +1,10 @@
-async function sendResponse(message, finalFormatedResponse, isReply) {
+async function sendResponse(message, formattedMessage, isReply) {
+    console.log("Sending response")
     try{
         if(isReply === true){
-            await message.reply(finalFormatedResponse);
+            await message.reply(formattedMessage);
         }else{
-            await message.channel.send(finalFormatedResponse);
+            await message.channel.send(formattedMessage);
         }
     }catch(error){
         console.error("Error running the thread: ", error);

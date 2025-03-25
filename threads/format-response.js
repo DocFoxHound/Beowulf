@@ -1,7 +1,6 @@
-async function formatResponse(run, threadPair, openai, client) {
-    threadPair.isActive = false;
+async function formatResponse(run, thread, openai, client) {
     try {
-        const messages = await openai.beta.threads.messages.list(threadPair.threadId);
+        const messages = await openai.beta.threads.messages.list(thread.id);
         let response = messages.data[0].content[0].text.value;
         response = response.replace(client.user.username + ": ", "") //replace some common bot-isms
                            .replace(/【.*?】/gs, "")

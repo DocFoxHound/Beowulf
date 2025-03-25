@@ -13,11 +13,11 @@ const sendResponse = require("./threads/send-response.js")
 const formatResponse = require("./threads/format-response.js")
 const handleRequiresAction = require("./threads/handle-requires-action.js")
 const runThread = require("./threads/run-thread.js")
-const findExistingThread = require("./threads/find-existing-thread.js")
 const formatMessage = require("./threads/format-message.js")
 const addMessageToThread = require("./threads/add-message-to-thread.js")
 const deployCommands = require("./deploy-commands.js")
 const { processUEXData } = require("./common/process-uex-data.js")
+const { handleMessage } = require('./threads/thread-handler.js');
 // const checkQueue = require("./queue-functions/queue-check.js")
 
 // Initialize dotenv config file
@@ -66,9 +66,6 @@ for (const folder of commandFolders) {
 	}
 }
 
-//used for finding user mentions, later on in the program
-const mentionRegex = /<@!?(\d+)>/g;
-
 // Set channels
 channelIds = process.env?.CHANNELS?.split(",");
 channelIdAndName = [];
@@ -77,7 +74,7 @@ channelIdAndName = [];
 let preloadedDbTables;
 
 //array of threads (one made per user)
-threadArray = [{channelId: "", threadId: "", isActive: Boolean, isRetrying: Boolean}];
+// threadArray = [{channelId: "", threadId: "", isActive: Boolean, isRetrying: Boolean}];
 
 //list of messages we need to add, queued
 const messageAddQueue = [];
@@ -153,81 +150,11 @@ client.on("ready", async () => {
 }),
 
 client.on("messageCreate", async (message) => {
-  // Check for conditions to ignore the message early
   if (!channelIds.includes(message.channelId) || !message.guild || message.system) {
     return;
   }
+  handleMessage(message, openai, client, preloadedDbTables);
 
-  // Check if the bot is mentioned or if the message is a reply to the bot
-  if (message.mentions.users.has(client.user.id)) {
-    const thread = await findExistingThread.findExistingThread(message.author.id, threadArray, openai);
-    const threadPair = threadArray.find(item => item.threadId === thread.id);
-
-    //if the thread isn't busy, we'll take the thread for this channel, format the message, add to the thread, and run it
-    if(threadPair.isActive === false){
-      threadPair.isActive = true; //mark the thread as being active
-      const formattedMessage = await formatMessage.formatMessage(message, mentionRegex, userCache); //format the message for processing
-      await addMessageToThread.addMessageToThread(thread, openai, formattedMessage, false); //add the message to the thread
-      message.channel.sendTyping();  // Send typing indicator once we know we need to process
-      let run = await runThread.runThread(thread, openai);
-      //check if the run completes or needs action
-      if (run.status === "requires_action") {
-        await handleRequiresAction.handleRequiresAction(message, run, client, preloadedDbTables, openai, false, threadPair);
-      } else if (run.status === "completed") {
-        console.log("Completed Response")
-        const formattedResponse = await formatResponse.formatResponse(run, threadPair, openai, client);
-        await sendResponse.sendResponse(message, formattedResponse, true);
-      }
-      threadPair.isActive = false; //make sure to mark the thread as inactive
-
-    //If the thread is busy, take the message and retry it on a new thread
-    }else{ 
-      console.log("Waiting on Thread")
-      messageHistory = await message.channel.messages.fetch({ limit: 5, before: message.id }); //get the last 10 messages from the channel
-      const newThread = await openai.beta.threads.create(); //make a new short-term thread to use and lose
-      for (const message of messageHistory.values()) { //iterate and add messages to a thread
-        // const isBot = (message.id === client.user.id) ? true : false; //check if the message is from the bot or from a user
-        const isBot = (message.id === client.user.id); //check if the message is from the bot or from a user
-        const newFormattedMessage = await formatMessage.formatMessage(message, mentionRegex, userCache); //format the message for processing
-        messageAddQueue.push(newFormattedMessage);
-        if(threadPair.isRetrying === false){ //make sure we mitigate collision by only doing this if a retry isn't already active
-          await retryMessageAdd.retryMessageAdd(newThread, openai, messageAddQueue, threadPair, isBot);
-        }
-      };
-      message.channel.sendTyping();  // Send typing indicator once we know we need to process
-      const run = await runThread.runThread(message, thread, openai, threadPair, client, preloadedDbTables);
-      //check if the run completes or needs action
-      if (run.status === "requires_action") {
-        await handleRequiresAction.handleRequiresAction(message, run, client, preloadedDbTables, openai, false, threadPair);
-      } else if (run.status === "completed") {
-        console.log("Completed Response")
-        const formattedResponse = await formatResponse.formatResponse(run, threadPair, openai, client);
-        await sendResponse.sendResponse(message, formattedResponse, true);
-      }
-    }
-
-  // Handle all other non-response or mentions messages
-  } else {
-    if(message.author.id !== client.user.id){ //make sure this isn't a bot
-      const thread = await findExistingThread.findExistingThread(message.channel.id, threadArray, openai); //get or make the thread for this channel
-      const threadPair = threadArray.find(item => item.threadId === thread.id);
-      const isBot = (message.author.id === client.user.id);
-
-      //if the thread isn't busy, add the message
-      if(threadPair.isActive === false){ 
-        const formattedMessage = await formatMessage.formatMessage(message, mentionRegex, userCache); //format the message for processing
-        await addMessageToThread.addMessageToThread(thread, openai, formattedMessage, false, isBot); 
-
-      //if the thread is busy
-      }else{ 
-        const formattedMessage = await formatMessage.formatMessage(message, mentionRegex, userCache); //format the message for processing
-        messageAddQueue.push(formattedMessage);
-        if(threadPair.isRetrying === false){ //make sure we mitigate collision by only doing this if a retry isn't already active
-          await retryMessageAdd.retryMessageAdd(thread, openai, messageAddQueue, threadPair, isBot);
-        }    
-      }
-    }
-  }
 });
 
 client.on(Events.InteractionCreate, async interaction => {

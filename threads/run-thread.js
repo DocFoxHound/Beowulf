@@ -1,9 +1,8 @@
 async function runThread(thread, openai) {
-    console.log("Responding")
+    console.log("Running thread")
     try{
         let run = await openai.beta.threads.runs.createAndPoll(thread.id, {
-            assistant_id: myAssistant.id,
-            additional_instructions: process.env.BOT_INSTRUCTIONS,
+            assistant_id: myAssistant.id
         });
         return run;
     }catch(error){
