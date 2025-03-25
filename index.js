@@ -20,6 +20,11 @@ const { processUEXData } = require("./common/process-uex-data.js")
 const { handleMessage } = require('./threads/thread-handler.js');
 const { createUser } = require('./api/userlistApi.js');
 const { getUserById } = require('./api/userlistApi.js');
+const { editUser } = require('./api/userlistApi.js');
+const { getUserRank } = require('./userlist-functions/userlist-controller.js')
+const { getRaptorRank } = require('./userlist-functions/userlist-controller.js')
+const { getCorsairRank } = require('./userlist-functions/userlist-controller.js')
+const { getRaiderRank } = require('./userlist-functions/userlist-controller.js')
 // const checkQueue = require("./queue-functions/queue-check.js")
 
 // Initialize dotenv config file
@@ -202,7 +207,8 @@ client.on(Events.InteractionCreate, async interaction => {
 
 // Event Listener: new member joins the server
 client.on(Events.GuildMemberAdd, async member => {
-  if(getUserById(member.user.id)){
+  const user = await getUserById(member.user.id);
+  if(user.id){
     console.log(`User ${member.user.username} is already in the UserList.`);
     return;
   }else{
@@ -239,6 +245,52 @@ client.on(Events.GuildMemberAdd, async member => {
     } else {
       console.error(`Failed to add user ${member.user.username} to the UserList.`);
     }
+  }
+});
+
+client.on('guildMemberUpdate', async (oldMember, newMember) => {
+  try{
+    const oldNick = oldMember.nickname;
+    const newNick = newMember.nickname;
+    const user = await getUserById(newMember.user.id);
+
+    //get the member's rank
+    const memberRoles = newMember.roles.cache.map(role => role.id);
+    const userRank = await getUserRank(memberRoles);
+    const raptorLevel = await getRaptorRank(memberRoles);
+    const corsairLevel = await getCorsairRank(memberRoles);
+    const raiderLevel = await getRaiderRank(memberRoles);
+
+    const updatedUser = {
+      id: user.id,
+      username: newMember.username,
+      nickname: newMember.nickname,
+      corsair_level: corsairLevel,
+      raptor_level: raptorLevel,
+      raider_level: raiderLevel,
+      rank: userRank,
+      raptor_1_solo: user.raptor_1_solo,
+      raptor_1_team: user.raptor_1_team,
+      raptor_2_solo: user.raptor_2_solo,
+      raptor_2_team: user.raptor_2_team,
+      raptor_3_solo: user.raptor_3_solo,
+      raptor_3_team: user.raptor_3_team,
+      corsair_1_turret: user.corsair_1_turret,
+      corsair_1_torpedo: user.corsair_1_torpedo,
+      corsair_2_ship_commander: user.corsair_2_ship_commander,
+      corsair_2_wing_commander: user.corsair_2_wing_commander,
+      corsair_3_fleet_commander: user.corsair_3_fleet_commander,
+      raider_1_swabbie: user.raider_1_swabbie,
+      raider_1_linemaster: user.raider_1_linemaster,
+      raider_1_boarder: user.raider_1_boarder,
+      raider_2_powdermonkey: user.raider_2_powdermonkey,
+      raider_2_mate: user.raider_2_mate,
+      raider_3_sailmaster: user.raider_3_sailmaster
+    }
+    await editUser(user.id, updatedUser);
+    console.log("User updated successfully");
+  }catch(error){
+    console.log("Error updating user: ", error);
   }
 });
 

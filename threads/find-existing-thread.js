@@ -1,5 +1,5 @@
 const createNewThread = require("./create-new-thread")
-async function findExistingThread(channelId, threadArray, openai){
+async function findExistingThread(channelId, openai){
     //check if there is a thread that exists that's already paired with the userID
     try{
         const threadPair = threadArray.find(item => item.channelId === channelId);
@@ -9,7 +9,7 @@ async function findExistingThread(channelId, threadArray, openai){
         return myThread
     }catch{ //if not, create a new thread and log the threadId - userId pair
         console.log(`Created thread for ${channelId}`)
-        return createNewThread.createNewThread(channelId, threadArray, openai);
+        return createNewThread.createNewThread(channelId, openai);
     }
 }
 

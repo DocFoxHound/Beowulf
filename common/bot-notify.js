@@ -21,7 +21,7 @@ async function notifyNewQueue(queue, requestedText, user, openai, client){
             break;
     }
     messageToBot = `Rewrite the following: "${user} has been added to the ${queue} queue for ${requestedText} class/assessment"`
-    const thread = await createNewThread(channelToNotify, threadArray, openai);
+    const thread = await createNewThread(channelToNotify, openai);
     await addMessageToThread(thread, openai, messageToBot, false); //add the message to the thread
     let run = await runThreadForQueueNotify(thread, openai, true);
     console.log("Run Status: " + run.status)
@@ -51,7 +51,7 @@ async function notifyOldQueue(queue, requestedText, openai, client){
             break;
     }
     messageToBot = `Rewrite the following: "${requestedText}"`
-    const thread = await createNewThread(channelToNotify, threadArray, openai);
+    const thread = await createNewThread(channelToNotify, openai);
     await addMessageToThread(thread, openai, messageToBot, false); //add the message to the thread
     let run = await runThreadForQueueNotify(thread, openai, true);
     console.log(run.status)

@@ -265,7 +265,7 @@ async function updateUserClassStatus(userDataForUserList, requestedClass, classC
 }
 
 async function getUserRank(memberRoles) {
-    const discordRankRoles = rankRoles.getRanks();
+    const discordRankRoles = await rankRoles.getRanks();
     // Create a map of role names to roles for quick lookup
     const roleMap = new Map(discordRankRoles.map(role => [role.name, role]));
     // Define the priority of roles from highest to lowest
@@ -320,7 +320,6 @@ async function getCorsairRank(memberRoles) {
         }
     }
     return 0;
-    
 }
 
 async function getCorsairRankDb(userId) {
@@ -380,5 +379,6 @@ module.exports = {
     updateUserClassStatus,
     getRaptorRankDb,
     getCorsairRankDb,
-    getRaiderRankDb
+    getRaiderRankDb,
+    getUserRank
 }
