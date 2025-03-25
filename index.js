@@ -18,6 +18,8 @@ const addMessageToThread = require("./threads/add-message-to-thread.js")
 const deployCommands = require("./deploy-commands.js")
 const { processUEXData } = require("./common/process-uex-data.js")
 const { handleMessage } = require('./threads/thread-handler.js');
+const { createUser } = require('./api/userlistApi.js');
+const { getUserById } = require('./api/userlistApi.js');
 // const checkQueue = require("./queue-functions/queue-check.js")
 
 // Initialize dotenv config file
@@ -196,6 +198,48 @@ client.on(Events.InteractionCreate, async interaction => {
 			console.error(error);
 		}
 	}
+});
+
+// Event Listener: new member joins the server
+client.on(Events.GuildMemberAdd, async member => {
+  if(getUserById(member.user.id)){
+    console.log(`User ${member.user.username} is already in the UserList.`);
+    return;
+  }else{
+    const newUser = {
+      id: member.user.id,
+      username: member.user.username,
+      nickname: null,
+      corsair_level: 0,
+      raptor_level: 0,
+      raider_level: 0,
+      rank: null,
+      raptor_1_solo: false,
+      raptor_1_team: false,
+      raptor_2_solo: false,
+      raptor_2_team: false,
+      raptor_3_solo: false,
+      raptor_3_team: false,
+      corsair_1_turret: false,
+      corsair_1_torpedo: false,
+      corsair_2_ship_commander: false,
+      corsair_2_wing_commander: false,
+      corsair_3_fleet_commander: false,
+      raider_1_swabbie: false,
+      raider_1_linemaster: false,
+      raider_1_boarder: false,
+      raider_2_powdermonkey: false,
+      raider_2_mate: false,
+      raider_3_sailmaster: false
+    }
+  
+    const result = await createUser(newUser);
+    if (result) {
+      console.log(`User ${member.user.username} has been added to the UserList.`);
+    } else {
+      console.error(`Failed to add user ${member.user.username} to the UserList.`);
+    }
+  }
 });
 
 // Error handling to prevent crashes
