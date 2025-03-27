@@ -151,7 +151,7 @@ client.on("ready", async () => {
   setInterval(async () => preloadedDbTables = await preloadFromDb(), //do NOT await this, it takes forever
     21600000 //every 6 hours
   );
-  setInterval(() => queueReminderCheck(openai, client, null, null),
+  setInterval(() => queueReminderCheck(openai, client, null),
     43200000 //every 12 hours
   );
 }),

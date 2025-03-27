@@ -33,7 +33,7 @@ async function executeFunction(run, message, preloadedDbTables, openai, client) 
     case "notify_queue_entry":
       return botNotify.notifyNewQueueThreadResponse(run);
     case "get_users_in_queue":
-      return queueReminderCheck(openai, client, run, message);
+      return queueReminderCheck(openai, client, run);
     // case "remove_player_from_queue":
     //   return queueController(run, message, openai, client, false, "function-remove"); //false = remove user
     case "progress":
