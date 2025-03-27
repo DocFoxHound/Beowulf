@@ -19,6 +19,7 @@ const { getClasses } = require("../api/classApi");
 const { editOrAddUserInQueue } = require("../api/queueApi");
 
 async function queueControllerForSlashCommands(className, targetUser, handlerUser,  openai, client, addOrRemove, classStatus, selfOrOther, interaction){
+    console.log("Queue Controller for Slash Commands")
     try{
         const guild = interaction.guild;
         requestedClass = className;
@@ -49,6 +50,7 @@ async function queueControllerForSlashCommands(className, targetUser, handlerUse
 }
 
 async function queueControllerForChat(run, message, openai, client){
+    console.log("Queue Controller for Chat Commands")
     try{
         toolCall = run.required_action.submit_tool_outputs.tool_calls[0];
         parsedArgs = JSON.parse(toolCall.function.arguments);

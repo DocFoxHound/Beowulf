@@ -5,6 +5,7 @@ const { queueControllerForChat } = require("../queue-functions/queue-controller"
 const progressQuery = require("./progress-query").progressQuery;
 const handlerQuery = require("./handler-query").handlerQuery;
 const badgeQuery = require("./badge-query").badgeQuery;
+const { promoteRequest } = require("./promotion-request");
 // const queueCheck = require("../queue-functions/queue-check")
 const botNotify = require("../common/bot-notify")
 
@@ -29,19 +30,21 @@ async function executeFunction(run, message, preloadedDbTables, openai, client) 
     case "where_to_buy":
       return transactCommodityLocation.transact_commodity_location(run, preloadedDbTables);
     case "add_or_remove_queue_entry":
-      return queueControllerForChat(run, message, openai, client);
+      return await queueControllerForChat(run, message, openai, client);
     case "notify_queue_entry":
       return botNotify.notifyNewQueueThreadResponse(run);
     case "get_users_in_queue":
-      return queueReminderCheck(openai, client, run);
+      return await queueReminderCheck(openai, client, run);
     // case "remove_player_from_queue":
     //   return queueController(run, message, openai, client, false, "function-remove"); //false = remove user
     case "progress":
-      return progressQuery(run, message);
+      return await progressQuery(run, message);
     case "top_ticket_handlers":
-      return handlerQuery(run, client);
+      return await handlerQuery(run, client);
     case "recognize_badges_request":
-      return badgeQuery(run, message);
+      return await badgeQuery(run, message);
+    case "recognize_promotion_request":
+      return await promoteRequest();
   }
 }
 
