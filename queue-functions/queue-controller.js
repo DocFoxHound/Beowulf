@@ -1,17 +1,23 @@
-const notifyNewQueue = require("../common/bot-notify").notifyNewQueue
-const notifyOldQueue = require("../common/bot-notify").notifyOldQueue
-const notifyRemovalFromQueue = require("../common/bot-notify").notifyRemovalFromQueue
-const botNotify = require("../common/bot-notify")
+const { notifyNewQueue } = require("../common/bot-notify");
+const { notifyOldQueue } = require("../common/bot-notify");
+const { notifyRemovalFromQueue } = require("../common/bot-notify");
+const botNotify = require("../common/bot-notify");
 const queueApi = require("../api/queueApi");
+const { deleteUserInQueue } = require("../api/queueApi");
 // const userlistApi = require("../api/userlistApi");
-const sendResponse = require("../threads/send-response").sendResponse
-const formatResponse = require("../threads/format-response").formatResponse
+const { sendResponse } = require("../threads/send-response");
+const { formatResponse } = require("../threads/format-response");
 const lodash = require('lodash');
-const userlist = require("../userlist-functions/userlist-controller")
-const logHandler = require("../completed-queue-functions/completed-queue-handler").logHandler
-const updateUserClassStatus = require("../userlist-functions/userlist-controller").updateUserClassStatus
-const completedQueueHandler = require("../completed-queue-functions/completed-queue-handler")
-const getClasses = require("../api/classApi").getClasses
+// const userlist = require("../userlist-functions/userlist-controller")
+const { logHandlerFunctionCommand } = require("../completed-queue-functions/completed-queue-handler");
+const { checkUserListForUserByNameOrId } = require("../userlist-functions/userlist-controller");
+const { updateUserClassStatus } = require("../userlist-functions/userlist-controller");
+const { editUser } = require("../api/userlistApi");
+const { updatedUserListData } = require("../userlist-functions/userlist-controller");
+const completedQueueHandler = require("../completed-queue-functions/completed-queue-handler");
+const { getClasses } = require("../api/classApi");
+const { editOrAddUserInQueue } = require("../api/queueApi");
+
 
 const assessmentMap = {
     'raptor_1_solo': `Dogfighting 101`,
@@ -96,6 +102,44 @@ async function queueController(runOrClassName, messageOrUser, openai, client, ad
     }else if(addToQueue === false){
         const completionStatus = parsedArgs.status || parsedArgs;
         return removeFromQueue(player /*target user*/, requestedClass, completionStatus, messageOrUser /*handler or originator*/, client, openai, commandOrigin, guild, optionalTarget, optionalHandler);
+    }
+}
+
+async function queueControllerForChat(run, message, openai, client){
+    try{
+        const author = message.author;
+        toolCall = run.required_action.submit_tool_outputs.tool_calls[0];
+        parsedArgs = JSON.parse(toolCall.function.arguments);
+        requestedClass = parsedArgs.queue_class;
+        selfOrOther = parsedArgs.self_or_other || "self";
+        targetUsername = parsedArgs.user_name || null;
+        classStatus = (parsedArgs.status === "null" ? null : parsedArgs.status) || null;
+        handlerUsername = classStatus !== "completed" ? null : parsedArgs.handler_user_name;
+        const addOrRemove = parsedArgs.add_or_remove === "add" ? true : false;
+        
+        if(classStatus === "completed"){
+            // Check if the user has the required role
+            const guild = message.guild;
+            const member = await guild.members.fetch(message.author.id);
+            const memberRoles = member.roles.cache;
+            const moderatorRoles = process.env.MODERATOR_ROLES.split(',');
+            const hasPermission = moderatorRoles.some(role => memberRoles.has(role));
+            if (!hasPermission) {
+                return "You do not have permission to mark something as complete or not.";
+            }
+        }
+
+        if(selfOrOther === "self"){
+            const response = await addOrEditQueue(requestedClass, message.author.username, handlerUsername, openai, client, addOrRemove, classStatus, selfOrOther);
+            return response;
+        }else if(selfOrOther === "other"){
+            const response = await addOrEditQueue(requestedClass, targetUsername, handlerUsername, openai, client, addOrRemove, classStatus, selfOrOther);
+            return response;
+        }
+
+    }catch(error){
+        console.log(error);
+        return "There was an error adding to the queue"
     }
 }
 
@@ -223,6 +267,203 @@ async function queueReminderCheck(openai, client, run, message){
         }
     }
     
+}
+
+//case: self request to add to class:
+//classStatus should be null, addOrRemove should be true, handlerUsername should be null, targetUsername should be author
+async function addOrEditQueue(requestedClass, targetUsername, handlerUsername, openai, client, addOrRemove, classStatus, selfOrOther) {
+    try{
+        //handling some common user errors before we get into the weeds
+        if(requestedClass === "unknown"){
+            return "The class requested doesn't match any classes."
+        }
+        if(selfOrOther === "self" && handlerUsername !== null){
+            return "You cannot specify a handler for yourself."
+        }
+        if(addOrRemove === true && classStatus !== null){
+            return "You cannot specify a status for adding to the queue."
+        }
+        if(addOrRemove === true && handlerUsername !== null){
+            return "You cannot specify a handler for adding to the queue."
+        }
+        if(selfOrOther === "self" && classStatus === "completed"){
+            return "You cannot mark a class complete for yourself."
+        }
+        if(handlerUsername !== null && classStatus === "not_completed"){
+            return "You cannot specify a handler for a class that is not completed."
+        }
+
+        // Check if the handler exists in the userlist
+        let handlerData = await checkUserListForUserByNameOrId(handlerUsername) || null;
+        if(!handlerData && classStatus === "completed"){
+            return "The name of the person who handled the ticket couldn't be found."
+        }
+
+        //get the user objects from the userList and the queue
+        const userInList = await checkUserListForUserByNameOrId(targetUsername) || null;
+        if (!userInList) {
+            return "The user specified couldn't be found.";
+        }
+
+        //get the user object from the queue, if it exists
+        let inQueue = true;
+        const userInQueue = await checkQueueForUser(targetUsername) || null;
+        if (!userInQueue) {
+            inQueue = false;
+        }
+
+         // Fetch the list of available classes
+         const classes = await getClasses();
+
+         //Find the class object that matches the requested class
+         const classToUpdate = classes.find(c => 
+             c.name.toLowerCase() === requestedClass.toLowerCase() || 
+             c.alt_name.toLowerCase() === requestedClass.toLowerCase() ||
+             c.ai_function_class_names.includes(requestedClass.toLowerCase())
+         );
+         if(!classToUpdate){
+            return "The class mentioned wasn't found anywhere.";
+         }
+
+        //check if the user is already signed up for this class
+        if(inQueue === true && addOrRemove && userInQueue[classToUpdate.name] === addOrRemove){
+            return `User is already signed up for ${classToUpdate.alt_name}`;
+        }
+
+        //check if the user has already completed this class
+        if(inQueue === false && addOrRemove && userInList[classToUpdate.name] === true){
+            return `User has already completed ${classToUpdate.alt_name}`;
+        }
+
+        //check if the user needs prerequisites to sign up for this class
+        const prereqNeeded = await prerequisiteCheck(classToUpdate, userInList);
+        if(addOrRemove && prereqNeeded === true){
+            return `${userInList.nickname || userInList.username} needs to complete prerequisites and given granted the correct prestige rank before signing up for ${classToUpdate.alt_name}`;
+        }
+
+        //Copy the user from the queue, or make a new user model to add to the queue
+        const newUserModel = {
+            id: inQueue ? userInQueue.id : userInList.id,
+            username: inQueue ? userInQueue.username : userInList.username,
+            nickname: inQueue ? userInQueue.nickname : userInList.nickname,
+            createdAt: new Date(),
+            raptor_1_solo: inQueue ? userInQueue.raptor_1_solo : false,
+            raptor_1_team: inQueue ? userInQueue.raptor_1_team : false,
+            raptor_2_solo: inQueue ? userInQueue.raptor_2_solo : false,
+            raptor_2_team: inQueue ? userInQueue.raptor_2_team : false,
+            raptor_3_solo: inQueue ? userInQueue.raptor_3_solo : false,
+            raptor_3_team: inQueue ? userInQueue.raptor_3_team : false,
+            corsair_1_turret: inQueue ? userInQueue.corsair_1_turret : false,
+            corsair_1_torpedo: inQueue ? userInQueue.corsair_1_torpedo : false,
+            corsair_2_ship_commander: inQueue ? userInQueue.corsair_2_ship_commander : false,
+            corsair_2_wing_commander: inQueue ? userInQueue.corsair_2_wing_commander : false,
+            corsair_3_fleet_commander: inQueue ? userInQueue.corsair_3_fleet_commander : false,
+            raider_1_swabbie: inQueue ? userInQueue.raider_1_swabbie : false,
+            raider_1_linemaster: inQueue ? userInQueue.raider_1_linemaster : false,
+            raider_1_boarder: inQueue ? userInQueue.raider_1_boarder : false,
+            raider_2_powdermonkey: inQueue ? userInQueue.raider_2_powdermonkey : false,
+            raider_2_mate: inQueue ? userInQueue.raider_2_mate : false,
+            raider_3_sailmaster: inQueue ? userInQueue.raider_3_sailmaster : false
+        };
+
+        //Copy the user from the queue, or make a new user model to add to the queue
+        const newUserModelForUserList = {
+            id: inQueue ? userInQueue.id : userInList.id,
+            username: userInList.username,
+            nickname: userInList.nickname,
+            corsair_level: userInList.corsair_level,
+            raptor_level: userInList.raptor_level,
+            raider_level: userInList.raider_level,
+            raptor_1_solo: userInList.raptor_1_solo,
+            raptor_1_team: userInList.raptor_1_team,
+            raptor_2_solo: userInList.raptor_2_solo,
+            raptor_2_team: userInList.raptor_2_team,
+            raptor_3_solo: userInList.raptor_3_solo,
+            raptor_3_team: userInList.raptor_3_team,
+            corsair_1_turret: userInList.corsair_1_turret,
+            corsair_1_torpedo: userInList.corsair_1_torpedo,
+            corsair_2_ship_commander: userInList.corsair_2_ship_commander,
+            corsair_2_wing_commander: userInList.corsair_2_wing_commander,
+            corsair_3_fleet_commander: userInList.corsair_3_fleet_commander,
+            raider_1_swabbie: userInList.raider_1_swabbie,
+            raider_1_linemaster: userInList.raider_1_linemaster,
+            raider_1_boarder: userInList.raider_1_boarder,
+            raider_2_powdermonkey: userInList.raider_2_powdermonkey,
+            raider_2_mate: userInList.raider_2_mate,
+            raider_3_sailmaster: userInList.raider_3_sailmaster,
+            rank: userInList.rank
+        };
+
+        //mark the class we're queueing for as true or false, this is for the queue user model
+        if (classToUpdate) {
+            newUserModel[classToUpdate.name] = addOrRemove;
+        }
+
+        //mark the class we're queueing for as true or false, this is for the userList user model
+        if (!addOrRemove && classStatus === "completed" && classToUpdate) {
+            newUserModelForUserList[classToUpdate.name] = true;
+        }
+
+        // if adding to queue
+        if(addOrRemove){
+            const addOrEditSuccess = await editOrAddUserInQueue(newUserModel.id, newUserModel);
+            notifyNewQueue(classToUpdate.prestige_category.toUpperCase(), requestedClass, newUserModel.nickname || newUserModel.username, openai, client);
+            if(addOrEditSuccess){
+                return `${newUserModel.nickname || newUserModel.username} was successfully added to the queue for ${requestedClass}.`;
+            }else{
+                return "There was an error adding to the queue"
+            }
+        }
+
+        // if removing from queue and the class is not completed
+        if(!addOrRemove && (classStatus === "not_completed" || classStatus === null)){
+            const addOrEditSuccess = await editOrAddUserInQueue(newUserModel.id, newUserModel);
+            emptyUserQueueCheck(classes, newUserModel)
+            if(addOrEditSuccess){
+                return `${newUserModel.nickname || newUserModel.username} was successfully removed from the queue for ${requestedClass}.`;
+            }
+        }
+
+        //if removing from queue and the class is completed
+        if(!addOrRemove && classStatus === "completed"){
+            //remove from queue
+            const addOrEditSuccess = await editOrAddUserInQueue(newUserModel.id, newUserModel);
+            const successfulEdit = await editUser(newUserModelForUserList.id, newUserModelForUserList);
+            emptyUserQueueCheck(classes, newUserModel)
+            if(addOrEditSuccess && successfulEdit){
+                const logResult = await logHandlerFunctionCommand(newUserModel, handlerData, classToUpdate.id);
+                return `${newUserModel.nickname || newUserModel.username} was successfully removed from the queue for ${requestedClass} and marked complete.`;    
+            }
+        }
+    }catch(error){
+        console.log(error);
+        return "There was an error adding to the queue"
+    }
+}
+
+async function emptyUserQueueCheck(classes, userModel){
+    // List of fields to check
+    const fieldsToCheck = classes.map(classItem => classItem.name);
+    // Check if all specified fields are false
+    const allFieldsAreFalse = fieldsToCheck.every(field => userModel[field] === false);
+
+    if (allFieldsAreFalse) {
+        deleteUserInQueue(userModel.id);
+    } else {
+        return;
+    }
+}
+
+async function prerequisiteCheck(classToUpdate, userInList){
+    const prerequisites = classToUpdate.prerequisites;
+    if(prerequisites){
+        for (const prerequisite of prerequisites) {
+            if(userInList[prerequisite] === false){
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 async function editQueue(requestedText, userData, openai, client, addOrRemove, forQueue){
@@ -761,6 +1002,7 @@ async function removeFromQueue(targetUser /*targetUser*/, requestedClass, comple
 module.exports = {
     queueController,
     queueReminderCheck,
-    checkQueueForUser
+    checkQueueForUser,
+    queueControllerForChat
     // getQueue,
 };

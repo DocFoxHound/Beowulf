@@ -33,6 +33,7 @@ async function handleMessage(message, openai, client, preloadedDbTables){
 
         //if the message is notifying the bot we process it
         if(message.mentions.users.has(client.user.id)){
+
             const originatingThread = await getThreadByMessageId(message.reference?.messageId) || null;
             
             //get the thread that's been used for this conversation, or make a new one if it doesn't exist
@@ -63,7 +64,7 @@ async function handleMessage(message, openai, client, preloadedDbTables){
             
             //run the thread
             message.channel.sendTyping();  
-            const run = await runThread(thread, openai);
+            const run = await runThread(thread, openai); //this is slow
 
             if (run.status === "requires_action") {
                 await handleRequiresAction(message, run, client, preloadedDbTables, openai, false);

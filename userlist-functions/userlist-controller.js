@@ -1,4 +1,5 @@
 const userlistApi = require("../api/userlistApi")
+const { getUsers } = require("../api/userlistApi")
 const rankRoles = require("../api/rank-roles-api")
 const getClasses = require("../api/classApi").getClasses;
 const editQueue = require("../api/queueApi").editQueue;
@@ -81,6 +82,10 @@ async function createNewUser(userData, client, guildId){
         userlistApi.createUser(user);
     }
     
+}
+
+async function updatedUserListData(userData){
+
 }
 
 async function updateUserClassStatus(userDataForUserList, requestedClass, classCompleted) {
@@ -370,6 +375,25 @@ async function checkUserListForUser(targetUserData){
     }
 }
 
+//checks if the user is in a queue already or not
+async function checkUserListForUserByNameOrId(username){
+    const users = await getUsers();
+        user = null;
+        for (const element of users) {
+            if(element.id === username || element.username === username || element.nickname === username){
+                user = element;
+            }
+        }
+    //if the user is in the database, we'll return the user data
+    if(user){
+        return user;
+    //if the user IS NOT in the database, we have to create a new queue entry for them
+    }else{
+        return null;
+    }
+        
+}
+
 module.exports = {
     checkUserListForUser,
     createNewUser,
@@ -380,5 +404,7 @@ module.exports = {
     getRaptorRankDb,
     getCorsairRankDb,
     getRaiderRankDb,
-    getUserRank
+    getUserRank,
+    checkUserListForUserByNameOrId,
+    updatedUserListData
 }

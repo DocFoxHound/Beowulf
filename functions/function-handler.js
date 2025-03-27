@@ -1,7 +1,7 @@
 const piracyAdviceLocation = require("./piracy-advice-location");
 const transactCommodityLocation = require("./transact-commodity-location");
 const queueReminderCheck = require("../queue-functions/queue-controller").queueReminderCheck;
-const queueController = require("../queue-functions/queue-controller").queueController;
+const { queueControllerForChat } = require("../queue-functions/queue-controller");
 const progressQuery = require("./progress-query").progressQuery;
 const handlerQuery = require("./handler-query").handlerQuery;
 const badgeQuery = require("./badge-query").badgeQuery;
@@ -13,7 +13,6 @@ async function executeFunction(run, message, preloadedDbTables, openai, client) 
   message.channel.sendTyping();  // Send typing indicator once we know we need to process
   //if the function is something that requires getting a list of users...
   const toolCall = run.required_action.submit_tool_outputs.tool_calls[0];
-  console.log(toolCall.function.name)
   switch (toolCall.function.name) {
     case "piracy_advice_location":
       return piracyAdviceLocation.piracy_advice_location(run, preloadedDbTables);
@@ -29,14 +28,14 @@ async function executeFunction(run, message, preloadedDbTables, openai, client) 
       return transactCommodityLocation.transact_commodity_location(run, preloadedDbTables);
     case "where_to_buy":
       return transactCommodityLocation.transact_commodity_location(run, preloadedDbTables);
-    case "add_player_to_queue":
-      return queueController(run, message, openai, client, true, "function-add"); //true = add user
+    case "add_or_remove_queue_entry":
+      return queueControllerForChat(run, message, openai, client);
     case "notify_queue_entry":
       return botNotify.notifyNewQueueThreadResponse(run);
     case "get_users_in_queue":
       return queueReminderCheck(openai, client, run, message);
-    case "remove_player_from_queue":
-      return queueController(run, message, openai, client, false, "function-remove"); //false = remove user
+    // case "remove_player_from_queue":
+    //   return queueController(run, message, openai, client, false, "function-remove"); //false = remove user
     case "progress":
       return progressQuery(run, message);
     case "top_ticket_handlers":

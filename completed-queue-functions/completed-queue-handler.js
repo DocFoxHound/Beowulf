@@ -28,6 +28,25 @@ async function logHandler(targetUser, handlerUser, classId, slashCommand){
     await completedQueueHandler.createEntry(newEntry);
 }
 
+async function logHandlerFunctionCommand(targetUser, handlerUser, classId){
+    console.log("New log entry")
+    //check if there's a log for this user and this class
+    await removeLog(targetUser.id, classId);
+
+    newEntry = {
+        ticket_id: Date.now(),
+        user_id: targetUser.id,
+        user_username: targetUser.username,
+        user_nickname: targetUser.nickname || null,
+        handler_id: handlerUser.id,
+        handler_username: handlerUser.username,
+        handler_nickname: handlerUser.nickname || null,
+        createdAt: new Date(),
+        class_id: classId,
+    }
+    await completedQueueHandler.createEntry(newEntry);
+}
+
 async function removeLog(userId, classId){
     console.log("Remove log entry")
     const entries = await getEntryByUserAndClass(userId, classId)
@@ -40,4 +59,5 @@ async function removeLog(userId, classId){
 
 module.exports = {
     logHandler,
+    logHandlerFunctionCommand
 }
