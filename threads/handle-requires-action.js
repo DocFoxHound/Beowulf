@@ -16,7 +16,7 @@ async function handleRequiresAction(message, run, client, preloadedDbTables, ope
             return error; // Exit the function if there's an error
         }
         console.log("After response thread run")
-        // let messages = await client.beta.threads.messages.list(thread.id);
+        
         try{
             let messages = await openai.beta.threads.messages.list(run.thread_id);
         }catch(error){
@@ -26,7 +26,7 @@ async function handleRequiresAction(message, run, client, preloadedDbTables, ope
 
         if (run.status === "completed") {
             console.log("Completed Request");
-            await sendResponse(message, messages.data[0].content[0].text.value, openai, client);
+            await sendResponse(message, messages.data[0].content[0].text.value, false, run.thread_id);
         }
     }else{ //if this message originated from an automated process
         const toolCall = run.required_action.submit_tool_outputs.tool_calls[0];
@@ -37,7 +37,7 @@ async function handleRequiresAction(message, run, client, preloadedDbTables, ope
 
         if (run.status === "completed") {
             console.log("Completed Request");
-            await sendResponse(message, messages.data[0].content[0].text.value, openai, client);
+            await sendResponse(message, messages.data[0].content[0].text.value, false, run.thread_id);
         }
     }
     
