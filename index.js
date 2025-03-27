@@ -22,9 +22,9 @@ const { createUser } = require('./api/userlistApi.js');
 const { getUserById } = require('./api/userlistApi.js');
 const { editUser } = require('./api/userlistApi.js');
 const { getUserRank } = require('./userlist-functions/userlist-controller.js')
-const { getRaptorRank } = require('./userlist-functions/userlist-controller.js')
-const { getCorsairRank } = require('./userlist-functions/userlist-controller.js')
-const { getRaiderRank } = require('./userlist-functions/userlist-controller.js')
+const { getRaptorRankDb } = require('./userlist-functions/userlist-controller.js')
+const { getCorsairRankDb } = require('./userlist-functions/userlist-controller.js')
+const { getRaiderRankDb } = require('./userlist-functions/userlist-controller.js')
 // const checkQueue = require("./queue-functions/queue-check.js")
 
 // Initialize dotenv config file
@@ -207,7 +207,7 @@ client.on(Events.InteractionCreate, async interaction => {
 
 // Event Listener: new member joins the server
 client.on(Events.GuildMemberAdd, async member => {
-  const user = await getUserById(member.user.id);
+  const user = await getUserById(member.user.id) || null;
   if(user.id){
     console.log(`User ${member.user.username} is already in the UserList.`);
     return;
@@ -252,17 +252,21 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
   try{
     const oldNick = oldMember.nickname;
     const newNick = newMember.nickname;
-    const user = await getUserById(newMember.user.id);
+    const user = await getUserById(newMember.user.id) || null;
+    if(!user){
+      console.log("Member update had no user identified, returning")
+      return;
+    }
 
     //get the member's rank
     const memberRoles = newMember.roles.cache.map(role => role.id);
     const userRank = await getUserRank(memberRoles);
-    const raptorLevel = await getRaptorRank(memberRoles);
-    const corsairLevel = await getCorsairRank(memberRoles);
-    const raiderLevel = await getRaiderRank(memberRoles);
+    const raptorLevel = await getRaptorRankDb(oldMember.id);
+    const corsairLevel = await getCorsairRankDb(oldMember.id);
+    const raiderLevel = await getRaiderRankDb(oldMember.id);
 
     const updatedUser = {
-      id: user.id,
+      id: oldMember.id,
       username: newMember.username,
       nickname: newMember.nickname,
       corsair_level: corsairLevel,
