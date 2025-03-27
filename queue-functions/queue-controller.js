@@ -110,7 +110,7 @@ async function queueControllerForSlashCommands(className, targetUser, handlerUse
         const guild = interaction.guild;
         requestedClass = className;
         targetUsername = targetUser.username; //if null we need to error
-        handlerUsername = classStatus !== "completed" ? null : handlerUser.username;
+        handlerUsername = (classStatus !== "completed" ? null : handlerUser.username) || null;
 
         if(targetUser === null){
             return "The target user specified was not found.";

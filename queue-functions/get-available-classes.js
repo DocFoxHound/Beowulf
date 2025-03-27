@@ -1,17 +1,16 @@
 const checkUserListForUser = require("../userlist-functions/userlist-controller").checkUserListForUser;
 const checkQueueForUser = require("../queue-functions/queue-controller").checkQueueForUser
-const getRaptorRank = require("../userlist-functions/userlist-controller").getRaptorRank;
-const getCorsairRank = require("../userlist-functions/userlist-controller").getCorsairRank;
-const getRaiderRank = require("../userlist-functions/userlist-controller").getRaiderRank;
+const { getRaptorRankDb } = require("../userlist-functions/userlist-controller");
+const { getCorsairRankDb } = require("../userlist-functions/userlist-controller");
+const { getRaiderRankDb } = require("../userlist-functions/userlist-controller");
 const getClasses = require("../api/classApi").getClasses;
 
-async function getAvailableClasses(user, guild, whichClasses) {
-    console.log("Get Available Classes: ", whichClasses)
+async function getAvailableClasses(user, whichClasses) {
     //lookup the classes
     let allClasses = [];
     if(whichClasses === "available"){
         console.log("Available Classes")
-        allClasses = await getAvailableUserClasses(user, guild);
+        allClasses = await getAvailableUserClasses(user);
     }else if(whichClasses === "current"){
         console.log("Current Classes")
         allClasses = await getCurrentUserClasses(user);
@@ -25,14 +24,12 @@ async function getAvailableClasses(user, guild, whichClasses) {
     return allClasses.filter(c => allClasses.includes(c));
 }
 
-async function getAvailableUserClasses(user, guild){
+async function getAvailableUserClasses(user){
     const queueData = await checkQueueForUser(user.id)
     const userData = await checkUserListForUser(user)
-    const member = await guild.members.fetch(user.id);
-    const memberRoles = member.roles.cache.map(role => role.id);
-    const userRaptorLevel = await getRaptorRank(memberRoles, true);
-    const userCorsairLevel = await getCorsairRank(memberRoles, true);
-    const userRaiderLevel = await getRaiderRank(memberRoles, true);
+    const userRaptorLevel = await getRaptorRankDb(user.id);
+    const userCorsairLevel = await getCorsairRankDb(user.id);
+    const userRaiderLevel = await getRaiderRankDb(user.id);
     let classList = [];
     if(userRaptorLevel === 0){ //all classes a RAPTOR 0 can take
         if(userData.raptor_1_solo === false && queueData.raptor_1_solo === false){

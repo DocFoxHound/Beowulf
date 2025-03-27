@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
 // const { signupToClassQueue, getAvailableClasses } = require('../classQueue');
-const queueController = require("../../queue-functions/queue-controller").queueController
+const { queueControllerForSlashCommands } = require('../../queue-functions/queue-controller');
 const getAvailableClasses = require("../../queue-functions/get-available-classes").getAvailableClasses
 
 const command = new SlashCommandBuilder()
@@ -15,13 +15,17 @@ const command = new SlashCommandBuilder()
 
 module.exports = {
   data: command,
-  async execute(interaction, client, openAi) {
+  async execute(interaction, client, openai) {
     // Get the chosen class name from the command options
     const className = interaction.options.getString('class');
+    const handlerUser = null;
+    const addOrRemove = true;
+    const classStatus = null;
+    const selfOrOther = null;
     // Call your signup logic from the external file
     try {
       // await queueController(interaction.user.id, className);
-      await interaction.reply(await queueController(className, interaction.user, openAi, client, true, "slash-queue"));
+      await interaction.reply(await queueControllerForSlashCommands(className, interaction.user, handlerUser,  openai, client, addOrRemove, classStatus, selfOrOther, interaction));
     } catch (error) {
       console.error(error);
       await interaction.reply({ content: 'There was an error signing you up for the class.', ephemeral: true });
@@ -31,8 +35,7 @@ module.exports = {
     // Get the user's current input so far
     const focusedValue = interaction.options.getFocused();
     // Get the classes that the user hasn’t taken yet
-    const availableClasses = await getAvailableClasses(interaction.user, interaction.guild, "available");
-    console.log(availableClasses)
+    const availableClasses = await getAvailableClasses(interaction.user, "available");
     // Filter based on the current input
     const filtered = availableClasses.filter(c =>
       c.toLowerCase().startsWith(focusedValue.toLowerCase())
