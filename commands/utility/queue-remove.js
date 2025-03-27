@@ -1,7 +1,8 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { queueController } = require('../../queue-functions/queue-controller');
+const { queueControllerForSlashCommands } = require('../../queue-functions/queue-controller');
 const { getAvailableClasses } = require('../../queue-functions/get-available-classes');
 const { getUsersInQueue } = require('../../api/queueApi');  
+const { getUsers } = require("../../api/userlistApi"); 
 // const { getQueueUsers } = require('../../queue-functions/get-queue-users'); // Add this import
 
 module.exports = {
@@ -10,7 +11,7 @@ module.exports = {
         .setDescription('Edit your queue entry')
         .addStringOption(option =>
             option.setName('target')
-                .setDescription('The user whose queue entry to edit.')
+                .setDescription('The user whose queue entry to edit. (only yourself if not a moderator)')
                 .setRequired(true)
                 .setAutocomplete(true)) // Enable autocomplete for users
         .addStringOption(option =>
@@ -20,12 +21,16 @@ module.exports = {
                 .setAutocomplete(true))
         .addStringOption(option =>
             option.setName('status')
-                .setDescription('Status for removal action')
-                .setRequired(true)
+                .setDescription('Status for removal action. (moderator only)')
+                .setRequired(false)
                 .addChoices(
                     { name: 'Completed', value: 'completed' },
                     { name: 'Not Completed', value: 'not_completed' }
-                )),
+                ))
+        .addUserOption(option => 
+            option.setName('handler')
+                .setDescription('The user who handled the ticket (moderator only)')
+                .setRequired(false)),
 
     async execute(interaction, openai, client) {
         try {
@@ -34,33 +39,25 @@ module.exports = {
             const moderatorRoles = process.env.MODERATOR_ROLES.split(',');
             const hasPermission = moderatorRoles.some(role => memberRoles.has(role));
 
-            if (!hasPermission) {
-                return await interaction.reply({
-                    content: 'You do not have permission to use this command.',
-                    ephemeral: true
-                });
-            }
+            // if (!hasPermission) {
+            //     return await interaction.reply({
+            //         content: 'You do not have permission to use this command.',
+            //         ephemeral: true
+            //     });
+            // }
 
             // Extract options
             const targetOption = interaction.options.getString('target');
-            //need to convert target (username) into user object
-            const guild = interaction.guild
-            // Now search by username (case-insensitive)
-            const usernameToFind = targetOption;
-            const members = await guild.members.fetch();
-            const foundMember = members.find(
-            member => member.user.username.toLowerCase() === usernameToFind.toLowerCase()
-            );
-            const targetUser = foundMember || interaction.user;
+            const handlerUser = !hasPermission ? null : interaction.options.getUser('handler');
+            const allUsers = await getUsers();
+            const targetUser = allUsers.find(
+                user => user.id === targetOption || user.username === targetOption || user.nickname === targetOption
+              ) || null;
             const className = interaction.options.getString('class');
-            const action = interaction.options.getString('action');
-            const status = interaction.options.getString('status');
-
-            const parsedArgs = {
-                status: status
-            };
-            const result = await queueController(className, targetUser, openai, client, false, "slash-queue", parsedArgs, guild);
-            // runOrClassName, messageOrUser, openai, client, addToQueue, slashCommand, classCompletedOrIncomplete, guild
+            const selfOrOther = !hasPermission ? "self" : "other";
+            const addOrRemove = false;
+            const classStatus = !hasPermission ? "not_completed" : interaction.options.getString('status');
+            const result = await queueControllerForSlashCommands(className, targetUser, handlerUser,  openai, client, addOrRemove, classStatus, selfOrOther, interaction);
 
             await interaction.reply({
                 content: result,
@@ -81,19 +78,41 @@ module.exports = {
         if (focusedOption.name === 'target') {
             // Get the users that are in the queue
             const queueUsers = await getUsersInQueue();
-            // Filter based on the current input
-            const filteredUsers = queueUsers.filter(user =>
-                user.username.toLowerCase().startsWith(focusedOption.value.toLowerCase())
-            );
-            // Respond with the filtered users
-            await interaction.respond(
-                filteredUsers.map(user => ({ name: user.username, value: user.id })).slice(0, 25)
-            );
+            // if not a moderator, then only show the person's name
+            // Check if the user has the required permissions
+            const member = interaction.member;
+            const moderatorRoles = process.env.MODERATOR_ROLES.split(',');
+            const hasPermission = member.roles.cache.some(role => moderatorRoles.includes(role.id));
+            if(!hasPermission){
+                // Filter the target if they are not a mod, to just showing themself
+                const filteredUsers = queueUsers.filter(user =>
+                    user.username.toLowerCase() === member.user.username.toLowerCase()
+                );
+                // Respond with the filtered users
+                await interaction.respond(
+                    filteredUsers.map(user => ({ name: user.username, value: user.id })).slice(0, 25)
+                );
+                return
+            }else{
+                // Filter based on the current input
+                const filteredUsers = queueUsers.filter(user =>
+                    user.username.toLowerCase().startsWith(focusedOption.value.toLowerCase())
+                );
+                // Respond with the filtered users
+                await interaction.respond(
+                    filteredUsers.map(user => ({ name: user.username, value: user.id })).slice(0, 25)
+                );
+            }
         } else if (focusedOption.name === 'class') {
             // Get the user's current input so far
             const focusedValue = interaction.options.getFocused();
             // Get the classes that the user hasn’t taken yet
-            const availableClasses = await getAvailableClasses(interaction.user, interaction.guild, "current");
+            targetOption = interaction.options.getString('target');
+            const allUsers = await getUsers();
+            const targetUser = allUsers.find(
+                user => user.id === targetOption || user.username === targetOption || user.nickname === targetOption
+              ) || null;
+            const availableClasses = await getAvailableClasses(targetUser, interaction.guild, "current");
             // Filter based on the current input
             const filtered = availableClasses.filter(c =>
                 c.toLowerCase().startsWith(focusedValue.toLowerCase())

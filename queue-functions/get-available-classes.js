@@ -164,7 +164,6 @@ async function getCurrentUserClasses(user){
         }
         return classList;
     }else{
-        console.log("No classes")
         return classList.push("Error retrieving classes");
     }
     

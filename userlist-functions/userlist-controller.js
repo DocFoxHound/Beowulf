@@ -43,7 +43,6 @@ async function createNewUser(userData, client, guildId){
     }catch{
         member = null;
     }
-    console.log(member)
     // const discordUser = await client.users.fetch(userData.id);
     if(member){
         console.log("Adding user from Discord to DB")

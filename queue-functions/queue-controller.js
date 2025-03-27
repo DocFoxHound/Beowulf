@@ -105,9 +105,38 @@ async function queueController(runOrClassName, messageOrUser, openai, client, ad
     }
 }
 
+async function queueControllerForSlashCommands(className, targetUser, handlerUser,  openai, client, addOrRemove, classStatus, selfOrOther, interaction){
+    try{
+        const guild = interaction.guild;
+        requestedClass = className;
+        targetUsername = targetUser.username; //if null we need to error
+        handlerUsername = classStatus !== "completed" ? null : handlerUser.username;
+
+        if(targetUser === null){
+            return "The target user specified was not found.";
+        }
+        
+        if(classStatus === "completed"){
+            // Check if the user has the required role
+            const member = await guild.members.fetch(interaction.user.id);
+            const memberRoles = member.roles.cache;
+            const moderatorRoles = process.env.MODERATOR_ROLES.split(',');
+            const hasPermission = moderatorRoles.some(role => memberRoles.has(role));
+            if (!hasPermission) {
+                return "You do not have permission to mark something as complete or not.";
+            }
+        }
+
+        const response = await addOrEditQueue(requestedClass, targetUsername, handlerUsername, openai, client, addOrRemove, classStatus, selfOrOther);
+        return response;
+    }catch(error){
+        console.log(error);
+        return "There was an error adding to the queue"
+    }
+}
+
 async function queueControllerForChat(run, message, openai, client){
     try{
-        const author = message.author;
         toolCall = run.required_action.submit_tool_outputs.tool_calls[0];
         parsedArgs = JSON.parse(toolCall.function.arguments);
         requestedClass = parsedArgs.queue_class;
@@ -420,7 +449,7 @@ async function addOrEditQueue(requestedClass, targetUsername, handlerUsername, o
             const addOrEditSuccess = await editOrAddUserInQueue(newUserModel.id, newUserModel);
             emptyUserQueueCheck(classes, newUserModel)
             if(addOrEditSuccess){
-                return `${newUserModel.nickname || newUserModel.username} was successfully removed from the queue for ${requestedClass}.`;
+                return `${newUserModel.nickname || newUserModel.username} was successfully removed from the queue for ${requestedClass} and marked incomplete.`;
             }
         }
 
@@ -432,7 +461,7 @@ async function addOrEditQueue(requestedClass, targetUsername, handlerUsername, o
             emptyUserQueueCheck(classes, newUserModel)
             if(addOrEditSuccess && successfulEdit){
                 const logResult = await logHandlerFunctionCommand(newUserModel, handlerData, classToUpdate.id);
-                return `${newUserModel.nickname || newUserModel.username} was successfully removed from the queue for ${requestedClass} and marked complete.`;    
+                return `${newUserModel.nickname || newUserModel.username} was successfully removed from the queue for ${requestedClass} and marked complete by ${handlerData.username}.`;    
             }
         }
     }catch(error){
@@ -1000,9 +1029,9 @@ async function removeFromQueue(targetUser /*targetUser*/, requestedClass, comple
 }
 
 module.exports = {
-    queueController,
     queueReminderCheck,
     checkQueueForUser,
-    queueControllerForChat
+    queueControllerForChat,
+    queueControllerForSlashCommands
     // getQueue,
 };
