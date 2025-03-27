@@ -32,7 +32,6 @@ async function handleRequiresAction(message, run, client, preloadedDbTables, ope
         const toolCall = run.required_action.submit_tool_outputs.tool_calls[0];
         const contentText = await functionHandler.executeFunction(run, message, preloadedDbTables, openai, client);
         run = await addResultsToRun.addResultsToRun(contentText, openai, run.thread_id, toolCall.id, run.id);
-        console.log("Run: ", run);
         // let messages = await client.beta.threads.messages.list(thread.id);
         let messages = await openai.beta.threads.messages.list(run.thread_id);
 
