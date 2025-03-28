@@ -20,11 +20,19 @@ module.exports = {
      * @param {CommandInteraction} interaction
      */
     async execute(interaction, client, openai) {
+        const member = interaction.member;
+        const moderatorRoles = process.env.LIVE_ENVIRONMENT === "true" ? process.env.MODERATOR_ROLES.split(',') : process.env.TEST_MODERATOR_ROLES.split(',');
+        const hasPermission = member.roles.cache.some(role => moderatorRoles.includes(role.id));
+        if(!hasPermission) {
+            return interaction.reply({ 
+                content: "You do not have permission to use this command.",
+                ephemeral: true 
+            });
+        }
         try {
             const type = interaction.options.getString('type');
             if(type === 'update'){
                 const response = await refreshUserlist(client, openai);
-                console.log("Response: ", response)
                 return interaction.reply({ 
                     content: response,
                     ephemeral: true 
@@ -39,8 +47,8 @@ module.exports = {
                 });
             }
         } catch (error) {
-            console.error('Error adding badge:', error);
-            await interaction.reply('An error occurred while adding the badge. Please try again later.');
+            console.error('Error updating userlist:', error);
+            await interaction.reply('An error occurred while updating userlist. Please try again later.');
         }
     }
 };

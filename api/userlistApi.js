@@ -63,10 +63,27 @@ async function editUser(userId, updatedUserData) {
     }
 }
 
+async function deleteUser(userId) {
+    console.log("Deleting User")
+    const apiUrl = `${process.env.SERVER_URL}/api/users/${id}`; 
+    try {
+        const response = await axios.delete(apiUrl, {
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        return true;
+    } catch (error) {
+        console.error('Error deleting user: ', error.response ? error.response.data : error.message);
+        return false;
+    }
+}
+
 module.exports = {
     createUser,
     getUsers,
     getUserById,
     editUser,
-    getUserByUsername
+    getUserByUsername,
+    deleteUser
 };

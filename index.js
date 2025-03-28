@@ -209,6 +209,10 @@ client.on(Events.InteractionCreate, async interaction => {
 // Event Listener: new member joins the server
 client.on(Events.GuildMemberAdd, async member => {
   const user = await getUserById(member.user.id) || null;
+  if(!user){
+    console.log(`Trouble adding ${member.user.username} to the UserList.`);
+    return;
+  }
   if(user.id){
     console.log(`User ${member.user.username} is already in the UserList.`);
     return;
