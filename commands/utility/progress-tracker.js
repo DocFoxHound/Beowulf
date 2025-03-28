@@ -11,8 +11,7 @@ module.exports = {
         .setName('progress-tracker')
         .setDescription('View your promotion progress across RAPTOR, CORSAIR, and RAIDER assessments')
         .addUserOption(option =>
-            option
-                .setName('target')
+            option.setName('target')
                 .setDescription('The user to check progress for')
                 .setRequired(true)
             ),

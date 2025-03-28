@@ -15,7 +15,6 @@ async function createNewUser(userData, client, guildId){
         corsair_level: 0,
         raptor_level: 0,
         raider_level: 0,
-        rank: null,
         raptor_1_solo: false,
         raptor_1_team: false,
         raptor_2_solo: false,
@@ -32,7 +31,8 @@ async function createNewUser(userData, client, guildId){
         raider_1_boarder: false,
         raider_2_powdermonkey: false,
         raider_2_mate: false,
-        raider_3_sailmaster: false
+        raider_3_sailmaster: false,
+        rank: null
     }
 
     //check if user is still in discord
@@ -269,35 +269,50 @@ async function updateUserClassStatus(userDataForUserList, requestedClass, classC
 }
 
 async function getUserRank(memberRoles) {
-    const discordRankRoles = await rankRoles.getRanks();
-    // Create a map of role names to roles for quick lookup
-    const roleMap = new Map(discordRankRoles.map(role => [role.name, role]));
-    // Define the priority of roles from highest to lowest
-    const rolePriority = ["Captain", "Crew Chief", "Blooded", "Blood Qualified", "Marauder", "Crew", "Prospect", "Friendly", "Guest", "test_captain", "test_blooded", "test_marauder", "test_crew", "test_prospect"];
-    // Iterate over the array of roles once to get the highest-priority role that the user has
-    for (const roleName of rolePriority) {
-        const role = roleMap.get(roleName);
-        if (role && memberRoles.includes(role.id)) {
-            return role.id;
+    try{
+        const discordRankRoles = await rankRoles.getRanks();
+        // Create a map of role names to roles for quick lookup
+        const roleMap = new Map(discordRankRoles.map(role => [role.name, role]));
+        // Define the priority of roles from highest to lowest
+        const rolePriority = ["Captain", "Crew Chief", "Blooded", "Blood Qualified", "Marauder", "Crew", "Prospect", "Friendly", "Guest", "test_captain", "test_blooded", "test_marauder", "test_crew", "test_prospect"];
+        // Iterate over the array of roles once to get the highest-priority role that the user has
+        for (const roleName of rolePriority) {
+            const role = roleMap.get(roleName);
+            if (role && memberRoles.includes(role.id)) {
+                return role.id;
+            }
         }
+        return null;
+    }catch(error){
+        console.log(error)
     }
-    return null;
 }
 
 async function getRaptorRank(memberRoles) {
-    const discordPrestigeRanks = await prestigeRoles.getPrestiges();
-    // Create a map of role names to roles for quick lookup
-    const roleMap = new Map(discordPrestigeRanks.map(role => [role.name, role]));
-    // Define the priority of roles from highest to lowest
-    const rolePriority = ["RAPTOR Council", "RAPTOR III", "RAPTOR II", "RAPTOR I", "test_raptor_council", "test_raptor_I"];
-    // Iterate over the array of roles once to get the highest-priority role that the user has
-    for (const roleName of rolePriority) {
-        const role = roleMap.get(roleName);
-        if (role && memberRoles.includes(role.id)) {
-            return role.id;
+    try {
+        const discordPrestigeRanks = await prestigeRoles.getPrestiges();
+
+        // Filter roles that contain "RAPTOR" (case-insensitive) in their name
+        const raptorRoles = discordPrestigeRanks.filter(role =>
+            role.name.toLowerCase().includes("raptor")
+        );
+
+        // Create a map of role IDs to their corresponding rank levels for quick lookup
+        const rankMap = new Map(raptorRoles.map(role => [role.id, role.rank_level]));
+
+        // Iterate through the memberRoles array and check for a match in the rankMap
+        for (const roleId of memberRoles) {
+            if (rankMap.has(roleId)) {
+                return rankMap.get(roleId); // Return the rank_level value if a match is found
+            }
         }
+
+        // If no match is found, return 0 or a default value
+        return 0;
+    } catch (error) {
+        console.error("Error in getRaptorRank: ", error);
+        return 0; // Return a default value in case of an error
     }
-    return 0;
 }
 
 async function getRaptorRankDb(userId) {
@@ -311,19 +326,30 @@ async function getRaptorRankDb(userId) {
 }
 
 async function getCorsairRank(memberRoles) {
-    const discordPrestigeRanks = await prestigeRoles.getPrestiges();
-    // Create a map of role names to roles for quick lookup
-    const roleMap = new Map(discordPrestigeRanks.map(role => [role.name, role]));
-    // Define the priority of roles from highest to lowest
-    const rolePriority = ["CORSAIR Council", "CORSAIR III", "CORSAIR II", "CORSAIR I", "test_corsair_council", "test_corsair_I"];
-    // Iterate over the array of roles once to get the highest-priority role that the user has
-    for (const roleName of rolePriority) {
-        const role = roleMap.get(roleName);
-        if (role && memberRoles.includes(role.id)) {
-            return role.id;
+    try {
+        const discordPrestigeRanks = await prestigeRoles.getPrestiges();
+
+        // Filter roles that contain "RAPTOR" (case-insensitive) in their name
+        const raptorRoles = discordPrestigeRanks.filter(role =>
+            role.name.toLowerCase().includes("corsair")
+        );
+
+        // Create a map of role IDs to their corresponding rank levels for quick lookup
+        const rankMap = new Map(discordPrestigeRanks.map(role => [role.id, role.rank_level]));
+
+        // Iterate through the memberRoles array and check for a match in the rankMap
+        for (const roleId of memberRoles) {
+            if (rankMap.has(roleId)) {
+                return rankMap.get(roleId); // Return the rank_level value if a match is found
+            }
         }
+
+        // If no match is found, return 0 or a default value
+        return 0;
+    } catch (error) {
+        console.error("Error in getCorsairRank: ", error);
+        return 0; // Return a default value in case of an error
     }
-    return 0;
 }
 
 async function getCorsairRankDb(userId) {
@@ -337,19 +363,30 @@ async function getCorsairRankDb(userId) {
 }
 
 async function getRaiderRank(memberRoles) {
-    const discordPrestigeRanks = await prestigeRoles.getPrestiges();
-    // Create a map of role names to roles for quick lookup
-    const roleMap = new Map(discordPrestigeRanks.map(role => [role.name, role]));
-    // Define the priority of roles from highest to lowest
-    const rolePriority = ["RAIDER Council", "RAIDER III", "RAIDER II", "RAIDER I", "test_raider_council", "test_raider_I"];
-    // Iterate over the array of roles once to get the highest-priority role that the user has
-    for (const roleName of rolePriority) {
-        const role = roleMap.get(roleName);
-        if (role && memberRoles.includes(role.id)) {
-            return role.id;
+    try {
+        const discordPrestigeRanks = await prestigeRoles.getPrestiges();
+
+        // Filter roles that contain "RAPTOR" (case-insensitive) in their name
+        const raptorRoles = discordPrestigeRanks.filter(role =>
+            role.name.toLowerCase().includes("raider")
+        );
+
+        // Create a map of role IDs to their corresponding rank levels for quick lookup
+        const rankMap = new Map(discordPrestigeRanks.map(role => [role.id, role.rank_level]));
+
+        // Iterate through the memberRoles array and check for a match in the rankMap
+        for (const roleId of memberRoles) {
+            if (rankMap.has(roleId)) {
+                return rankMap.get(roleId); // Return the rank_level value if a match is found
+            }
         }
+
+        // If no match is found, return 0 or a default value
+        return 0;
+    } catch (error) {
+        console.error("Error in getRaiderRank: ", error);
+        return 0; // Return a default value in case of an error
     }
-    return 0;
 }
 
 async function getRaiderRankDb(userId) {

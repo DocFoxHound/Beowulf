@@ -25,6 +25,7 @@ const { getUserRank } = require('./userlist-functions/userlist-controller.js')
 const { getRaptorRankDb } = require('./userlist-functions/userlist-controller.js')
 const { getCorsairRankDb } = require('./userlist-functions/userlist-controller.js')
 const { getRaiderRankDb } = require('./userlist-functions/userlist-controller.js')
+const { refreshUserlist } = require("./common/refresh-userlist.js");
 // const checkQueue = require("./queue-functions/queue-check.js")
 
 // Initialize dotenv config file
@@ -74,7 +75,7 @@ for (const folder of commandFolders) {
 }
 
 // Set channels
-channelIds = process.env?.CHANNELS?.split(",");
+channelIds = process.env.LIVE_ENVIRONMENT === "true" ? process.env.CHANNELS.split(",") : process.env.TEST_CHANNELS.split(",");
 channelIdAndName = [];
 
 //json things to hold in memory
@@ -136,9 +137,6 @@ client.on("ready", async () => {
     // 300000 // every 5 minutes
     10800000 //every 3 hours
   );
-  setInterval(() => vectorHandler.refreshUserList(openai, client),
-    43200000 //every 12 hours
-  );
   // setInterval(() => userCache.clear(),
   //   21600000 // Clear cache every 6 hours, avoids excessive memory bloat
   // );
@@ -148,11 +146,14 @@ client.on("ready", async () => {
   setInterval(() => processUEXData("other_tables"), //do NOT await this, it takes forever
     674800000 //every 7 days
   );
-  setInterval(async () => preloadedDbTables = await preloadFromDb(), //do NOT await this, it takes forever
+  setInterval(async () => preloadedDbTables = preloadFromDb(), //do NOT await this, it takes forever
     21600000 //every 6 hours
   );
   setInterval(() => queueReminderCheck(openai, client, null),
     43200000 //every 12 hours
+  );
+  setInterval(() => refreshUserlist(client, openai),
+    43201000 //every 12 hours and 1 second
   );
 }),
 
@@ -219,7 +220,6 @@ client.on(Events.GuildMemberAdd, async member => {
       corsair_level: 0,
       raptor_level: 0,
       raider_level: 0,
-      rank: null,
       raptor_1_solo: false,
       raptor_1_team: false,
       raptor_2_solo: false,
@@ -236,7 +236,8 @@ client.on(Events.GuildMemberAdd, async member => {
       raider_1_boarder: false,
       raider_2_powdermonkey: false,
       raider_2_mate: false,
-      raider_3_sailmaster: false
+      raider_3_sailmaster: false,
+      rank: null
     }
   
     const result = await createUser(newUser);
@@ -272,7 +273,6 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
       corsair_level: corsairLevel,
       raptor_level: raptorLevel,
       raider_level: raiderLevel,
-      rank: userRank,
       raptor_1_solo: user.raptor_1_solo,
       raptor_1_team: user.raptor_1_team,
       raptor_2_solo: user.raptor_2_solo,
@@ -289,7 +289,8 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
       raider_1_boarder: user.raider_1_boarder,
       raider_2_powdermonkey: user.raider_2_powdermonkey,
       raider_2_mate: user.raider_2_mate,
-      raider_3_sailmaster: user.raider_3_sailmaster
+      raider_3_sailmaster: user.raider_3_sailmaster,
+      rank: userRank
     }
     await editUser(user.id, updatedUser);
     console.log("User updated successfully");

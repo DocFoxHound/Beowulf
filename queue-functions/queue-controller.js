@@ -34,7 +34,7 @@ async function queueControllerForSlashCommands(className, targetUser, handlerUse
             // Check if the user has the required role
             const member = await guild.members.fetch(interaction.user.id);
             const memberRoles = member.roles.cache;
-            const moderatorRoles = process.env.MODERATOR_ROLES.split(',');
+            const moderatorRoles = process.env.LIVE_ENVIRONMENT === "true" ? process.env.MODERATOR_ROLES.split(',') : process.env.TEST_MODERATOR_ROLES.split(',');
             const hasPermission = moderatorRoles.some(role => memberRoles.has(role));
             if (!hasPermission) {
                 return "You do not have permission to mark something as complete or not.";
@@ -66,7 +66,7 @@ async function queueControllerForChat(run, message, openai, client){
             const guild = message.guild;
             const member = await guild.members.fetch(message.author.id);
             const memberRoles = member.roles.cache;
-            const moderatorRoles = process.env.MODERATOR_ROLES.split(',');
+            const moderatorRoles = process.env.LIVE_ENVIRONMENT === "true" ? process.env.MODERATOR_ROLES.split(',') : process.env.TEST_MODERATOR_ROLES.split(',');
             const hasPermission = moderatorRoles.some(role => memberRoles.has(role));
             if (!hasPermission) {
                 return "You do not have permission to mark something as complete or not.";

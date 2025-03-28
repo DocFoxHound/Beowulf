@@ -32,7 +32,20 @@ async function sendMessage(channelId, message, client) {
     }
 }
 
+async function sendMessageNotifySubject(channelId, userId, message, client) {
+    const channel = client.channels.cache.get(channelId);
+    const userMention = `<@${userId}>`;
+    const messageWithMention = `${userMention} ${message}`;
+    try{
+        await channel.send(messageWithMention);
+    }catch(error){
+        console.error("Error running the thread: ", error);
+        await channel.send("Sorry, there was an error processing your request.");
+    }
+}
+
 module.exports = {
     sendResponse,
     sendMessage,
+    sendMessageNotifySubject,
 }

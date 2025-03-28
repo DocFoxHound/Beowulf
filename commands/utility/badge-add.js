@@ -31,7 +31,7 @@ module.exports = {
     async execute(interaction) {
         // Check if the user has the required role
         const memberRoles = interaction.member.roles.cache;
-        const moderatorRoles = process.env.MODERATOR_ROLES.split(',');
+        const moderatorRoles = process.env.LIVE_ENVIRONMENT === "true" ? process.env.MODERATOR_ROLES.split(',') : process.env.TEST_MODERATOR_ROLES.split(',');
         const hasPermission = moderatorRoles.some(role => memberRoles.has(role));
 
         if (!hasPermission) {

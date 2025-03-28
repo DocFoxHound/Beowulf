@@ -102,74 +102,6 @@ async function refreshChatLogs(channelIdAndName, openai, client) {
   }
 }
 
-async function refreshUserList(openai, client) {
-  console.log("Refreshing User List");
-  const guild = await client.guilds.fetch(process.env.GUILD_ID);
-  fileToDeleteId = "";
-  try {
-    //get the list of files and find the UserList.txt file's ID
-    const list = await openai.files.list();
-    const files = list.data; // Assuming the list is in the data.data array
-    const file = await files.find((f) => f.filename === guild.name + "UserList.txt");
-    
-    //if the file search comes back empty, that means the file doesn't exist (or we just couldn't find it)
-    if(file === undefined){
-      console.log("Couldn't locate the old UserList.txt, building a new one.");
-      const allUsers = await getAndUploadUserList(guild);
-      await createAndUploadFile(allUsers, openai, `${guild.name}UserList`);
-  }else{
-      fileToDeleteId = file.id;
-      //first, delete it from the vector storage
-      await openai.beta.vectorStores.files.del(
-        process.env.VECTOR_STORE,
-        fileToDeleteId
-      );
-      console.log("Removed old UserList.txt, building a new one.");
-      //then, delete it from the file storage
-      await openai.files.del(fileToDeleteId);
-      //now get Discord Users and build a new UserList.txt
-      const allUsers = await getAndUploadUserList(guild);
-      await createAndUploadFile(allUsers, openai, `${guild.name}UserList`);
-  }
-  } catch (error) {
-    console.log(`Error in refreshing the UserList: ${error}`);
-  }
-}
-
-// retrieves and uploads a user list by role (listed in .env)
-async function getAndUploadUserList(guild) {
-  console.log("Getting the UserList");
-  let userArray = ["All Members/Users of " + guild.name + " and their roles"];
-  const roleIDs = process.env.MEMBER_ROLES;
-
-  //get all users and log them in an array with their username, online/offline status, and roles
-  try {
-    const members = await guild.members.fetch();
-    const membersWithRoles = members.filter((member) =>
-      member.roles.cache.some((role) => roleIDs.includes(role.id))
-    );
-    membersWithRoles.forEach((member) => {
-      userRoles = "";
-      member.roles.cache.forEach((role) => {
-        userRoles = userRoles + (role.name + ", ");
-      });
-      if (member.nickname == null) {
-        userArray.push(
-          "USERNAME: '" + member.user.username + "' ROLES: " + userRoles
-        );
-      } else {
-        userArray.push(
-          "USERNAME: '" + member.nickname + "' ROLES: " + userRoles
-        );
-      }
-    });
-  } catch (error) {
-    console.error("Failed to fetch members: ", error);
-  }
-  //returns the list as a string separated by a return
-  return userArray.join("\n");
-}
-
 async function getChatLogs(client, guild, channelIdAndName, openai) {
   for (const channel of channelIdAndName) {
     console.log(`Getting logs for: ${channel.channelName}`)
@@ -323,5 +255,4 @@ async function createAndUploadFile(textString, openai, givenName) {
 
 module.exports = {
   refreshChatLogs,
-  refreshUserList,
 };

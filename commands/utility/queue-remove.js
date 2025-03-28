@@ -36,7 +36,7 @@ module.exports = {
         try {
             // Check if the user has the required role
             const memberRoles = interaction.member.roles.cache;
-            const moderatorRoles = process.env.MODERATOR_ROLES.split(',');
+            const moderatorRoles = process.env.LIVE_ENVIRONMENT === "true" ? process.env.MODERATOR_ROLES.split(',') : process.env.TEST_MODERATOR_ROLES.split(',');
             const hasPermission = moderatorRoles.some(role => memberRoles.has(role));
 
             // if (!hasPermission) {
@@ -81,7 +81,7 @@ module.exports = {
             // if not a moderator, then only show the person's name
             // Check if the user has the required permissions
             const member = interaction.member;
-            const moderatorRoles = process.env.MODERATOR_ROLES.split(',');
+            const moderatorRoles = process.env.LIVE_ENVIRONMENT === "true" ? process.env.MODERATOR_ROLES.split(',') : process.env.TEST_MODERATOR_ROLES.split(',');
             const hasPermission = member.roles.cache.some(role => moderatorRoles.includes(role.id));
             if(!hasPermission){
                 // Filter the target if they are not a mod, to just showing themself

@@ -17,7 +17,7 @@ dotenv.config({
 });
 
 const clientId = process.env.CLIENT_ID;
-const guildId = process.env.GUILD_ID_TEST;
+const guildId = process.env.LIVE_ENVIRONMENT === "true" ? process.env.GUILD_ID : process.env.TEST_GUILD_ID;
 const token = process.env.CLIENT_TOKEN;
 
 const commands = [];
