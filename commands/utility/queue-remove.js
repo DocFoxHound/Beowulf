@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { queueControllerForSlashCommands } = require('../../queue-functions/queue-controller');
-const { getAvailableClasses } = require('../../queue-functions/get-available-classes');
+const { getAvailableUserClassesQueueRemove } = require('../../queue-functions/get-available-classes');
 const { getUsersInQueue } = require('../../api/queueApi');  
 const { getUsers } = require("../../api/userlistApi"); 
 // const { getQueueUsers } = require('../../queue-functions/get-queue-users'); // Add this import
@@ -112,7 +112,7 @@ module.exports = {
             const targetUser = allUsers.find(
                 user => user.id === targetOption || user.username === targetOption || user.nickname === targetOption
               ) || null;
-            const availableClasses = await getAvailableClasses(targetUser, interaction.guild, "current");
+            const availableClasses = await getAvailableUserClassesQueueRemove(targetUser, interaction.guild, "current");
             // Filter based on the current input
             const filtered = availableClasses.filter(c =>
                 c.toLowerCase().startsWith(focusedValue.toLowerCase())

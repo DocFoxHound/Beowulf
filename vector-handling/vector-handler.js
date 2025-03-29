@@ -36,7 +36,7 @@ async function loadChatlogs(client, openai){
     try{
       const list = await openai.files.list();
       const files = list.data;
-      const oldFile = files.find(
+      const oldFile = await files.find(
         (f) =>
           f.filename === `chatlog_${channel}.json`
       );
@@ -55,7 +55,7 @@ async function loadChatlogs(client, openai){
     //create and upload the new file
     try{
       const filePath = `./chatlogs/chatlog_${channel}.json`;
-      const fileContent = JSON.stringify(channelLogs[channel], null, 2);
+      const fileContent = await JSON.stringify(channelLogs[channel], null, 2);
       // Save to a temp .json file
       fs.writeFileSync(filePath, fileContent);
 
@@ -71,9 +71,7 @@ async function loadChatlogs(client, openai){
       });
 
       // Clean up the local file
-      fs.unlinkSync(filePath);
-
-      console.log(`✅ Uploaded chat log for ${channel} as file ID: ${file.id}`);
+      await fs.unlinkSync(filePath);
     }catch(error){
       console.log(`Error uploading chat log for ${channel}: ${error}`);
     }

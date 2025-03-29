@@ -5,7 +5,7 @@ const { topHandlers } = require('../../common/embeds.js')
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('top-handlers')
+        .setName('queue-top-handlers')
         .setDescription('See who has handled the most queue entries in the server.')
         .addStringOption(option =>
             option.setName('timeframe')

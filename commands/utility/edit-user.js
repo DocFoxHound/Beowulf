@@ -7,7 +7,7 @@ const { getClasses } = require('../../api/classApi');
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('edit-user')
+        .setName('zadmin-edit-user')
         .setDescription('Edit a user status for a specific class')
         .addUserOption(option => 
             option.setName('target')

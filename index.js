@@ -134,8 +134,8 @@ client.on("ready", async () => {
   // await vectorHandler.refreshUserList(openai, client)
   // processUEXData("all"); //do NOT await this, it takes forever
   preloadedDbTables = await preloadFromDb();
-  await trimChatLogs();
-  await loadChatlogs(client, openai)
+  // await trimChatLogs();
+  // await loadChatlogs(client, openai)
 
   //routine tasks
   setInterval(() => vectorHandler.refreshChatLogs(channelIdAndName, openai, client),
