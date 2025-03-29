@@ -26,6 +26,9 @@ const { getRaptorRankDb } = require('./userlist-functions/userlist-controller.js
 const { getCorsairRankDb } = require('./userlist-functions/userlist-controller.js')
 const { getRaiderRankDb } = require('./userlist-functions/userlist-controller.js')
 const { refreshUserlist } = require("./common/refresh-userlist.js");
+const { saveMessage } = require("./common/message-saver.js");
+const { loadChatlogs } = require("./vector-handling/vector-handler.js");
+const { trimChatLogs } = require("./vector-handling/vector-handler.js");
 // const checkQueue = require("./queue-functions/queue-check.js")
 
 // Initialize dotenv config file
@@ -131,6 +134,8 @@ client.on("ready", async () => {
   // await vectorHandler.refreshUserList(openai, client)
   // processUEXData("all"); //do NOT await this, it takes forever
   preloadedDbTables = await preloadFromDb();
+  await trimChatLogs();
+  await loadChatlogs(client, openai)
 
   //routine tasks
   setInterval(() => vectorHandler.refreshChatLogs(channelIdAndName, openai, client),
@@ -155,12 +160,20 @@ client.on("ready", async () => {
   setInterval(() => refreshUserlist(client, openai),
     43201000 //every 12 hours and 1 second
   );
+  setInterval(() => loadChatlogs(client, openai),
+    60000 // every 1 minutes
+    // 10800000 //every 3 hours
+  );
+  setInterval(() => trimChatLogs(),
+    43200000 //every 12 hours
+  );
 }),
 
 client.on("messageCreate", async (message) => {
   if (!channelIds.includes(message.channelId) || !message.guild || message.system) {
     return;
   }
+  saveMessage(message, client);
   handleMessage(message, openai, client, preloadedDbTables);
 
 });
