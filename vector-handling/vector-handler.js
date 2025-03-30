@@ -1,3 +1,4 @@
+const { channel } = require("node:diagnostics_channel");
 const { getMessages } = require("../api/messageApi");
 const { deleteMessagesByCount } = require("../api/messageApi");
 const fs = require("node:fs");
@@ -12,13 +13,28 @@ async function loadChatlogs(client, openai){
     try{
       const channelName = message.message.metadata.channel; // Get the channel name
       const messageJson = message.message; // Get the message JSON
+      if(channelName === "bot-commands"){
+        //if this is a bot command, ignore it
+        continue;
+      }
+
+      const category = channelName.includes("raptor-lounge") ? "PVP Training and Theory" :
+        channelName.includes("raider-council") ? "Pirate Planning and Practices" :
+        channelName.includes("corsair-cove") ? "Large Fleet Tactics and Strategy" :
+        channelName.includes("wright-bar") ? "Logistics and Game Theory Discussion" :
+        channelName.includes("help-me-fly") ? "PVP and Training Chat" :
+        channelName.includes("loadout-talk") ? "PVP and Ship Loadout Chat" :
+        channelName.includes("bot-commands") ? "bot-commands" :
+        channelName.includes("sc-feeds") ? "Star Citizen News and Updates" :
+        channelName.includes("announcements") ? "IronPoint Announcements" :
+        "General Discussion"
 
       // Initialize the array for the channel if it doesn't exist
       if (!channelLogs[channelName]) {
           channelLogs[channelName] = {
             header: {
               channel_name: channelName,
-              channel_category: "dogfighting"
+              channel_category: category
             },
             chat_log: []
           };
