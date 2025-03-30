@@ -137,11 +137,6 @@ client.on("ready", async () => {
   // await trimChatLogs();
   // await loadChatlogs(client, openai)
 
-  //routine tasks
-  setInterval(() => vectorHandler.refreshChatLogs(channelIdAndName, openai, client),
-    // 300000 // every 5 minutes
-    10800000 //every 3 hours
-  );
   // setInterval(() => userCache.clear(),
   //   21600000 // Clear cache every 6 hours, avoids excessive memory bloat
   // );
