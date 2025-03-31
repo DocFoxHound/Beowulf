@@ -156,7 +156,7 @@ client.on("ready", async () => {
     43201000 //every 12 hours and 1 second
   );
   setInterval(() => loadChatlogs(client, openai),
-    60000 // every 1 minutes
+    120000 // every 2 minutes
     // 10800000 //every 3 hours
   );
   setInterval(() => trimChatLogs(),
