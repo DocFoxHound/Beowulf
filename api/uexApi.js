@@ -305,6 +305,57 @@ async function createOrUpdateStarSystem(data) {
 }
 
 //--------------------------------------------
+//              SHIPS CONTROLLER           
+//--------------------------------------------
+
+async function getAllShips() {
+    const apiUrl = `${process.env.SERVER_URL}/api/uex/ships/`;
+    try {
+        const response = await axios.get(apiUrl);
+        return response.data;  // This will be the return value of the function
+    } catch (error) {
+        console.error('Error fetching entity:', error.response ? error.response.data : error.message);
+        return null;  // Return null if there's an error
+    }
+}
+
+async function getShipsById(id){
+    const apiUrl = process.env.SERVER_URL;
+    try {
+        const response = await axios.get(`${apiUrl}/api/uex/ships/${id}`);
+        return response.data;  // This now properly returns the response data to the caller
+    } catch (error) {
+        return null;  // Return null or throw an error, depending on how you want to handle errors
+    }
+}
+
+async function createOrUpdateShips(data) {
+    const apiUrl = `${process.env.SERVER_URL}/api/uex/ships`;
+    try {
+        // Check if the city exists
+        await axios.get(`${apiUrl}/${data.id}`);
+        // Update the existing city
+        await axios.put(`${apiUrl}/${data.id}`, data, {
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+    } catch (error) {
+        if (error.response && error.response.status === 404) {
+            // Create a new city if it does not exist
+            await axios.post(apiUrl, data, {
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+        } else {
+            console.error('Error creating or updating entity: ', error.response ? error.response.data : error.message);
+        }
+    }
+}
+
+
+//--------------------------------------------
 //           TERMINAL CONTROLLER              
 //--------------------------------------------
 
@@ -428,5 +479,8 @@ module.exports = {
     createOrUpdateTerminal,
     getAllTerminalPrices,
     getTerminalPricesById,
-    createOrUpdateTerminalPrices
+    createOrUpdateTerminalPrices,
+    getAllShips,
+    getShipsById,
+    createOrUpdateShips,
 };

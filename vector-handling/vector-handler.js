@@ -3,11 +3,20 @@ const { getMessages } = require("../api/messageApi");
 const { deleteMessagesByCount } = require("../api/messageApi");
 const fs = require("node:fs");
 const { Readable } = require('stream');
+const { getAllLessonsLearned } = require("../api/lessonsLearnedApi");
 
 async function loadChatlogs(client, openai){
-  const chatLog = await getMessages();
+  let chatLog = null;
+  let lessonsLearned = null;
   let channelLogs = [];
-// # blood-chat, marauder-chat, raptor-lounge, raider-council, corsair-cove, wright-bar, help-me-fly, crew-plus-chat, general-chat, loadout-talk, bot-commands, star-citizen, other-games, off-topic, rig-talk, pet-parlor, salt-mining, memes, sc-feeds, media-team, misc-media, announcements
+  try{
+    chatLog = await getMessages();
+    lessonsLearned = await getAllLessonsLearned();
+  }catch(error){
+    console.log(`Error getting lessons learned: ${error}`);
+    return;
+  }
+  // # blood-chat, marauder-chat, raptor-lounge, raider-council, corsair-cove, wright-bar, help-me-fly, crew-plus-chat, general-chat, loadout-talk, bot-commands, star-citizen, other-games, off-topic, rig-talk, pet-parlor, salt-mining, memes, sc-feeds, media-team, misc-media, announcements
   //prepare the message
   for (const message of chatLog) {
     try{
@@ -46,31 +55,54 @@ async function loadChatlogs(client, openai){
     }
   }
 
+  //compile lessons learned
+  for(const lesson of lessonsLearned){
+    try{
+      const channelName = "common-knowledge"; // Get the channel name
+      const messageJson = lesson.lesson; // Get the message JSON
+
+      if(!channelLogs[channelName]){
+        channelLogs[channelName] = {
+          header: {
+            channel_name: channelName,
+            channel_category: "Common Knowledge"
+          },
+          chat_log: []
+        };
+      }
+      // Add the message content to the appropriate channel array
+      channelLogs[channelName].chat_log.push(messageJson);
+    }catch(error){
+      console.log(`Error processing lesson learned: ${error}`);
+    }
+  }
+
+  //delete all previous files
+  const list = await openai.files.list();
+  const vectorFiles = await openai.beta.vectorStores.files.list(process.env.VECTOR_STORE);
+  const files = list.data;
+  //delete from file storage
+  for(const file of files){
+    try{
+      await openai.files.del(file.id);
+    }catch(error){
+      console.log(`Error deleting file from storage: ${error.message}`);
+    }
+  }
+  //then delete from vector store
+  for (const file of vectorFiles.data) {
+    try {
+      await openai.beta.vectorStores.files.del(process.env.VECTOR_STORE, file.id);
+    } catch (error) {
+      console.error(`Error removing file from vector store:`, error.message);
+    }
+  }
+  
   //upload the message
   for (const channel in channelLogs) {
-    //delete the old file by the same name
-    try{
-      const list = await openai.files.list();
-      const files = list.data;
-      const oldFile = await files.find(
-        (f) =>
-          f.filename === `chatlog_${channel}.json`
-      );
-  
-      //first, delete it from the vector storage
-      await openai.beta.vectorStores.files.del(
-        process.env.VECTOR_STORE,
-        oldFile.id
-      );
-      //then, delete it from the file storage
-      await openai.files.del(oldFile.id);
-    }catch(error){
-      console.log(`Error deleting old file for ${channel}: ${error}`);
-    }
-
     //create and upload the new file
     try{
-      const filePath = `./chatlogs/chatlog_${channel}.json`;
+      const filePath = channel === "common-knowledge" ? `./chatlogs/${channel}.json` : `./chatlogs/chatlog_${channel}.json`;
       const fileContent = await JSON.stringify(channelLogs[channel], null, 2);
       // Save to a temp .json file
       fs.writeFileSync(filePath, fileContent);

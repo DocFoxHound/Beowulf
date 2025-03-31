@@ -21,7 +21,7 @@ module.exports = {
      */
     async execute(interaction, client, openai) {
         const member = interaction.member;
-        const moderatorRoles = process.env.LIVE_ENVIRONMENT === "true" ? process.env.MODERATOR_ROLES.split(',') : process.env.TEST_MODERATOR_ROLES.split(',');
+        const moderatorRoles = process.env.LIVE_ENVIRONMENT === "true" ? process.env.ADMIN_ROLES.split(',') : process.env.TEST_ADMIN_ROLES.split(',');
         const hasPermission = member.roles.cache.some(role => moderatorRoles.includes(role.id));
         if(!hasPermission) {
             return interaction.reply({ 

@@ -133,9 +133,9 @@ client.on("ready", async () => {
   // await vectorHandler.refreshChatLogs(channelIdAndName, openai, client)
   // await vectorHandler.refreshUserList(openai, client)
   // processUEXData("all"); //do NOT await this, it takes forever
-  preloadedDbTables = await preloadFromDb();
   // await trimChatLogs();
-  // await loadChatlogs(client, openai)
+  await loadChatlogs(client, openai)
+  preloadedDbTables = await preloadFromDb();
 
   // setInterval(() => userCache.clear(),
   //   21600000 // Clear cache every 6 hours, avoids excessive memory bloat
@@ -155,10 +155,10 @@ client.on("ready", async () => {
   setInterval(() => refreshUserlist(client, openai),
     43201000 //every 12 hours and 1 second
   );
-  setInterval(() => loadChatlogs(client, openai),
-    120000 // every 2 minutes
-    // 10800000 //every 3 hours
-  );
+  // setInterval(() => loadChatlogs(client, openai),
+  //   120000 // every 2 minutes
+  //   // 10800000 //every 3 hours
+  // );
   setInterval(() => trimChatLogs(),
     43200000 //every 12 hours
   );

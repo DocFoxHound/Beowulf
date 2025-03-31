@@ -19,6 +19,8 @@ async function processUEXData(whichTable){
         apiUrls.push({url: `https://api.uexcorp.space/2.0/star_systems${apiKey}`, title: "star_systems", iterate: false});
         apiUrls.push({url: `https://api.uexcorp.space/2.0/terminals${apiKey}`, title: "terminals", iterate: false});
         apiUrls.push({url: `https://api.uexcorp.space/2.0/commodities_prices?id_terminal=`, title: "terminal_prices", iterate: true}); //this needs to be iterated
+        apiUrls.push({url: `https://api.uexcorp.space/2.0/vehicles_prices${apiKey}`, title: "ships", iterate: false});
+        apiUrls.push({url: `https://api.uexcorp.space/2.0/game_versions${apiKey}`, title: "game_version", iterate: false});
     }else if(whichTable === "cities"){
         apiUrls.push({url: `https://api.uexcorp.space/2.0/cities${apiKey}`, title: "cities", iterate: false});
     }else if(whichTable === "commodities"){
@@ -31,6 +33,10 @@ async function processUEXData(whichTable){
         apiUrls.push({url: `https://api.uexcorp.space/2.0/space_stations${apiKey}`, title: "space_stations", iterate: false});
     }else if(whichTable === "star_systems"){
         apiUrls.push({url: `https://api.uexcorp.space/2.0/star_systems${apiKey}`, title: "star_systems", iterate: false});
+    }else if(whichTable === "ships"){
+        apiUrls.push({url: `https://api.uexcorp.space/2.0/vehicles_prices${apiKey}`, title: "ships", iterate: false});
+    }else if(whichTable === "game_version"){
+        apiUrls.push({url: `https://api.uexcorp.space/2.0/game_versions${apiKey}`, title: "game_version", iterate: false});
     }else if(whichTable === "terminals"){
         apiUrls.push({url: `https://api.uexcorp.space/2.0/terminals${apiKey}`, title: "terminals", iterate: false});
     }else if(whichTable === "terminal_prices"){
@@ -87,6 +93,7 @@ async function sendToDb(title, data){
     try{
         const dataArray = Array.isArray(data) ? data : [data];
         for (const item of dataArray) {
+            console.log(Array.isArray(item.data))
             if (item.data && Array.isArray(item.data)) {
                 switch (title){
                     case "cities":
@@ -123,6 +130,17 @@ async function sendToDb(title, data){
                         console.log("Processing star systems")
                         for(const d of item.data){
                             await UEX.createOrUpdateStarSystem(d);
+                        }
+                        break;
+                    case "ships":
+                        console.log("Processing Ships")
+                        for(const d of item.data){
+                            const ship = {
+                                id: d.id_vehicle,
+                                ship: d.vehicle_name,
+                                avg_price: d.price
+                            }
+                            await UEX.createOrUpdateShips(ship);
                         }
                         break;
                     case "terminals":
