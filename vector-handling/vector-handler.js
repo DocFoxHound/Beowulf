@@ -16,14 +16,23 @@ async function loadChatlogs(client, openai){
     console.log(`Error getting lessons learned: ${error}`);
     return;
   }
+
+
   // # blood-chat, marauder-chat, raptor-lounge, raider-council, corsair-cove, wright-bar, help-me-fly, crew-plus-chat, general-chat, loadout-talk, bot-commands, star-citizen, other-games, off-topic, rig-talk, pet-parlor, salt-mining, memes, sc-feeds, media-team, misc-media, announcements
   //prepare the message
   for (const message of chatLog) {
     try{
       const channelName = message.message.metadata.channel; // Get the channel name
       const messageJson = message.message; // Get the message JSON
+      // const messageTimestamp = new Date(message.id).getTime();
+
+      // // Skip messages older than one minute
+      // if (messageTimestamp < oneMinuteAgo) {
+      //   continue;
+      // }
+
+      //if this is a bot command, ignore it
       if(channelName === "bot-commands"){
-        //if this is a bot command, ignore it
         continue;
       }
 
@@ -59,7 +68,7 @@ async function loadChatlogs(client, openai){
   for(const lesson of lessonsLearned){
     try{
       const channelName = "common-knowledge"; // Get the channel name
-      const messageJson = lesson.lesson; // Get the message JSON
+      const messageJson = {id: lesson.id, lesson: lesson.lesson}; // Get the message JSON
 
       if(!channelLogs[channelName]){
         channelLogs[channelName] = {
@@ -67,39 +76,67 @@ async function loadChatlogs(client, openai){
             channel_name: channelName,
             channel_category: "Common Knowledge"
           },
-          chat_log: []
+          lessons: []
         };
       }
       // Add the message content to the appropriate channel array
-      channelLogs[channelName].chat_log.push(messageJson);
+      channelLogs[channelName].lessons.push(messageJson);
     }catch(error){
       console.log(`Error processing lesson learned: ${error}`);
     }
   }
-
-  //delete all previous files
+  
+  //some constants for this next process part
+  const oneMinuteAgo = Date.now() - 70000;
   const list = await openai.files.list();
   const vectorFiles = await openai.beta.vectorStores.files.list(process.env.VECTOR_STORE);
-  const files = list.data;
-  //delete from file storage
-  for(const file of files){
+
+  //upload the message
+  for (const channel in channelLogs) {
+    let chatLogArray = null;
+    let lastItem = null;
+    let lastTime = null;
+
+    if(channel === "common-knowledge"){
+      // console.log(channelLogs[channel].lessons)
+      lessonArray = channelLogs[channel].lessons;
+      const length = lessonArray.length;
+      lastItem = lessonArray[length - 1];
+      lastTime = lastItem.id;
+    }else{
+      chatLogArray = channelLogs[channel].chat_log;
+      lastItem = chatLogArray[chatLogArray.length - 1];
+      lastTime = new Date(lastItem.metadata.date).getTime()
+    }
+
+    // Skip messages older than one minute
+    if(lastTime < oneMinuteAgo){
+      continue;
+    }
+
+    //delete the previous files
+    const files = list.data;
+    const oldFile = await files.find(
+      (f) =>
+        f.filename === (channel === "common-knowledge" ? `${channel}.json` :`chatlog_${channel}.json`)
+    );
+    const oldVectorFile = await vectorFiles.data.find(
+      (f) =>
+        f.filename === (channel === "common-knowledge" ? `${channel}.json` :`chatlog_${channel}.json`)
+    );
+    //delete from file storage
     try{
-      await openai.files.del(file.id);
+      await openai.files.del(oldFile.id);
     }catch(error){
       console.log(`Error deleting file from storage: ${error.message}`);
     }
-  }
-  //then delete from vector store
-  for (const file of vectorFiles.data) {
+    //then delete from vector store
     try {
-      await openai.beta.vectorStores.files.del(process.env.VECTOR_STORE, file.id);
+      await openai.beta.vectorStores.files.del(process.env.VECTOR_STORE, oldVectorFile.id);
     } catch (error) {
       console.error(`Error removing file from vector store:`, error.message);
     }
-  }
-  
-  //upload the message
-  for (const channel in channelLogs) {
+
     //create and upload the new file
     try{
       const filePath = channel === "common-knowledge" ? `./chatlogs/${channel}.json` : `./chatlogs/chatlog_${channel}.json`;

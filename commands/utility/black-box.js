@@ -4,7 +4,7 @@ const { createBadge } = require('../../api/badgeApi');
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('black-box')
+        .setName('black-box-add')
         .setDescription('Add a new badge to a user')
         .addStringOption(option => 
             option.setName('ship')
