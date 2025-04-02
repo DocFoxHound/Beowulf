@@ -53,7 +53,7 @@ async function processUEXData(whichTable){
     
 
     for (const api of apiUrls) {
-        if(api.iterate === false){
+        if(api.iterate === false && api.title !== "ships" && api.title !== "vehicles"){
             await delay(2000); // Wait for 1 second, since we can only do 60 calls in 60 seconds
             try{
                 const response = await axios.get(api.url);
@@ -65,6 +65,19 @@ async function processUEXData(whichTable){
             }catch(error){
                 console.log(`Error in getting UEX data: ${error}`)
             }
+        }else if(api.title === "ships"){
+            try{
+                const ships = await axios.get(api.url);
+                const vehicles = await axios.get(`https://api.uexcorp.space/2.0/vehicles${apiKey}`);
+                const data = {ships: ships.data, vehicles: vehicles.data};
+                await sendToDb(api.title, data);
+            }catch(error){
+                console.log(`Error in getting UEX data: ${error}`)
+            }
+            
+
+
+            
         }else if (api.title === "terminal_prices"){
             totalTerminals = allTerminals.data.length;
             individualTerminalData = [];
@@ -91,70 +104,84 @@ function delay(ms) {
 
 async function sendToDb(title, data){
     try{
-        const dataArray = Array.isArray(data) ? data : [data];
-        for (const item of dataArray) {
-            console.log(Array.isArray(item.data))
-            if (item.data && Array.isArray(item.data)) {
-                switch (title){
-                    case "cities":
-                        console.log("Processing cities")
-                        for(const d of item.data){
-                            await UEX.createOrUpdateCity(d);
-                        }
-                        break;
-                    case "commodities":
-                        console.log("Processing commodities")
-                        for(const d of item.data){
-                            await UEX.createOrUpdateCommodity(d);
-                        }
-                        break;
-                    case "outposts":
-                        console.log("Processing outposts")
-                        for(const d of item.data){
-                            await UEX.createOrUpdateOutpost(d);
-                        }
-                        break;
-                    case "planets":
-                        console.log("Processing planets")
-                        for(const d of item.data){
-                            await UEX.createOrUpdatePlanet(d);
-                        }
-                        break;
-                    case "space_stations":
-                        console.log("Processing space stations")
-                        for(const d of item.data){
-                            await UEX.createOrUpdateSpaceStation(d);
-                        }
-                        break;
-                    case "star_systems":
-                        console.log("Processing star systems")
-                        for(const d of item.data){
-                            await UEX.createOrUpdateStarSystem(d);
-                        }
-                        break;
-                    case "ships":
-                        console.log("Processing Ships")
-                        for(const d of item.data){
-                            const ship = {
-                                id: d.id_vehicle,
-                                ship: d.vehicle_name,
-                                avg_price: d.price
+        if(title === "ships"){
+            const dataArray = Array.isArray(data) ? data : [data];
+            for(const item of dataArray){
+                for(const ship of item.ships.data){
+                    const shipClone = structuredClone(ship);
+                    const vehicle = structuredClone(item.vehicles.data.find(v => v.id === shipClone.id_vehicle));
+                    const shipId = shipClone.id_vehicle;
+                    const shipPrice = shipClone.price;
+                    const vehicleName = vehicle.name;
+                    const pad_type = vehicle.pad_type;
+                    const maxCrew = Math.max(...vehicle.crew.split(',').map(Number)) || vehicle.crew;
+                    const crewNumber = structuredClone(maxCrew);
+                    const newShip = {
+                        id: vehicle.id,
+                        ship: vehicleName,
+                        avg_price: shipPrice,
+                        crew: crewNumber || 1,
+                        pad_type: vehicle.pad_type,
+                    }
+                    await UEX.createOrUpdateShips(newShip);
+                }
+            }
+            console.log("Processing Ships")
+            
+        }else{
+            const dataArray = Array.isArray(data) ? data : [data];
+            for (const item of dataArray) {
+                if (item.data && Array.isArray(item.data)) {
+                    switch (title){
+                        case "cities":
+                            console.log("Processing cities")
+                            for(const d of item.data){
+                                await UEX.createOrUpdateCity(d);
                             }
-                            await UEX.createOrUpdateShips(ship);
-                        }
-                        break;
-                    case "terminals":
-                        console.log("Processing terminals")
-                        for(const d of item.data){
-                            await UEX.createOrUpdateTerminal(d);
-                        }
-                        break;
-                    case "terminal_prices":
-                        console.log("Processing terminal prices")
-                        for(const d of item.data){
-                            await UEX.createOrUpdateTerminalPrices(d);
-                        }
-                        break;
+                            break;
+                        case "commodities":
+                            console.log("Processing commodities")
+                            for(const d of item.data){
+                                await UEX.createOrUpdateCommodity(d);
+                            }
+                            break;
+                        case "outposts":
+                            console.log("Processing outposts")
+                            for(const d of item.data){
+                                await UEX.createOrUpdateOutpost(d);
+                            }
+                            break;
+                        case "planets":
+                            console.log("Processing planets")
+                            for(const d of item.data){
+                                await UEX.createOrUpdatePlanet(d);
+                            }
+                            break;
+                        case "space_stations":
+                            console.log("Processing space stations")
+                            for(const d of item.data){
+                                await UEX.createOrUpdateSpaceStation(d);
+                            }
+                            break;
+                        case "star_systems":
+                            console.log("Processing star systems")
+                            for(const d of item.data){
+                                await UEX.createOrUpdateStarSystem(d);
+                            }
+                            break;
+                        case "terminals":
+                            console.log("Processing terminals")
+                            for(const d of item.data){
+                                await UEX.createOrUpdateTerminal(d);
+                            }
+                            break;
+                        case "terminal_prices":
+                            console.log("Processing terminal prices")
+                            for(const d of item.data){
+                                await UEX.createOrUpdateTerminalPrices(d);
+                            }
+                            break;
+                    }
                 }
             }
         }
