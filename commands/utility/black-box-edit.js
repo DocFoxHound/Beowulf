@@ -2,6 +2,7 @@ const { SlashCommandBuilder } = require('@discordjs/builders');
 const { CommandInteraction } = require('discord.js');
 const { getAllShips } = require('../../api/uexApi');
 const { editBlackBox, getBlackBoxesByUserId, getBlackBoxByEntryId, getAssistantBlackBoxes } = require('../../api/blackBoxApi');
+const { getPlayerShipsByUserId } = require('../../api/playerShipApi');
 
 const command = new SlashCommandBuilder()
     .setName('black-box-edit')
@@ -108,7 +109,22 @@ module.exports = {
             await interaction.respond(
                 filtered.slice(0, 25) // Limit to 25 results
             );
-        } else if (optionName === 'ship-used' || optionName === 'ship-killed') {
+        } else if (optionName === 'ship-used') {
+            const allPlayerShips = await getPlayerShipsByUserId(interaction.user.id);
+            const allShipsSmallerCrew = allPlayerShips.filter(ship => ship.crew <= 2); // Filter ships with crew size <= 2
+            const allShipsListed = allShipsSmallerCrew.map(ship => ({
+                name: `${ship.custom_name} (${ship.ship_model})`, // Include both custom_name and model in the name
+                value: ship.id // Use custom_name as the value
+            }));
+
+            // Filter ships based on the focused value
+            const filtered = allShipsListed.filter(ship =>
+                ship.name.toLowerCase().includes(focusedValue.toLowerCase())
+            );
+
+            // Respond with up to 25 suggestions
+            await interaction.respond(filtered.slice(0, 25));
+        } else if (optionName === 'ship-killed') {
             // Autocomplete for 'ship-used' and 'ship-killed' options
             const allShips = await getAllShips(); // Fetch all ships
             const allShipsListed = allShips.map(ship => ship.ship); // Map to ship names

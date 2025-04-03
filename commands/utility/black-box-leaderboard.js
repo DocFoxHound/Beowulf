@@ -2,6 +2,7 @@ const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, Butt
 const { getAllBlackBoxes, getBlackBoxesByPatch, getBlackBoxesByUserAndPatch, getBlackBoxesByUserId, getAssistantBlackBoxes, getAssistantBlackBoxesByUserAndPatch } = require('../../api/blackBoxApi');
 const { getAllGameVersions } = require('../../api/gameVersionApi');
 const { getUserById } = require('../../api/userlistApi');
+const { getPlayerShipByEntryId } = require('../../api/playerShipApi');
 
 const command = new SlashCommandBuilder()
     .setName('black-box-leaderboard')
@@ -30,6 +31,7 @@ module.exports = {
                 blackBoxLogs = [...allPrimaryBlackBoxLogs, ...allSecondaryBlackBoxLogs];
             } else if (patch !== 'ALL' && user) { //patch identified, user identified
                 const coupling = {user_id: user.id, patch: patch}
+                console.log("Coupling:", coupling)
                 const allPrimaryBlackBoxLogs = await getBlackBoxesByUserAndPatch(coupling) || [];
                 const allSecondaryBlackBoxLogs = await getAssistantBlackBoxesByUserAndPatch(coupling) || []; // Fetch all assistant black box logs
                 blackBoxLogs = [...allPrimaryBlackBoxLogs, ...allSecondaryBlackBoxLogs];
@@ -62,7 +64,7 @@ module.exports = {
                 embeds = createLeaderboardEmbeds(leaderBoardData, patch);
             }
             if(individualData !== null) {
-                embeds = createIndividualEmbeds(individualData, patch);
+                embeds = createIndividualEmbeds(individualData, patch, user);
             }
 
             if (embeds.length === 1) {
@@ -164,13 +166,19 @@ async function generateLeaderboardData(blackBoxLogs) {
 // Helper function to generate individual data
 async function generateIndividualData(blackBoxLogs, user) {
     try{
-        const username = user ? user.nickname : user.username;
+        const username = user.username;
         const leaderboard = {};
 
         for (const log of blackBoxLogs) {
             const hitId = log.id;
-            // const user = await getUserById(log.user_id);
-            // const username = user ? user.nickname : user.username;
+            const shipUsedObject = await getPlayerShipByEntryId(log.ship_used);
+            const assistsList = null;
+            if(log.assists.length > 0){
+                for(const assist of log.assists){
+                    const assistUser = await getUserById(assist);
+                    assistsList.push(assistUser.username);
+                }
+            }
 
             if (!leaderboard[username]) {
                 leaderboard[username] = { 
@@ -180,15 +188,16 @@ async function generateIndividualData(blackBoxLogs, user) {
                     hits: [],
                 };
             }
+
             leaderboard[username].kill_count += log.kill_count;
             leaderboard[username].value += log.value;
             leaderboard[username].hits.push({
                 id: hitId,
                 kill_count: log.kill_count,
-                ship_used: log.ship_used,
+                ship_used: shipUsedObject.custom_name,
                 ship_killed: log.ship_killed,
                 value: log.value,
-                assists: log.assists || "none",
+                assists: assistsList || "none",
                 victims: log.victims,
                 patch: log.patch,
             });
@@ -242,33 +251,76 @@ function createLeaderboardEmbeds(leaderboardData, patch) {
 }
 
 // Helper function to create individual stat sheet embeds
-function createIndividualEmbeds(individualData, patch) {
-    try{
+function createIndividualEmbeds(individualData, patch, user) {
+    try {
         const embeds = [];
         const fieldsPerPage = 25; // Discord's limit for fields per embed
 
         // Calculate total kills and total value
-        const totalKills = Object.values(individualData).reduce((sum, entry) => sum + entry.kill_count, 0);
-        const totalValue = formatToCurrency(Object.values(individualData).reduce((sum, entry) => sum + entry.value, 0));
+        const totalKills = individualData[user.username].kill_count || 0;
+        const totalValue = formatToCurrency(individualData[user.username].value || 0);
+        // const totalKills = Object.values(individualData).reduce((sum, entry) => sum + entry.kill_count, 0);
+        // const totalValue = formatToCurrency(Object.values(individualData).reduce((sum, entry) => sum + entry.value, 0));
 
-        // Prepare all fields for the embeds
-        const allFields = [];
+        console.log(individualData[user.username])
+        console.log(totalKills)
+        console.log(totalValue)
+
+        const individualShipTotals = {};
+        for(const hit of individualData[user.username].hits){
+            const shipName = hit.ship_used;
+            if (!individualShipTotals[shipName]) {
+                individualShipTotals[shipName] = { kill_count: 0, value: 0 };
+            }
+            individualShipTotals[shipName].kill_count += hit.kill_count;
+            individualShipTotals[shipName].value += hit.value;
+        }
+
+        for(const shipName in individualShipTotals){
+            const stats = individualShipTotals[shipName];
+            console.log(shipName)
+            console.log(stats)
+        }
+
+        const individualShipEntryArray = {}
+        // Object.entries(individualData).forEach(([username, stats]) => {
+        //     stats.hits.forEach(hit => {
+        //         const assists = Array.isArray(hit.assists) ? hit.assists.join(', ') : hit.assists;
+        //         const victims = hit.victims.join(', ');
+        //         const killOrKills = hit.kill_count === 1 ? 'Kill' : 'Kills';
+
+        //         hitsFields.push({
+        //             name: `Ship: ${hit.ship_killed || 'Unknown'}`.slice(0, 256),
+        //             // name: `Hit ID: ${hit.id || 'Unknown'}`.slice(0, 256),
+        //             value: `**Hit ID:** ${hit.id || 'Unknown'}\n**Assists:** ${assists || 'None'}\n**Victims:** ${victims || 'None'}\n**${killOrKills}:** ${hit.kill_count || 0}\n${formatToCurrency(hit.value || 0)}`.slice(0, 1024),
+        //             inline: false
+        //         });
+        //     });
+        // });
+
+
+
+
+        // Prepare the fields for the hits lists
+        const hitsFields = [];
         Object.entries(individualData).forEach(([username, stats]) => {
             stats.hits.forEach(hit => {
                 const assists = Array.isArray(hit.assists) ? hit.assists.join(', ') : hit.assists;
                 const victims = hit.victims.join(', ');
+                const killOrKills = hit.kill_count === 1 ? 'Kill' : 'Kills';
 
-                allFields.push({
-                    name: `Hit ID: ${hit.id || 'Unknown'}`.slice(0, 256),
-                    value: `**Kill Count:** ${hit.kill_count || 0}\n**Damages Cost:** ${formatToCurrency(hit.value || 0)}\n**Assists:** ${assists || 'None'}\n**Victims:** ${victims || 'None'}\n**Patch:** ${hit.patch}`.slice(0, 1024),
+                hitsFields.push({
+                    name: `Ship: ${hit.ship_killed || 'Unknown'}`.slice(0, 256),
+                    // name: `Hit ID: ${hit.id || 'Unknown'}`.slice(0, 256),
+                    value: `**Hit ID:** ${hit.id || 'Unknown'}\n**Assists:** ${assists || 'None'}\n**Victims:** ${victims || 'None'}\n**${killOrKills}:** ${hit.kill_count || 0}\n${formatToCurrency(hit.value || 0)}`.slice(0, 1024),
                     inline: false
                 });
             });
         });
 
-        // Split fields into pages
-        for (let i = 0; i < allFields.length; i += fieldsPerPage) {
-            const currentFields = allFields.slice(i, i + fieldsPerPage);
+        // Make fields for each hit in the hitsFields thing and make some pages, too
+        for (let i = 0; i < hitsFields.length; i += fieldsPerPage) {
+            const currentFields = hitsFields.slice(i, i + fieldsPerPage);
 
             // Create an embed for the current page
             const embed = new EmbedBuilder()
@@ -279,10 +331,51 @@ function createIndividualEmbeds(individualData, patch) {
 
             embeds.push(embed);
         }
+
+        // Add a new embed page for ships sorted by name
+        const shipStats = {};
+
+        // // Aggregate kills and values by ship name
+        // Object.entries(individualData).forEach(([username, stats]) => {
+        //     stats.hits.forEach(hit => {
+        //         const shipName = getPlayerShipByEntryId(hit.ship_used);
+        //         console.log(shipName)
+        //         // const shipName = hit.ship_used || 'Unknown Ship';
+        //         if (!shipStats[shipName]) {
+        //             shipStats[shipName] = { kill_count: 0, value: 0 };
+        //         }
+        //         shipStats[shipName].kill_count += hit.kill_count;
+        //         shipStats[shipName].value += hit.value;
+        //     });
+        // });
+
+        // // Sort ships by name
+        // const sortedShips = Object.entries(shipStats).sort(([aName], [bName]) => aName.localeCompare(bName));
+
+        // // Create fields for the ship stats embed
+        // const shipFields = sortedShips.map(([shipName, stats]) => ({
+        //     name: shipName,
+        //     value: `**Total Kills:** ${stats.kill_count}\n**Total Value:** ${formatToCurrency(stats.value)}`,
+        //     inline: false
+        // }));
+
+        // // Split ship fields into pages if necessary
+        // for (let i = 0; i < shipFields.length; i += fieldsPerPage) {
+        //     const currentFields = shipFields.slice(i, i + fieldsPerPage);
+
+        //     const shipEmbed = new EmbedBuilder()
+        //         .setTitle(`Ship Stats (${patch})`)
+        //         .setColor('#00ff00')
+        //         .setDescription('Summary of kills and values by ship.')
+        //         .addFields(currentFields);
+
+        //     embeds.push(shipEmbed);
+        // }
+
         return embeds;
-    }catch(error){
+    } catch (error) {
         console.error('Error creating individual stat sheet embeds:', error);
-        return null;  // Return null if there's an error
+        return null; // Return null if there's an error
     }
 }
 

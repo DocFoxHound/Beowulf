@@ -3,14 +3,17 @@ const { CommandInteraction } = require('discord.js');
 const { getAllShips } = require('../../api/uexApi');
 const { createBlackBox } = require('../../api/blackBoxApi');
 const { getAllGameVersions } = require('../../api/gameVersionApi');
-const { getPlayerShipsByUserId } = require('../../api/playerShipApi');
 
 const command = new SlashCommandBuilder()
-    .setName('black-box-add')
-    .setDescription('Add a kill log for your ship to the Black Box.')
+    .setName('ship-log-add')
+    .setDescription("Log kills for the large ship you captain'd. If you were a passenger do not add a log.")
+    .addUserOption(option =>
+        option.setName('ship-owner')
+            .setDescription('Whose ship was it?')
+            .setRequired(true))
     .addStringOption(option => 
         option.setName('ship-used')
-            .setDescription('The ship used for the kill')
+            .setDescription('The ship used.')
             .setRequired(true)
             .setAutocomplete(true)) // Enable autocomplete
     .addStringOption(option => 
@@ -29,7 +32,28 @@ const command = new SlashCommandBuilder()
     .addStringOption(option =>
         option.setName('assists')
             .setDescription('@ the players who assisted in the kill. (leave blank for none)')
-            .setRequired(false));
+            .setRequired(false))
+    .addStringOption(option =>
+        option.setName('story')
+            .setDescription("Enter your captain's log here.")
+            .setRequired(false))
+    .addStringOption(option => 
+        option.setName('ship-killed2')
+            .setDescription('The type of ship you killed (only one per entry)')
+            .setRequired(false)
+            .setAutocomplete(true)) // Enable autocomplete
+    .addStringOption(option => 
+        option.setName('ship-killed3')
+            .setDescription('The type of ship you killed (only one per entry)')
+            .setRequired(false)
+            .setAutocomplete(true)) // Enable autocomplete
+    .addStringOption(option => 
+        option.setName('ship-killed4')
+            .setDescription('The type of ship you killed (only one per entry)')
+            .setRequired(false)
+            .setAutocomplete(true)) // Enable autocomplete
+
+            ;
     
 module.exports = {
     data: command,
@@ -57,6 +81,24 @@ module.exports = {
         // Call your signup logic from the external file
         try {
             const parentId = new Date().getTime()
+            //for all of the assistants
+            // if(assistedPlayers.length > 0) {
+            //     for(const assistant of assistedPlayers) {
+            //         delay(10);
+            //         await createBlackBox({
+            //             id: new Date().getTime(), // Use a unique ID for the entry
+            //             user_id: assistant, 
+            //             ship_used: "assist", 
+            //             ship_killed: shipKilled, 
+            //             value: dividiedAvgPrice,
+            //             kill_count: dividedKillAmount, 
+            //             victims: victimNamesArray,
+            //             patch: latestPatch,
+            //             assists: assistedPlayers,
+            //             parent_entry: parentId
+            //         });
+            //     }
+            // }
             //for the main player putting in the entry
             await createBlackBox({
                 id: parentId,
@@ -97,7 +139,7 @@ module.exports = {
             await interaction.respond(filtered.slice(0, 25));
         } else if (optionName === 'ship-killed') {
             const allShipsListed = allShips.map(ship => ({
-                name: `${ship.ship}`, // Include both ship name and model in the name
+                name: `${ship.ship} (${ship.model})`, // Include both ship name and model in the name
                 value: ship.ship // Use ship name as the value
             }));
 
@@ -111,7 +153,3 @@ module.exports = {
         }
     }
 };
-
-function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
