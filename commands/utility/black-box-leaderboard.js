@@ -31,7 +31,6 @@ module.exports = {
                 blackBoxLogs = [...allPrimaryBlackBoxLogs, ...allSecondaryBlackBoxLogs];
             } else if (patch !== 'ALL' && user) { //patch identified, user identified
                 const coupling = {user_id: user.id, patch: patch}
-                console.log("Coupling:", coupling)
                 const allPrimaryBlackBoxLogs = await getBlackBoxesByUserAndPatch(coupling) || [];
                 const allSecondaryBlackBoxLogs = await getAssistantBlackBoxesByUserAndPatch(coupling) || []; // Fetch all assistant black box logs
                 blackBoxLogs = [...allPrimaryBlackBoxLogs, ...allSecondaryBlackBoxLogs];
@@ -172,7 +171,7 @@ async function generateIndividualData(blackBoxLogs, user) {
         for (const log of blackBoxLogs) {
             const hitId = log.id;
             const shipUsedObject = await getPlayerShipByEntryId(log.ship_used);
-            const assistsList = null;
+            const assistsList = [];
             if(log.assists.length > 0){
                 for(const assist of log.assists){
                     const assistUser = await getUserById(assist);
@@ -220,8 +219,9 @@ function createLeaderboardEmbeds(leaderboardData, patch) {
 
         // Top players by kill count
         const killsEmbed = new EmbedBuilder()
-            .setTitle(`Leaderboard - Top Players by Kill Count (${patch})`)
-            .setColor('#ff0000');
+            .setTitle(`Top Players by Total Kills (Patch ${patch})`)
+            .setDescription(`**IronPoint Total Kills:** ${sortedByKills.reduce((acc, [_, stats]) => acc + stats.kill_count, 0)}`)
+            .setColor('#7199de');
         sortedByKills.forEach(([username, stats], index) => {
             killsEmbed.addFields({
                 name: `${index + 1}. ${username}`,
@@ -233,8 +233,9 @@ function createLeaderboardEmbeds(leaderboardData, patch) {
 
         // Top players by value
         const valueEmbed = new EmbedBuilder()
-            .setTitle(`Leaderboard - Top Players by Value (${patch})`)
-            .setColor('#ff0000');
+            .setTitle(`Top Players by Damage Done (Patch ${patch})`)
+            .setDescription(`**IronPoint Total Damage Cost:** ${formatToCurrency(sortedByValue.reduce((acc, [_, stats]) => acc + stats.value, 0))}`)
+            .setColor('#0000ff');
         sortedByValue.forEach(([username, stats], index) => {
             valueEmbed.addFields({
                 name: `${index + 1}. ${username}`,
@@ -259,12 +260,6 @@ function createIndividualEmbeds(individualData, patch, user) {
         // Calculate total kills and total value
         const totalKills = individualData[user.username].kill_count || 0;
         const totalValue = formatToCurrency(individualData[user.username].value || 0);
-        // const totalKills = Object.values(individualData).reduce((sum, entry) => sum + entry.kill_count, 0);
-        // const totalValue = formatToCurrency(Object.values(individualData).reduce((sum, entry) => sum + entry.value, 0));
-
-        console.log(individualData[user.username])
-        console.log(totalKills)
-        console.log(totalValue)
 
         const individualShipTotals = {};
         for(const hit of individualData[user.username].hits){
@@ -276,30 +271,29 @@ function createIndividualEmbeds(individualData, patch, user) {
             individualShipTotals[shipName].value += hit.value;
         }
 
+        const individualShipEntryArray = []
         for(const shipName in individualShipTotals){
             const stats = individualShipTotals[shipName];
-            console.log(shipName)
-            console.log(stats)
+            individualShipEntryArray.push({
+                name: shipName,
+                value: `**Total Kills:** ${stats.kill_count}\n**Damages Done:** ${formatToCurrency(stats.value)}`,
+                inline: false
+            })
         }
 
-        const individualShipEntryArray = {}
-        // Object.entries(individualData).forEach(([username, stats]) => {
-        //     stats.hits.forEach(hit => {
-        //         const assists = Array.isArray(hit.assists) ? hit.assists.join(', ') : hit.assists;
-        //         const victims = hit.victims.join(', ');
-        //         const killOrKills = hit.kill_count === 1 ? 'Kill' : 'Kills';
+        // Make fields for each hit in the hitsFields thing and make some pages, too
+        for (let i = 0; i < individualShipEntryArray.length; i += fieldsPerPage) {
+            const currentFields = individualShipEntryArray.slice(i, i + fieldsPerPage);
 
-        //         hitsFields.push({
-        //             name: `Ship: ${hit.ship_killed || 'Unknown'}`.slice(0, 256),
-        //             // name: `Hit ID: ${hit.id || 'Unknown'}`.slice(0, 256),
-        //             value: `**Hit ID:** ${hit.id || 'Unknown'}\n**Assists:** ${assists || 'None'}\n**Victims:** ${victims || 'None'}\n**${killOrKills}:** ${hit.kill_count || 0}\n${formatToCurrency(hit.value || 0)}`.slice(0, 1024),
-        //             inline: false
-        //         });
-        //     });
-        // });
+            // Create an embed for the current page
+            const embed = new EmbedBuilder()
+                .setTitle(`Ship Totals (Patch: ${patch})`)
+                .setColor('#7199de')
+                .setDescription(`**Total Kills:** ${totalKills}\n**Total Damage Cost:** ${totalValue}`)
+                .addFields(currentFields);
 
-
-
+            embeds.push(embed);
+        }
 
         // Prepare the fields for the hits lists
         const hitsFields = [];
@@ -324,53 +318,12 @@ function createIndividualEmbeds(individualData, patch, user) {
 
             // Create an embed for the current page
             const embed = new EmbedBuilder()
-                .setTitle(`Individual Stat Sheet (${patch})`)
-                .setColor('#ff0000')
-                .setDescription(`**Total Kills:** ${totalKills}\n**Total Damage Cost:** ${totalValue}`)
+                .setTitle(`Hit History (Patch: ${patch})`)
+                .setColor('#0000ff')
                 .addFields(currentFields);
 
             embeds.push(embed);
         }
-
-        // Add a new embed page for ships sorted by name
-        const shipStats = {};
-
-        // // Aggregate kills and values by ship name
-        // Object.entries(individualData).forEach(([username, stats]) => {
-        //     stats.hits.forEach(hit => {
-        //         const shipName = getPlayerShipByEntryId(hit.ship_used);
-        //         console.log(shipName)
-        //         // const shipName = hit.ship_used || 'Unknown Ship';
-        //         if (!shipStats[shipName]) {
-        //             shipStats[shipName] = { kill_count: 0, value: 0 };
-        //         }
-        //         shipStats[shipName].kill_count += hit.kill_count;
-        //         shipStats[shipName].value += hit.value;
-        //     });
-        // });
-
-        // // Sort ships by name
-        // const sortedShips = Object.entries(shipStats).sort(([aName], [bName]) => aName.localeCompare(bName));
-
-        // // Create fields for the ship stats embed
-        // const shipFields = sortedShips.map(([shipName, stats]) => ({
-        //     name: shipName,
-        //     value: `**Total Kills:** ${stats.kill_count}\n**Total Value:** ${formatToCurrency(stats.value)}`,
-        //     inline: false
-        // }));
-
-        // // Split ship fields into pages if necessary
-        // for (let i = 0; i < shipFields.length; i += fieldsPerPage) {
-        //     const currentFields = shipFields.slice(i, i + fieldsPerPage);
-
-        //     const shipEmbed = new EmbedBuilder()
-        //         .setTitle(`Ship Stats (${patch})`)
-        //         .setColor('#00ff00')
-        //         .setDescription('Summary of kills and values by ship.')
-        //         .addFields(currentFields);
-
-        //     embeds.push(shipEmbed);
-        // }
 
         return embeds;
     } catch (error) {
