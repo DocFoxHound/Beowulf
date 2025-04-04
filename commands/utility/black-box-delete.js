@@ -1,11 +1,12 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { CommandInteraction } = require('discord.js');
 const { getAllShips } = require('../../api/uexApi');
-const { deleteBlackBox, getBlackBoxesByUserId, getAssistantBlackBoxes } = require('../../api/blackBoxApi');
+const { deleteBlackBox, getBlackBoxesByUserId, getAssistantBlackBoxes, getBlackBoxByEntryId } = require('../../api/blackBoxApi');
+const { getUserById } = require('../../api/userlistApi');
 
 const command = new SlashCommandBuilder()
     .setName('black-box-remove')
-    .setDescription('Add a kill log for your ship to the Black Box.')
+    .setDescription('Remove a kill log for your ship to the Black Box.')
     .addStringOption(option => 
         option.setName('kill')
             .setDescription('The kill log you want to remove')
@@ -17,10 +18,23 @@ module.exports = {
     async execute(interaction, client, openai) {
         // Get the needed variables
         const killLog = interaction.options.getString('kill');
-        // const allBlackBoxLogs = await getBlackBoxesByUserId(interaction.user.id); // Fetch all black box logs
 
         // Call your delete logic from the external file
         try {
+            const channelId = process.env.LIVE_ENVIRONMENT === "true" ? process.env.AUDIT_CHANNEL : process.env.TEST_AUDIT_CHANNEL; // Replace with actual channel ID
+            const channel = await client.channels.fetch(channelId);
+            const logRecord = await getBlackBoxByEntryId(killLog); // Fetch the kill log record
+            if(interaction.user.id !== logRecord.user_id){
+                const originalCreator = await getUserById(logRecord.user_id);
+                return interaction.reply({ 
+                    content: `Only ${originalCreator.username} or a Marauder+ can delete this black box: (${logRecord.id}).`, 
+                    ephemeral: true 
+                });
+            }
+            if (channel && channel.isTextBased()) {
+                await channel.send(`The following black box was deleted by ${interaction.user.username}: \n` + JSON.stringify(logRecord));
+            }
+
             await deleteBlackBox(killLog); // Pass the selected kill log ID
             await interaction.reply({ content: 'Black Box log deleted successfully!', ephemeral: true });
         } catch (error) {

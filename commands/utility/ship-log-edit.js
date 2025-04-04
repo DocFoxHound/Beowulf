@@ -1,38 +1,33 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { CommandInteraction } = require('discord.js');
 const { getAllShips } = require('../../api/uexApi');
-const { createShipLog } = require('../../api/shipLogApi');
-const { getAllGameVersions } = require('../../api/gameVersionApi');
+const { getShipLogsByCommanderId, getShipLogsByOwnerId, getShipLogByEntryId, editShipLog } = require('../../api/shipLogApi');
 const { getPlayerShipsByUserId, getPlayerShipByEntryId } = require('../../api/playerShipApi');
 
 const command = new SlashCommandBuilder()
-    .setName('ship-log-add')
-    .setDescription('Add an activity log for a large ship to the Ship Log.')
-    .addStringOption(option => 
-        option.setName('owner')
-            .setDescription('@ the player who owns the ship.')
-            .setRequired(true))
+    .setName('ship-log-edit')
+    .setDescription('Edit a Ship Log entry. Only for ships you own or commanded.')
     .addStringOption(option => 
         option.setName('commander')
             .setDescription('@ the player who commanded the ship')
             .setRequired(true))
     .addStringOption(option => 
-        option.setName('ship-used')
-            .setDescription('The ship used or crewed upon.')
+        option.setName('log')
+            .setDescription('The ship log for the ship the player commanded or you owned.')
             .setRequired(true)
             .setAutocomplete(true))
     .addStringOption(option =>
         option.setName('crew')
             .setDescription('@ the players who assisted/crewed this ship. (at minimum, 3 players)')
-            .setRequired(true))
+            .setRequired(false))
     .addStringOption(option => 
         option.setName('victim-orgs')
             .setDescription('The names of the orgs that were engaged, SEPARATED BY A COMMA. Use "unknown" if not known.')
-            .setRequired(true))
+            .setRequired(false))
     .addStringOption(option => 
         option.setName('ship-killed1')
             .setDescription('List a ship that was killed.')
-            .setRequired(true)
+            .setRequired(false)
             .setAutocomplete(true))
     .addStringOption(option => 
         option.setName('ship-killed2')
@@ -85,18 +80,15 @@ module.exports = {
     data: command,
     async execute(interaction, client, openai) {
         // Get the chosen class name from the command options
-        const owner = interaction.options.getString('owner').replace(/\D/g, '');
         const commander = interaction.options.getString('commander').replace(/\D/g, '');
-        const shipUsed = interaction.options.getString('ship-used');
-        const shipKilled = interaction.options.getString('ship-killed1');
-        const victimOrgs = interaction.options.getString('victim-orgs');
-        const assistsRaw = interaction.options.getString('crew');
-
-        const patches = await getAllGameVersions();
-        const latestPatchesSorted = patches.sort((a, b) => b.id - a.id);
-        const latestPatch = latestPatchesSorted[0].version; // Get the latest patch
-        const victimOrgsArray = victimOrgs.split(',').map(name => name.trim()); // Split by comma and trim whitespace
-        const assistedPlayers = assistsRaw
+        const logId = interaction.options.getString('log');
+        const shipLogObject = await getShipLogByEntryId(logId); // Fetch the kill log object
+        const shipUsed = interaction.options.getString('ship-used') || null;
+        const shipKilled = interaction.options.getString('ship-killed1') || null;
+        const victimOrgs = interaction.options.getString('victim-orgs') || null;
+        const assistsRaw = interaction.options.getString('crew') || null;
+        const victimOrgsArray = victimOrgs !== null ? victimOrgs.split(',').map(name => name.trim()) : null; // Split by comma and trim whitespace
+        const assistedPlayersTemp = assistsRaw
             ? assistsRaw.match(/<@!?(\d+)>/g)?.map(id => id.replace(/\D/g, '')) || []
             : [];
         let killList = [];
@@ -112,48 +104,67 @@ module.exports = {
             await interaction.reply({ content: 'There was an error retrieving the ship kills.', ephemeral: true });
             return;
         }
-        const killAmount = killList.length > 0 ? killList.length : 1; // default to 1 to not break spacetime
+        // const killAmount = killList.length > 0 ? killList.length : 1; // default to 1 to not break spacetime
         const allShips = await getAllShips(); // Fetch all ships
-        let totalPrice = 0;
+        let tempTotalPrice = 0;
         try{
             for(kill of killList) {
                 const shipKilledObject = allShips.find(ship => ship.id === kill);
-                totalPrice += shipKilledObject.avg_price;
+                tempTotalPrice += shipKilledObject.avg_price;
             }
         }catch(error){
             console.error('Error retrieving ship kills:', error);
             await interaction.reply({ content: 'There was an error retrieving the ship kills.', ephemeral: true });
             return;
         }
-        const numberAssisted = assistedPlayers.length > 0 ? assistedPlayers.length : 1;
-        const dividedKillAmount = assistedPlayers.length > 0 ? (killAmount / (numberAssisted + 1)) : killAmount;
-        const dividiedAvgPrice = assistedPlayers.length > 0 ? (totalPrice / (numberAssisted + 1)) : totalPrice;
-        const shipUsedName = await getPlayerShipByEntryId(shipUsed);
-        
+
+        const assistedPlayers = assistedPlayersTemp.length > 0 ? assistedPlayersTemp : shipLogObject.crew;
+        const totalPrice = tempTotalPrice > 0 ? tempTotalPrice : shipLogObject.value; // default to 0 to not break spacetime
+        const killAmount = (killList.length !== shipLogObject.ships_killed.length) ? killList.length : shipLogObject.ships_killed.length;
+        const numberAssisted = assistedPlayers.length;
+        const dividedKillAmount = (killAmount / (numberAssisted + 1));
+        const dividiedAvgPrice = (totalPrice / (numberAssisted + 1));
+        const shipUsedNameString = shipUsed !== null ? await getPlayerShipByEntryId(shipUsed) : null;
 
         // Call your signup logic from the external file
         try {
-            const parentId = new Date().getTime()
+            if(interaction.user.id !== commander){
+                const originalCreator = await getUserById(shipLogObject.user_id);
+                return interaction.reply({ 
+                    content: `Only ${originalCreator.username} or a Marauder+ can edit this black box: (${shipLogObject.id}).`, 
+                    ephemeral: true 
+                });
+            }
             //for the main player putting in the entry
-            await createShipLog({
-                id: parentId,
-                owner_id: owner, 
-                ship_used: shipUsed, 
+            const editedShipLog = ({
+                id: shipLogObject.id,
+                owner_id: shipLogObject.owner_id, 
+                ship_used: shipUsed !== null ? shipUsed : shipLogObject.ship_used, 
                 commander: commander,
-                value: totalPrice,
-                victim_orgs: victimOrgsArray,
-                patch: latestPatch,
+                value: tempTotalPrice === 0 ? shipLogObject.value : tempTotalPrice,
+                victim_orgs: victimOrgsArray !== null ? victimOrgsArray : shipLogObject.victim_orgs,
+                patch: shipLogObject.patch,
                 crew: assistedPlayers,
-                ships_killed: killList, 
+                ships_killed: killList.length > 0 ? killList : shipLogObject.ships_killed, 
                 divided_value: dividiedAvgPrice,
-                total_kills: killAmount,
+                total_kills: killList.length > 0 ? killAmount : shipLogObject.total_kills,
                 divided_kills: dividedKillAmount,
-                ship_used_name: shipUsedName.custom_name
+                ship_used_name: shipUsed !== null ? shipUsedNameString.custom_name : shipLogObject.ship_used_name
             });
+
+            const channelId = process.env.LIVE_ENVIRONMENT === "true" ? process.env.AUDIT_CHANNEL : process.env.TEST_AUDIT_CHANNEL; // Replace with actual channel ID
+            const channel = await client.channels.fetch(channelId);
+            const logRecord = await getShipLogByEntryId(logId); // Fetch the kill log record
+            if (channel && channel.isTextBased()) {
+            await channel.send(`The following ship log was edited by ${interaction.user.username}: ` + 
+                `\n**Old:** \n${JSON.stringify(shipLogObject)}` + 
+                `\n**New:** \n${JSON.stringify(editedShipLog)}`);
+            }
+            await editShipLog(logId, editedShipLog);
             await interaction.reply({ content: 'Ship Log added successfully!', ephemeral: true });
         } catch (error) {
             console.error(error);
-            await interaction.reply({ content: 'There was an error adding the Ship log.', ephemeral: true });
+            await interaction.reply({ content: 'There was an error adding the Ship Log.', ephemeral: true });
         }
     },
     async autocomplete(interaction) {
@@ -161,9 +172,34 @@ module.exports = {
         const optionName = interaction.options.getFocused(true).name; // Get the name of the focused option
         const allShips = await getAllShips(); // Fetch all ships
 
-        if (optionName === 'ship-used') {
-            const ownerUser = interaction.options.getString('owner').replace(/\D/g, ''); // Get the owner user
-            const allPlayerShips = await getPlayerShipsByUserId(ownerUser);
+        if (optionName === 'log') {
+            const commander = interaction.options.getString('commander').replace(/\D/g, ''); // Get the owner user
+            // const allBlackBoxLogs = await getBlackBoxesByUserId(interaction.user.id); // Fetch all black box logs
+            const allPrimaryBlackBoxLogs = await getShipLogsByCommanderId(commander) || []; // Fetch all black box logs
+            const allSecondaryBlackBoxLogs = await getShipLogsByOwnerId(interaction.user.id) || []; // Fetch all assistant black box logs
+            const allBlackBoxLogs = [...allPrimaryBlackBoxLogs, ...allSecondaryBlackBoxLogs];
+            const uniqueLogs = allBlackBoxLogs.filter(
+                (log, index, self) =>
+                  index === self.findIndex(other => other.id === log.id)
+              );
+
+            // Combine ship_used and victims[] into a single searchable array
+            const allBlackBoxLogsListed = uniqueLogs.map(log => ({
+                name: `${log.id}: ${log.ship_used_name} - Victims: ${log.victim_orgs.join(', ')}`,
+                value: log.id // Use the log ID as the value for selection
+            }));
+
+            // Filter logs based on the focused value (search both ship_used and victims)
+            const filtered = allBlackBoxLogsListed.filter(log =>
+                log.name.toLowerCase().includes(focusedValue.toLowerCase())
+            );
+
+            // Respond with up to 25 suggestions
+            await interaction.respond(
+                filtered.slice(0, 25) // Limit to 25 results
+            );
+        } else if (optionName === 'ship-used') {
+            const allPlayerShips = await getPlayerShipsByUserId(interaction.user.id);
             const allShipsSmallerCrew = allPlayerShips.filter(ship => ship.crew >= 3); // Filter ships with crew size <= 2
             const allShipsListed = allShipsSmallerCrew.map(ship => ({
                 name: `${ship.custom_name} (${ship.ship_model})`, // Include both custom_name and model in the name
@@ -196,4 +232,8 @@ module.exports = {
 
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
-}
+};
+
+function shipUsedName(shipUsed) {
+    return getPlayerShipByEntryId(shipUsed)
+};

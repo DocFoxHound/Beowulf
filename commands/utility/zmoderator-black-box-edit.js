@@ -85,6 +85,15 @@ module.exports = {
                 patch: killLogObject.patch,
                 assists: assistedPlayers
             });
+            const channelId = process.env.LIVE_ENVIRONMENT === "true" ? process.env.AUDIT_CHANNEL : process.env.TEST_AUDIT_CHANNEL; // Replace with actual channel ID
+            const channel = await client.channels.fetch(channelId);
+            const logRecord = await getBlackBoxByEntryId(killLog); // Fetch the kill log record
+            if (channel && channel.isTextBased()) {
+            await channel.send(`The following black box was edited by ${interaction.user.username}: ` + 
+                `\n**Old:** \n${JSON.stringify(killLogObject)}` + 
+                `\n**New:** \n${JSON.stringify(editedBlackBox)}`);
+            }
+
             await editBlackBox(killLogId, editedBlackBox);
             await interaction.reply({ content: 'Black Box log added successfully!', ephemeral: true });
         } catch (error) {

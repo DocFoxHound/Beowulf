@@ -26,17 +26,47 @@ async function getAllShipLogs() {
     }
 }
 
-async function getShipLogsByUserId(user_id) {
-    const apiUrl = `${process.env.SERVER_URL}/api/shiplog/user`;
+// async function getShipLogsByUserId(user_id) {
+//     const apiUrl = `${process.env.SERVER_URL}/api/shiplog/user`;
+//     try {
+//         const response = await axios.get(apiUrl, {
+//             params: {
+//                 user_id: user_id
+//             }
+//         });
+//         return response.data;  // This will be the return value of the function
+//     } catch (error) {
+//         console.error('Error fetching user ShipLogs:', error.response ? error.response.data : error.message);
+//         return null;  // Return null if there's an error
+//     }
+// }
+
+async function getShipLogsByCommanderId(commander) {
+    const apiUrl = `${process.env.SERVER_URL}/api/shiplog/commander`;
     try {
         const response = await axios.get(apiUrl, {
             params: {
-                user_id: user_id
+                commander: commander
             }
         });
         return response.data;  // This will be the return value of the function
     } catch (error) {
-        console.error('Error fetching user ShipLogs:', error.response ? error.response.data : error.message);
+        console.error('Error fetching user ShipLogs by Commander ID:', error.response ? error.response.data : error.message);
+        return null;  // Return null if there's an error
+    }
+}
+
+async function getShipLogsByOwnerId(owner_id) {
+    const apiUrl = `${process.env.SERVER_URL}/api/shiplog/owner`;
+    try {
+        const response = await axios.get(apiUrl, {
+            params: {
+                owner_id: owner_id
+            }
+        });
+        return response.data;  // This will be the return value of the function
+    } catch (error) {
+        console.error('Error fetching user ShipLogs by Owner ID:', error.response ? error.response.data : error.message);
         return null;  // Return null if there's an error
     }
 }
@@ -71,24 +101,40 @@ async function getShipLogsByPatch(patch) {
         });
         return response.data;  // This will be the return value of the function
     } catch (error) {
-        console.error('Error fetching user ShipLogs:', error.response ? error.response.data : error.message);
+        console.error('Error fetching user ShipLogs by Patch:', error.response ? error.response.data : error.message);
         return null;  // Return null if there's an error
     }
 }
 ///user2/:id/patch/:patch
 
-async function getShipLogsByUserAndPatch(coupling) {
-    const apiUrl = `${process.env.SERVER_URL}/api/shiplog/userandpatch`;
+async function getShipLogsByOwnerAndPatch(coupling) {
+    const apiUrl = `${process.env.SERVER_URL}/api/shiplog/ownerandpatch`;
     try {
         const response = await axios.get(apiUrl, {
             params: {
-                user_id: coupling.user_id,
+                owner_id: coupling.owner_id,
                 patch: coupling.patch
             }
         });
         return response.data;  // This will be the return value of the function
     } catch (error) {
-        console.error('Error fetching user ShipLogs:', error.response ? error.response.data : error.message);
+        console.error('Error fetching user ShipLogs by Owner ID and Patch:', error.response ? error.response.data : error.message);
+        return null;  // Return null if there's an error
+    }
+}
+
+async function getShipLogsByCommanderAndPatch(coupling) {
+    const apiUrl = `${process.env.SERVER_URL}/api/shiplog/commanderandpatch`;
+    try {
+        const response = await axios.get(apiUrl, {
+            params: {
+                commander: coupling.commander,
+                patch: coupling.patch
+            }
+        });
+        return response.data;  // This will be the return value of the function
+    } catch (error) {
+        console.error('Error fetching user ShipLogs by Commander and Patch:', error.response ? error.response.data : error.message);
         return null;  // Return null if there's an error
     }
 }
@@ -178,12 +224,14 @@ async function deleteShipLog(id) {
 module.exports = {
     createShipLog,
     getAllShipLogs,
-    getShipLogsByUserId,
     editShipLog,
     deleteShipLog,
     getShipLogsByPatch,
-    getShipLogsByUserAndPatch,
+    getShipLogsByOwnerAndPatch,
+    getShipLogsByCommanderAndPatch,
     getAssistantShipLogs,
     getAssistantShipLogsByUserAndPatch,
-    getShipLogByEntryId
+    getShipLogByEntryId,
+    getShipLogsByCommanderId,
+    getShipLogsByOwnerId
 };
