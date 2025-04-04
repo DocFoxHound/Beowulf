@@ -108,22 +108,26 @@ async function sendToDb(title, data){
             const dataArray = Array.isArray(data) ? data : [data];
             for(const item of dataArray){
                 for(const ship of item.ships.data){
-                    const shipClone = structuredClone(ship);
-                    const vehicle = structuredClone(item.vehicles.data.find(v => v.id === shipClone.id_vehicle));
-                    const shipId = shipClone.id_vehicle;
-                    const shipPrice = shipClone.price;
-                    const vehicleName = vehicle.name;
-                    const pad_type = vehicle.pad_type;
-                    const maxCrew = Math.max(...vehicle.crew.split(',').map(Number)) || vehicle.crew;
-                    const crewNumber = structuredClone(maxCrew);
-                    const newShip = {
-                        id: vehicle.id,
-                        ship: vehicleName,
-                        avg_price: shipPrice,
-                        crew: crewNumber || 1,
-                        pad_type: vehicle.pad_type,
+                    if(ship.price === 0){
+                        continue;
+                    }else{
+                        const shipClone = structuredClone(ship);
+                        const vehicle = structuredClone(item.vehicles.data.find(v => v.id === shipClone.id_vehicle));
+                        const shipId = shipClone.id_vehicle;
+                        const shipPrice = shipClone.price;
+                        const vehicleName = vehicle.name;
+                        const pad_type = vehicle.pad_type;
+                        const maxCrew = Math.max(...vehicle.crew.split(',').map(Number)) || vehicle.crew;
+                        const crewNumber = structuredClone(maxCrew);
+                        const newShip = {
+                            id: vehicle.id,
+                            ship: vehicleName,
+                            avg_price: shipPrice,
+                            crew: crewNumber || 1,
+                            pad_type: vehicle.pad_type,
+                        }
+                        await UEX.createOrUpdateShips(newShip);
                     }
-                    await UEX.createOrUpdateShips(newShip);
                 }
             }
             console.log("Processing Ships")
