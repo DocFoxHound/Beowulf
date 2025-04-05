@@ -26,21 +26,6 @@ async function getAllShipLogs() {
     }
 }
 
-// async function getShipLogsByUserId(user_id) {
-//     const apiUrl = `${process.env.SERVER_URL}/api/shiplog/user`;
-//     try {
-//         const response = await axios.get(apiUrl, {
-//             params: {
-//                 user_id: user_id
-//             }
-//         });
-//         return response.data;  // This will be the return value of the function
-//     } catch (error) {
-//         console.error('Error fetching user ShipLogs:', error.response ? error.response.data : error.message);
-//         return null;  // Return null if there's an error
-//     }
-// }
-
 async function getShipLogsByCommanderId(commander) {
     const apiUrl = `${process.env.SERVER_URL}/api/shiplog/commander`;
     try {
@@ -139,25 +124,9 @@ async function getShipLogsByCommanderAndPatch(coupling) {
     }
 }
 
-// async function getAssistantShipLog(coupling) {
-//     const apiUrl = `${process.env.SERVER_URL}/api/shiplog/assistantbox`;
-//     try {
-//         const response = await axios.get(apiUrl, {
-//             params: {
-//                 user_id: coupling.user_id,
-//                 parent_entry: coupling.parent_entry
-//             }
-//         });
-//         return response.data;  // This will be the return value of the function
-//     } catch (error) {
-//         console.error('Error fetching user ShipLogs:', error.response ? error.response.data : error.message);
-//         return null;  // Return null if there's an error
-//     }
-// }
 
-
-async function getAssistantShipLogs(user_id) {
-    const apiUrl = `${process.env.SERVER_URL}/api/shiplog/assistantbox`;
+async function getCrewShipLogs(user_id) {
+    const apiUrl = `${process.env.SERVER_URL}/api/shiplog/crew`;
     try {
         const response = await axios.get(apiUrl, {
             params: {
@@ -171,8 +140,8 @@ async function getAssistantShipLogs(user_id) {
     }
 }
 
-async function getAssistantShipLogsByUserAndPatch(coupling) {
-    const apiUrl = `${process.env.SERVER_URL}/api/shiplog/assistantboxuserpatch`;
+async function getCrewShipLogsByUserAndPatch(coupling) {
+    const apiUrl = `${process.env.SERVER_URL}/api/shiplog/crewuserpatch`;
     // console.log(coupling)
     try {
         const response = await axios.get(apiUrl, {
@@ -229,8 +198,8 @@ module.exports = {
     getShipLogsByPatch,
     getShipLogsByOwnerAndPatch,
     getShipLogsByCommanderAndPatch,
-    getAssistantShipLogs,
-    getAssistantShipLogsByUserAndPatch,
+    getCrewShipLogs,
+    getCrewShipLogsByUserAndPatch,
     getShipLogByEntryId,
     getShipLogsByCommanderId,
     getShipLogsByOwnerId
