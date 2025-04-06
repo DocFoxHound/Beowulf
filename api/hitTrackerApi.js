@@ -167,4 +167,5 @@ module.exports = {
     getAssistHitLogs,
     getAssistHitLogsByUserAndPatch,
     getHitLogByEntryId,
+    getHitLogsByUserId,
 };

@@ -155,11 +155,11 @@ module.exports = {
             }
 
             await createHitLog(hitLog);
-            message = `Hit Log Created by ${interaction.user.username}! \nTotal Value: ${totalValue}aUEC \nTotal Split Value: ${totalCutValue}aUEC \nTotal SCU: ${cargoList.reduce((acc, item) => acc + item.scuAmount, 0)} \nPlayers: ${assistedPlayerNames.join(', ')} \n**THE SPLIT VALUE DOESN'T EQUATE TO TOTAL INCOME**, just the worth of the items on the market. Split profits or cargo responsibly with your team.`;
+            message = `Hit Log (${parentId}) Created by ${interaction.user.username}! \nTotal Value: ${totalValue}aUEC \nTotal Split Value: ${totalCutValue}aUEC \nTotal SCU: ${cargoList.reduce((acc, item) => acc + item.scuAmount, 0)} \nPlayers: ${assistedPlayerNames.join(', ')} \n**THE SPLIT VALUE DOESN'T EQUATE TO TOTAL INCOME**, just the worth of the items on the market. Split profits or cargo responsibly with your team.`;
             await interaction.reply({ content: message, ephemeral: false });
         }catch(error){
             console.error('Error retrieving cargo types and amounts:', error);
-            await interaction.reply({ content: 'There was an error retrieving cargo types and amounts.', ephemeral: true });
+            await interaction.reply({ content: 'There was an error adding the Hit Tracker Log.', ephemeral: true });
             return;
         }
         

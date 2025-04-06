@@ -69,7 +69,7 @@ module.exports = {
                 patch: latestPatch,
                 assists: assistedPlayers
             });
-            await interaction.reply({ content: `Black Box added by ${interaction.user.username} successfully!`, ephemeral: false });
+            await interaction.reply({ content: `Black Box (${parentId}) added by ${interaction.user.username} successfully!`, ephemeral: false });
         } catch (error) {
             console.error(error);
             await interaction.reply({ content: 'There was an error adding the Black Box log.', ephemeral: true });
