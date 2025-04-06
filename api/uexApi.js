@@ -105,6 +105,206 @@ async function createOrUpdateCommodity(data) {
 }
 
 //--------------------------------------------
+//       COMMODITY BY TERMINAL CONTROLLER             
+//--------------------------------------------
+
+async function getAllTerminalCommodities() {
+    const apiUrl = `${process.env.SERVER_URL}/api/uex/terminalcommodities/`;
+    try {
+        const response = await axios.get(apiUrl);
+        return response.data;  // This will be the return value of the function
+    } catch (error) {
+        console.error('Error fetching entity:', error.response ? error.response.data : error.message);
+        return null;  // Return null if there's an error
+    }
+}
+
+async function getTerminalCommodityById(id){
+    const apiUrl = process.env.SERVER_URL;
+    try {
+        const response = await axios.get(`${apiUrl}/api/uex/terminalcommodities/${id}`);
+        return response.data;  // This now properly returns the response data to the caller
+    } catch (error) {
+        return null;  // Return null or throw an error, depending on how you want to handle errors
+    }
+}
+
+async function createOrUpdateTerminalCommodity(data) {
+    const apiUrl = `${process.env.SERVER_URL}/api/uex/terminalcommodities`;
+    try {
+        // Check if the city exists
+        await axios.get(`${apiUrl}/${data.id}`);
+        // Update the existing city
+        await axios.put(`${apiUrl}/${data.id}`, data, {
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+    } catch (error) {
+        if (error.response && error.response.status === 404) {
+            // Create a new city if it does not exist
+            await axios.post(apiUrl, data, {
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+        } else {
+            console.error('Error creating or updating entity: ', error.response ? error.response.data : error.message);
+        }
+    }
+}
+
+//--------------------------------------------
+//        COMMODITY SUMMARY CONTROLLER             
+//--------------------------------------------
+
+async function getAllSummarizedCommodities() {
+    const apiUrl = `${process.env.SERVER_URL}/api/uex/summarizedcommodities/`;
+    try {
+        const response = await axios.get(apiUrl);
+        return response.data;  // This will be the return value of the function
+    } catch (error) {
+        console.error('Error fetching entity:', error.response ? error.response.data : error.message);
+        return null;  // Return null if there's an error
+    }
+}
+
+async function getSummarizedCommodityById(id){
+    const apiUrl = process.env.SERVER_URL;
+    try {
+        const response = await axios.get(`${apiUrl}/api/uex/summarizedcommodities/${id}`);
+        return response.data;  // This now properly returns the response data to the caller
+    } catch (error) {
+        return null;  // Return null or throw an error, depending on how you want to handle errors
+    }
+}
+
+async function createOrUpdateSummarizedCommodity(data) {
+    const apiUrl = `${process.env.SERVER_URL}/api/uex/summarizedcommodities`;
+    try {
+        // Check if the city exists
+        await axios.get(`${apiUrl}/${data.id}`);
+        // Update the existing city
+        await axios.put(`${apiUrl}/${data.id}`, data, {
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+    } catch (error) {
+        if (error.response && error.response.status === 404) {
+            // Create a new city if it does not exist
+            await axios.post(apiUrl, data, {
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+        } else {
+            console.error('Error creating or updating entity: ', error.response ? error.response.data : error.message);
+        }
+    }
+}
+
+//--------------------------------------------
+//          ITEM BY TERMINAL CONTROLLER             
+//--------------------------------------------
+
+async function getAllTerminalItems() {
+    const apiUrl = `${process.env.SERVER_URL}/api/uex/terminalitems/`;
+    try {
+        const response = await axios.get(apiUrl);
+        return response.data;  // This will be the return value of the function
+    } catch (error) {
+        console.error('Error fetching entity:', error.response ? error.response.data : error.message);
+        return null;  // Return null if there's an error
+    }
+}
+
+async function getTerminalItemById(id){
+    const apiUrl = process.env.SERVER_URL;
+    try {
+        const response = await axios.get(`${apiUrl}/api/uex/terminalitems/${id}`);
+        return response.data;  // This now properly returns the response data to the caller
+    } catch (error) {
+        return null;  // Return null or throw an error, depending on how you want to handle errors
+    }
+}
+
+async function createOrUpdateTerminalItem(data) {
+    const apiUrl = `${process.env.SERVER_URL}/api/uex/terminalitems`;
+    try {
+        // Check if the city exists
+        await axios.get(`${apiUrl}/${data.id}`);
+        // Update the existing city
+        await axios.put(`${apiUrl}/${data.id}`, data, {
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+    } catch (error) {
+        if (error.response && error.response.status === 404) {
+            // Create a new city if it does not exist
+            await axios.post(apiUrl, data, {
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+        } else {
+            console.error('Error creating or updating entity: ', error.response ? error.response.data : error.message);
+        }
+    }
+}
+
+//--------------------------------------------
+//          ITEM SUMMARY CONTROLLER             
+//--------------------------------------------
+
+async function getAllSummarizedItems() {
+    const apiUrl = `${process.env.SERVER_URL}/api/uex/sumarizeditems/`;
+    try {
+        const response = await axios.get(apiUrl);
+        return response.data;  // This will be the return value of the function
+    } catch (error) {
+        console.error('Error fetching entity:', error.response ? error.response.data : error.message);
+        return null;  // Return null if there's an error
+    }
+}
+
+async function getSummarizedItemById(id){
+    const apiUrl = process.env.SERVER_URL;
+    try {
+        const response = await axios.get(`${apiUrl}/api/uex/sumarizeditems/${id}`);
+        return response.data;  // This now properly returns the response data to the caller
+    } catch (error) {
+        return null;  // Return null or throw an error, depending on how you want to handle errors
+    }
+}
+
+async function createOrUpdateSummarizedItem(data) {
+    const apiUrl = `${process.env.SERVER_URL}/api/uex/sumarizeditems`;
+    try {
+        // Check if the city exists
+        await axios.get(`${apiUrl}/${data.id}`);
+        // Update the existing city
+        await axios.put(`${apiUrl}/${data.id}`, data, {
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+    } catch (error) {
+        if (error.response && error.response.status === 404) {
+            // Create a new city if it does not exist
+            await axios.post(apiUrl, data, {
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+        } else {
+            console.error('Error creating or updating entity: ', error.response ? error.response.data : error.message);
+        }
+    }
+}
+
+//--------------------------------------------
 //           OUTPOST CONTROLLER               
 //--------------------------------------------
 
@@ -483,4 +683,16 @@ module.exports = {
     getAllShips,
     getShipsById,
     createOrUpdateShips,
+    getAllTerminalCommodities,
+    getTerminalCommodityById,
+    createOrUpdateTerminalCommodity,
+    getAllSummarizedCommodities,
+    getSummarizedCommodityById,
+    createOrUpdateSummarizedCommodity,
+    getAllTerminalItems,
+    getTerminalItemById,
+    createOrUpdateTerminalItem,
+    getAllSummarizedItems,
+    getSummarizedItemById,
+    createOrUpdateSummarizedItem,
 };
