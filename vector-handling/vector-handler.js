@@ -124,18 +124,19 @@ async function loadChatlogs(client, openai){
       (f) =>
         f.filename === (channel === "common-knowledge" ? `${channel}.json` :`chatlog_${channel}.json`)
     );
-    //delete from file storage
-    try{
-      await openai.files.del(oldFile.id);
-    }catch(error){
-      console.log(`Error deleting file from storage: ${error.message}`);
-    }
     //then delete from vector store
     try {
       await openai.beta.vectorStores.files.del(process.env.VECTOR_STORE, oldVectorFile.id);
     } catch (error) {
       console.error(`Error removing file from vector store:`, error.message);
     }
+    //delete from file storage
+    try{
+      await openai.files.del(oldFile.id);
+    }catch(error){
+      console.log(`Error deleting file from storage: ${error.message}`);
+    }
+    
 
     //create and upload the new file
     try{

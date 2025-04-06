@@ -132,7 +132,7 @@ module.exports = {
                 const originalCreator = await getUserById(shipLogObject.user_id);
                 return interaction.reply({ 
                     content: `Only ${originalCreator.username} or a Marauder+ can edit this black box: (${shipLogObject.id}).`, 
-                    ephemeral: true 
+                    ephemeral: false 
                 });
             }
             //for the main player putting in the entry

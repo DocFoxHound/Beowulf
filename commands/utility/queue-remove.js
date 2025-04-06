@@ -61,7 +61,7 @@ module.exports = {
 
             await interaction.reply({
                 content: result,
-                ephemeral: true
+                ephemeral: false
             });
         } catch (error) {
             console.error('Error in queue-edit command:', error);

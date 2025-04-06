@@ -45,7 +45,7 @@ module.exports = {
 
             await interaction.reply({
                 content: `Badge removed from ${targetUser.username}.`,
-                ephemeral: true
+                ephemeral: false
             });
         } catch (error) {
             console.error('Error fetching badges:', error);

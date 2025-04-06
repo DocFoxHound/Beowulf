@@ -25,8 +25,8 @@ module.exports = {
         const hasPermission = member.roles.cache.some(role => moderatorRoles.includes(role.id));
         if(!hasPermission) {
             return interaction.reply({ 
-                content: "You do not have permission to use this command.",
-                ephemeral: true 
+                content: `${interaction.user.username}, you do not have permission to use this command.`,
+                ephemeral: false 
             });
         }
         try {

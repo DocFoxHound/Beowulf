@@ -85,8 +85,8 @@ module.exports = {
         
         if (!hasPermission) {
             return interaction.reply({ 
-                content: 'You do not have permission to use this command.', 
-                ephemeral: true 
+                content: `${interaction.user.username}, you do not have permission to use this command.`, 
+                ephemeral: false 
             });
         }
         // Get the chosen class name from the command options
@@ -164,7 +164,7 @@ module.exports = {
                 `\n**New:** \n${JSON.stringify(editedShipLog)}`);
             }
             await editShipLog(logId, editedShipLog);
-            await interaction.reply({ content: 'Ship Log added successfully!', ephemeral: true });
+            await interaction.reply({ content: `Ship Log edited successfully by a moderator: ${interaction.user.username}!`, ephemeral: false });
         } catch (error) {
             console.error(error);
             await interaction.reply({ content: 'There was an error adding the Ship Log.', ephemeral: true });

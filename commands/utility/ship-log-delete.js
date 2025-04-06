@@ -29,7 +29,7 @@ module.exports = {
                 const originalCreator = await getUserById(logRecord.owner_id);
                 return interaction.reply({ 
                     content: `Only ${originalCreator.username} or a Marauder+ can delete this log: (${logRecord.id}).`, 
-                    ephemeral: true 
+                    ephemeral: false 
                 });
             }
             if (channel && channel.isTextBased()) {

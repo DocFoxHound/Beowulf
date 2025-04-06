@@ -43,8 +43,8 @@ module.exports = {
         
         if (!hasPermission) {
             return interaction.reply({ 
-                content: 'You do not have permission to use this command.', 
-                ephemeral: true 
+                content: `${interaction.user.username}, you do not have permission to use this command.`, 
+                ephemeral: false 
             });
         }
         // Get the needed variables
@@ -95,7 +95,7 @@ module.exports = {
             }
 
             await editBlackBox(killLogId, editedBlackBox);
-            await interaction.reply({ content: 'Black Box log added successfully!', ephemeral: true });
+            await interaction.reply({ content: `Black Box log edited successfully by an admin: ${interaction.user.username}!`, ephemeral: false });
         } catch (error) {
             console.error(error);
             await interaction.reply({ content: 'There was an error adding the Black Box log.', ephemeral: true });

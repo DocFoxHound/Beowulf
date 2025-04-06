@@ -68,7 +68,7 @@ module.exports = {
                 const originalCreator = await getUserById(killLogObject.user_id);
                 return interaction.reply({ 
                     content: `Only ${originalCreator.username} or a Marauder+ can edit this black box: (${killLogObject.id}).`, 
-                    ephemeral: true 
+                    ephemeral: false 
                 });
             }
             //for the main player putting in the entry
@@ -92,7 +92,7 @@ module.exports = {
                 `\n**New:** \n${JSON.stringify(editedBlackBox)}`);
             }
             await editBlackBox(killLogId, editedBlackBox);
-            await interaction.reply({ content: 'Black Box log added successfully!', ephemeral: true });
+            await interaction.reply({ content: `Black Box log added by ${interaction.user.username} successfully!`, ephemeral: false });
         } catch (error) {
             console.error(error);
             await interaction.reply({ content: 'There was an error adding the Black Box log.', ephemeral: true });

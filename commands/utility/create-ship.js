@@ -37,7 +37,7 @@ module.exports = {
                 crew: shipModel.crew,
                 pad_type: shipModel.pad_type,
             });
-            await interaction.reply({ content: 'PlayerShip log added successfully!', ephemeral: true });
+            await interaction.reply({ content: `PlayerShip log added by ${interaction.user.username} successfully!`, ephemeral: false });
         } catch (error) {
             console.error(error);
             await interaction.reply({ content: 'There was an error adding the PlayerShip.', ephemeral: true });

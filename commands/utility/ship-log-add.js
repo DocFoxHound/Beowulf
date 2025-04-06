@@ -150,7 +150,7 @@ module.exports = {
                 divided_kills: dividedKillAmount,
                 ship_used_name: shipUsedName.custom_name
             });
-            await interaction.reply({ content: 'Ship Log added successfully!', ephemeral: true });
+            await interaction.reply({ content: `Ship Log added by ${interaction.user.username} successfully!`, ephemeral: false });
         } catch (error) {
             console.error(error);
             await interaction.reply({ content: 'There was an error adding the Ship log.', ephemeral: true });

@@ -28,7 +28,7 @@ module.exports = {
                 const originalCreator = await getUserById(logRecord.user_id);
                 return interaction.reply({ 
                     content: `Only ${originalCreator.username} or a Marauder+ can delete this black box: (${logRecord.id}).`, 
-                    ephemeral: true 
+                    ephemeral: false 
                 });
             }
             if (channel && channel.isTextBased()) {
@@ -36,7 +36,7 @@ module.exports = {
             }
 
             await deleteBlackBox(killLog); // Pass the selected kill log ID
-            await interaction.reply({ content: 'Black Box log deleted successfully!', ephemeral: true });
+            await interaction.reply({ content: `Black Box log ${killLog} deleted successfully!`, ephemeral: false });
         } catch (error) {
             console.error(error);
             await interaction.reply({ content: 'There was an error deleting the Black Box log.', ephemeral: true });
