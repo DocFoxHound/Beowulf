@@ -13,6 +13,8 @@ async function processUEXData(whichTable){
     if(whichTable === "all"){
         apiUrls.push({url: `https://api.uexcorp.space/2.0/cities${apiKey}`, title: "cities", iterate: false});
         apiUrls.push({url: `https://api.uexcorp.space/2.0/commodities${apiKey}`, title: "commodities", iterate: false});
+        apiUrls.push({url: `https://api.uexcorp.space/2.0/commodities_prices_all${apiKey}`, title: "commodities_by_terminal", iterate: false});
+        apiUrls.push({url: `https://api.uexcorp.space/2.0/items_prices_all${apiKey}`, title: "items_by_terminal", iterate: false});
         apiUrls.push({url: `https://api.uexcorp.space/2.0/outposts${apiKey}`, title: "outposts", iterate: false});
         apiUrls.push({url: `https://api.uexcorp.space/2.0/planets`, title: "planets", iterate: false});
         apiUrls.push({url: `https://api.uexcorp.space/2.0/space_stations${apiKey}`, title: "space_stations", iterate: false});
@@ -25,6 +27,10 @@ async function processUEXData(whichTable){
         apiUrls.push({url: `https://api.uexcorp.space/2.0/cities${apiKey}`, title: "cities", iterate: false});
     }else if(whichTable === "commodities"){
         apiUrls.push({url: `https://api.uexcorp.space/2.0/commodities${apiKey}`, title: "commodities", iterate: false});
+    }else if(whichTable === "commodities_by_terminal"){
+        apiUrls.push({url: `https://api.uexcorp.space/2.0/commodities_prices_all${apiKey}`, title: "commodities_by_terminal", iterate: false});
+    }else if(whichTable === "items_by_terminal"){
+        apiUrls.push({url: `https://api.uexcorp.space/2.0/items_prices_all${apiKey}`, title: "items_by_terminal", iterate: false});
     }else if(whichTable === "outposts"){
         apiUrls.push({url: `https://api.uexcorp.space/2.0/outposts${apiKey}`, title: "outposts", iterate: false});
     }else if(whichTable === "planets"){
@@ -147,6 +153,92 @@ async function sendToDb(title, data){
                             console.log("Processing commodities")
                             for(const d of item.data){
                                 await UEX.createOrUpdateCommodity(d);
+                            }
+                            break;
+                        case "commodities_by_terminal":
+                            console.log("Processing commodities by terminal")
+                            for(const d of item.data){
+                                let totalBuy = 0;
+                                let totalSell = 0;
+                                let buyDivide = 0;
+                                let sellDivide = 0;
+                                for(const e of item.data){
+                                    if(d.id === e.id && e.price_buy !== 0){
+                                        totalBuy +=  e.price_buy;
+                                        buyDivide++;
+                                    }
+                                    if(d.id === e.id && e.price_sell !== 0){
+                                        totalSell += e.price_sell;
+                                        sellDivide++;
+                                    }
+                                }
+                                const avgBuy = totalBuy / buyDivide;
+                                const avgSell = totalSell / sellDivide;
+                                const terminalCommodity = {
+                                    id: d.id,
+                                    id_commodity: d.id_commodity,
+                                    price_buy: d.price_buy,
+                                    price_buy_avg: d.price_buy_avg,
+                                    price_sell: d.price_sell,
+                                    price_sell_avg: d.price_sell_avg,
+                                    scu_buy: d.scu_buy,
+                                    scu_buy_avg: d.scu_buy_avg,
+                                    scu_sell_stock: d.scu_sell_stock,
+                                    scu_sell_stock_avg: d.scu_sell_stock_avg,
+                                    scu_sell: d.scu_sell,
+                                    scu_sell_avg: d.scu_sell_avg,
+                                    status_buy: d.status_buy,
+                                    status_sell: d.status_sell,
+                                    commodity_name: d.commodity_name,
+                                    terminal_name: d.terminal_name,
+                                    id_terminal: d.id_terminal
+                                }
+                                const summaryCommodity = {
+                                    id: d.id_commodity,
+                                    commodity_name: d.commodity_name,
+                                    price_buy_avg: avgBuy || 0,
+                                    price_sell_avg: avgSell || 0
+                                }
+                                await UEX.createOrUpdateTerminalCommodity(terminalCommodity);
+                                await UEX.createOrUpdateSummarizedCommodity(summaryCommodity);
+                            }
+                            break;
+                        case "items_by_terminal":
+                            console.log("Processing items by terminal")
+                            for(const d of item.data){
+                                let totalBuy = 0;
+                                let totalSell = 0;
+                                let buyDivide = 0;
+                                let sellDivide = 0;
+                                for(const e of item.data){
+                                    if(d.id === e.id && e.price_buy !== 0){
+                                        totalBuy +=  e.price_buy;
+                                        buyDivide++;
+                                    }
+                                    if(d.id === e.id && e.price_sell !== 0){
+                                        totalSell += e.price_sell;
+                                        sellDivide++;
+                                    }
+                                }
+                                const avgBuy = totalBuy / buyDivide;
+                                const avgSell = totalSell / sellDivide;
+                                const terminalItem = {
+                                    id: d.id,
+                                    id_item: d.id_item,
+                                    id_terminal: d.id_terminal,
+                                    price_buy: d.price_buy,
+                                    price_sell: d.price_sell,
+                                    item_name: d.item_name,
+                                    terminal_name: d.terminal_name,
+                                }
+                                const summaryItem = {
+                                    id: d.id_item,
+                                    commodity_name: d.item_name,
+                                    price_buy_avg: avgBuy || 0,
+                                    price_sell_avg: avgSell || 0
+                                }
+                                await UEX.createOrUpdateTerminalItem(terminalItem);
+                                await UEX.createOrUpdateSummarizedItem(summaryItem);
                             }
                             break;
                         case "outposts":

@@ -10,6 +10,8 @@ async function downloadUEXData(){
     let totalTerminals = 0;
     const apiKey = `?api_key=${encodeURIComponent(process.env.UEX_CORP_API_TOKEN)}`
     apiUrls.push({url: `https://api.uexcorp.space/2.0/commodities${apiKey}`, title: "commodities", iterate: false});
+    apiUrls.push({url: `https://api.uexcorp.space/2.0/commodities_prices_all${apiKey}`, title: "commoditiesbyterminal", iterate: false});
+    apiUrls.push({url: `https://api.uexcorp.space/2.0/items_prices_all${apiKey}`, title: "itemsbyterminal", iterate: false});
     apiUrls.push({url: `https://api.uexcorp.space/2.0/star_systems${apiKey}`, title: "star_systems", iterate: false});
     apiUrls.push({url: `https://api.uexcorp.space/2.0/planets`, title: "planets", iterate: false});
     apiUrls.push({url: `https://api.uexcorp.space/2.0/terminals${apiKey}`, title: "terminals", iterate: false});

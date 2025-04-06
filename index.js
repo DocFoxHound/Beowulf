@@ -132,7 +132,7 @@ client.on("ready", async () => {
   //start off with a fresh reload of the online files
   // await vectorHandler.refreshChatLogs(channelIdAndName, openai, client)
   // await vectorHandler.refreshUserList(openai, client)
-  // processUEXData("ships"); //do NOT await this, it takes forever
+  // processUEXData("items_by_terminal"); //do NOT await this, it takes forever
   // await trimChatLogs();
   // await loadChatlogs(client, openai)
   preloadedDbTables = await preloadFromDb();

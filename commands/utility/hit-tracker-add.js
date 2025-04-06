@@ -66,7 +66,7 @@ const command = new SlashCommandBuilder()
     .addNumberOption(option => 
         option.setName('amount-6')
             .setDescription('List the amount of cargo (total SCU).')
-            .setRequired(true))
+            .setRequired(false))
     .addStringOption(option => 
         option.setName('cargo-7')
             .setDescription('Select the cargo.')
@@ -119,33 +119,6 @@ const command = new SlashCommandBuilder()
             .setAutocomplete(true))
     .addNumberOption(option => 
         option.setName('amount-12')
-            .setDescription('List the amount of cargo (total SCU).')
-            .setRequired(false))
-    .addStringOption(option => 
-        option.setName('cargo-13')
-            .setDescription('Select the cargo.')
-            .setRequired(false)
-            .setAutocomplete(true))
-    .addNumberOption(option => 
-        option.setName('amount-13')
-            .setDescription('List the amount of cargo (total SCU).')
-            .setRequired(false))
-    .addStringOption(option => 
-        option.setName('cargo-14')
-            .setDescription('Select the cargo.')
-            .setRequired(false)
-            .setAutocomplete(true))
-    .addNumberOption(option => 
-        option.setName('amount-14')
-            .setDescription('List the amount of cargo (total SCU).')
-            .setRequired(false))
-    .addStringOption(option => 
-        option.setName('cargo-15')
-            .setDescription('Select the cargo.')
-            .setRequired(false)
-            .setAutocomplete(true))
-    .addNumberOption(option => 
-        option.setName('amount-15')
             .setDescription('List the amount of cargo (total SCU).')
             .setRequired(false))
     ;
