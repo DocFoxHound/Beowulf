@@ -63,6 +63,7 @@ async function getHitLogByEntryId(id) {
 
 async function getHitLogsByPatch(patch) {
     const apiUrl = `${process.env.SERVER_URL}/api/hittracker/patch`;
+    console.log("Patch: ", patch)
     try {
         const response = await axios.get(apiUrl, {
             params: {

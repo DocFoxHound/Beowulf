@@ -235,7 +235,7 @@ function createLeaderboardEmbeds(leaderboardData, patch) {
         const valueEmbed = new EmbedBuilder()
             .setTitle(`Top Players by Damage Done (Patch ${patch})`)
             .setDescription(`**IronPoint Total Damage Cost:** ${formatToCurrency(sortedByValue.reduce((acc, [_, stats]) => acc + stats.value, 0))}`)
-            .setColor('#0000ff');
+            .setColor('#7199de');
         sortedByValue.forEach(([username, stats], index) => {
             valueEmbed.addFields({
                 name: `${index + 1}. ${username}`,
@@ -319,7 +319,7 @@ function createIndividualEmbeds(individualData, patch, user) {
             // Create an embed for the current page
             const embed = new EmbedBuilder()
                 .setTitle(`Hit History (Patch: ${patch})`)
-                .setColor('#0000ff')
+                .setColor('#7199de')
                 .addFields(currentFields);
 
             embeds.push(embed);

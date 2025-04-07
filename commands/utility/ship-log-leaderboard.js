@@ -327,7 +327,7 @@ function createLeaderboardEmbeds(leaderboardData, commanderData, crewData, patch
                 __Combat Output:__ Using total kills and total damages done.
                 __Leadership Load:__ Taking into account how many crew they have commanded.
                 __Initiative:__ The numbers of times they have commanded a ship.\n\n`)
-            .setColor('#37875b');
+            .setColor('#3e6606');
         sortedByTopCommanders.forEach(([username, stats], index) => {
             // Get top 3 ships
             const shipsCount = stats.ships.reduce((acc, ships) => {
@@ -362,7 +362,7 @@ function createLeaderboardEmbeds(leaderboardData, commanderData, crewData, patch
                 __Shared Kills:__ The sum of all kills divided by the numbers of crew on the ship.
                 __Shared Damages:__ The sum of all damages dealt to another org divided by the numbers of crew on the ship.
                 \n\n`)
-            .setColor('#37875b');
+            .setColor('#3e6606');
             sortedByTopCrew.forEach(([username, stats], index) => {
                 // Get top 3 ships
                 const shipsCount = stats.shipsCrewed.reduce((acc, shipsCrewed) => {
@@ -433,7 +433,7 @@ function createIndividualEmbeds(individualData, patch, user) {
             // Create an embed for the current page
             const embed = new EmbedBuilder()
                 .setTitle(`Ship Totals (Patch: ${patch})`)
-                .setColor('#7199de')
+                .setColor('#3e6606')
                 .setDescription(`**Total Kills:** ${totalKills}\n**Total Damage Cost:** ${totalValue}`)
                 .addFields(currentFields);
 
@@ -464,7 +464,7 @@ function createIndividualEmbeds(individualData, patch, user) {
             // Create an embed for the current page
             const embed = new EmbedBuilder()
                 .setTitle(`Hit History (Patch: ${patch})`)
-                .setColor('#0000ff')
+                .setColor('#3e6606')
                 .addFields(currentFields);
 
             embeds.push(embed);
