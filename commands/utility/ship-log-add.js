@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const { CommandInteraction } = require('discord.js');
+const { CommandInteraction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
 const { getAllShips } = require('../../api/uexApi');
 const { createShipLog } = require('../../api/shipLogApi');
 const { getAllGameVersions } = require('../../api/gameVersionApi');
@@ -92,6 +92,7 @@ module.exports = {
         const victimOrgs = interaction.options.getString('victim-orgs');
         const assistsRaw = interaction.options.getString('crew');
 
+        const shipLogChannel = process.env.LIVE_ENVIRONMENT === "true" ? process.env.SHIP_LOG_CHANNEL : process.env.TEST_SHIP_LOG_CHANNEL;
         const patches = await getAllGameVersions();
         const latestPatchesSorted = patches.sort((a, b) => b.id - a.id);
         const latestPatch = latestPatchesSorted[0].version; // Get the latest patch
@@ -134,23 +135,72 @@ module.exports = {
         // Call your signup logic from the external file
         try {
             const parentId = new Date().getTime()
-            //for the main player putting in the entry
-            await createShipLog({
-                id: parentId,
-                owner_id: owner, 
-                ship_used: shipUsed, 
-                commander: commander,
-                value: totalPrice,
-                victim_orgs: victimOrgsArray,
-                patch: latestPatch,
-                crew: assistedPlayers,
-                ships_killed: killList, 
-                divided_value: dividiedAvgPrice,
-                total_kills: killAmount,
-                divided_kills: dividedKillAmount,
-                ship_used_name: shipUsedName.custom_name
-            });
-            await interaction.reply({ content: `Ship Log (${parentId}) added by ${interaction.user.username} successfully!`, ephemeral: false });
+
+            // Create modal
+            const modal = new ModalBuilder()
+                .setCustomId('shipLogDescriptionModal')
+                .setTitle('Ship Log Description');
+
+            // Create description input
+            const descriptionInput = new TextInputBuilder()
+                .setCustomId('description')
+                .setLabel('Cover the following topics: What was the mission? What happened? What was the outcome? Where can you improve?')
+                .setStyle(TextInputStyle.Paragraph)
+                .setRequired(true)
+                .setMaxLength(4000);
+
+            // Add input to action row
+            const firstActionRow = new ActionRowBuilder().addComponents(descriptionInput);
+            modal.addComponents(firstActionRow);
+
+            // Show modal to user
+            await interaction.showModal(modal);
+
+            let modalDescription = '';
+            try {
+                const submitted = await interaction.awaitModalSubmit({
+                    time: 5 * 60 * 1000, // 5 minutes
+                    filter: i => i.customId === 'shipLogDescriptionModal' && i.user.id === interaction.user.id,
+                });
+
+                // Get the value
+                modalDescription = submitted.fields.getTextInputValue('description');
+                await submitted.deferUpdate(); // Avoids "This interaction failed"
+
+                //for the main player putting in the entry
+                await createShipLog({
+                    id: parentId,
+                    owner_id: owner, 
+                    ship_used: shipUsed, 
+                    commander: commander,
+                    value: totalPrice,
+                    victim_orgs: victimOrgsArray,
+                    patch: latestPatch,
+                    crew: assistedPlayers,
+                    ships_killed: killList, 
+                    divided_value: dividiedAvgPrice,
+                    total_kills: killAmount,
+                    divided_kills: dividedKillAmount,
+                    ship_used_name: shipUsedName.custom_name,
+                    description: modalDescription,
+                });
+
+                const logChannel = await client.channels.fetch(shipLogChannel).catch(err => {
+                    console.error('Could not find the ship-log channel:', err);
+                });
+
+                if (logChannel && logChannel.isTextBased()) {
+                    const logMessage = `🛳️ **New Ship Log Entry**\n**ID:** ${parentId}\n**Submitted by:** <@${interaction.user.id}>\n**Commander:** <@${commander}>\n**Crew:** ${assistedPlayers.map(id => `<@${id}>`).join(', ')}\n**Ship Used:** ${shipUsedName.custom_name} (the ${shipUsedName.ship_model})\n**Kills:** ${killAmount}\n**Total Value:** $${totalPrice.toLocaleString()}\n**Description:** ${modalDescription}`;
+                    await logChannel.send({ content: logMessage });
+                }
+
+                await submitted.followUp({ content: `Ship Log (${parentId}) added by ${interaction.user.username} successfully!`, ephemeral: false });
+            } catch (error) {
+                console.error('Modal submission failed or timed out:', error);
+                await interaction.followUp({ content: 'No description was submitted. Canceling ship log.', ephemeral: true });
+                return;
+            }
+            // await interaction.reply({ content: `Ship Log (${parentId}) added by ${interaction.user.username} successfully!`, ephemeral: false });
         } catch (error) {
             console.error(error);
             await interaction.reply({ content: 'There was an error adding the Ship log.', ephemeral: true });
@@ -160,36 +210,41 @@ module.exports = {
         const focusedValue = interaction.options.getFocused(); // Get the focused option value
         const optionName = interaction.options.getFocused(true).name; // Get the name of the focused option
         const allShips = await getAllShips(); // Fetch all ships
-
-        if (optionName === 'ship-used') {
-            const ownerUser = interaction.options.getString('owner').replace(/\D/g, ''); // Get the owner user
-            const allPlayerShips = await getPlayerShipsByUserId(ownerUser);
-            const allShipsSmallerCrew = allPlayerShips.filter(ship => ship.crew >= 3); // Filter ships with crew size <= 2
-            const allShipsListed = allShipsSmallerCrew.map(ship => ({
-                name: `${ship.custom_name} (${ship.ship_model})`, // Include both custom_name and model in the name
-                value: ship.id // Use custom_name as the value
-            }));
-
-            // Filter ships based on the focused value
-            const filtered = allShipsListed.filter(ship =>
-                ship.name.toLowerCase().includes(focusedValue.toLowerCase())
-            );
-
-            // Respond with up to 25 suggestions
-            await interaction.respond(filtered.slice(0, 25));
-        } else if (optionName.includes('ship-killed')) {
-            const allShipsListed = allShips.map(ship => ({
-                name: `${ship.ship}`, // Include both ship name and model in the name
-                value: ship.id // Use ship name as the value
-            }));
-
-            // Filter ships based on the focused value
-            const filtered = allShipsListed.filter(ship =>
-                ship.name.toLowerCase().includes(focusedValue.toLowerCase())
-            );
-
-            // Respond with up to 25 suggestions
-            await interaction.respond(filtered.slice(0, 25));
+        try{
+            if (optionName === 'ship-used') {
+                const ownerUser = interaction.options.getString('owner').replace(/\D/g, ''); // Get the owner user
+                const allPlayerShips = await getPlayerShipsByUserId(ownerUser);
+                const allShipsSmallerCrew = allPlayerShips.filter(ship => ship.crew >= 3); // Filter ships with crew size <= 2
+                const allShipsListed = allShipsSmallerCrew.map(ship => ({
+                    name: `${ship.custom_name} (${ship.ship_model})`, // Include both custom_name and model in the name
+                    value: ship.id // Use custom_name as the value
+                }));
+    
+                // Filter ships based on the focused value
+                const filtered = allShipsListed.filter(ship =>
+                    ship.name.toLowerCase().includes(focusedValue.toLowerCase())
+                );
+    
+                // Respond with up to 25 suggestions
+                await interaction.respond(filtered.slice(0, 25));
+            } else if (optionName.includes('ship-killed')) {
+                const allShipsListed = allShips.map(ship => ({
+                    name: `${ship.ship}`, // Include both ship name and model in the name
+                    value: ship.id // Use ship name as the value
+                }));
+    
+                // Filter ships based on the focused value
+                const filtered = allShipsListed.filter(ship =>
+                    ship.name.toLowerCase().includes(focusedValue.toLowerCase())
+                );
+    
+                // Respond with up to 25 suggestions
+                await interaction.respond(filtered.slice(0, 25));
+            }
+        }catch(error){
+            console.error('Error retrieving ships:', error);
+            await interaction.reply({ content: 'There was an error retrieving a ship. Make sure that you have created a ship of 3+ crew before trying to add a ship log.', ephemeral: true });
+            return;
         }
     }
 };
