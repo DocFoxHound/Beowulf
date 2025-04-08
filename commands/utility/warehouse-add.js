@@ -120,49 +120,56 @@ module.exports = {
         
     },
     async autocomplete(interaction) {
-        const focusedValue = interaction.options.getFocused(); // Get the focused option value
-        const optionName = interaction.options.getFocused(true).name; // Get the name of the focused option
-        const action = interaction.options.getString(`action`);
-        let addOrRemove = '';
+        try{
+            const focusedValue = interaction.options.getFocused(); // Get the focused option value
+            const optionName = interaction.options.getFocused(true).name; // Get the name of the focused option
+            const action = interaction.options.getString(`action`);
+            let addOrRemove = '';
+            
+            
+            if(action === 'add') {
+                addOrRemove = 'add';
+            }else if(action === 'remove') {
+                addOrRemove = 'remove';
+            }
+            if (addOrRemove === 'add' && optionName === 'cargo') {
+                const allCommodities = await getAllSummarizedCommodities(); // Fetch all ships
+                const allItems = await getAllSummarizedItems(); // Fetch all ships
+                const allCargo = [...allCommodities, ...allItems]; // Combine all items
+                const allCargoListed = allCargo.map(cargo => ({
+                    name: `${cargo.commodity_name} (${cargo.price_sell_avg === 0 ? cargo.price_buy_avg : cargo.price_sell_avg}aUEC)`, // Include both ship name and model in the name
+                    value: cargo.commodity_name // Use ship name as the value
+                }));
+    
+                // Filter ships based on the focused value
+                const filtered = allCargoListed.filter(cargo =>
+                    cargo.name.toLowerCase().includes(focusedValue.toLowerCase())
+                );
+    
+                // Respond with up to 25 suggestions
+                await interaction.respond(filtered.slice(0, 25));
+            }
+            if (addOrRemove === 'remove' && optionName === 'cargo') {
+                const allCommodities = await getWarehousesByUserId(interaction.user.id); // Fetch all ships
+                const allCargoListed = allCommodities.map(cargo => ({
+                    name: `${cargo.commodity_name} (${cargo.total_scu}scu/units)`, // Include both ship name and model in the name
+                    value: cargo.commodity_name // Use ship name as the value
+                }));
+    
+                // Filter ships based on the focused value
+                const filtered = allCargoListed.filter(cargo =>
+                    cargo.name.toLowerCase().includes(focusedValue.toLowerCase())
+                );
+    
+                // Respond with up to 25 suggestions
+                await interaction.respond(filtered.slice(0, 25));
+            }
+        }catch(error){
+            console.error('Error autofilling Warehouse:', error);
+            await interaction.reply({ content: 'There was an error with autofilling fields in the Warehouse command.', ephemeral: true });
+            return;
+        }
         
-        
-        if(action === 'add') {
-            addOrRemove = 'add';
-        }else if(action === 'remove') {
-            addOrRemove = 'remove';
-        }
-        if (addOrRemove === 'add' && optionName === 'cargo') {
-            const allCommodities = await getAllSummarizedCommodities(); // Fetch all ships
-            const allItems = await getAllSummarizedItems(); // Fetch all ships
-            const allCargo = [...allCommodities, ...allItems]; // Combine all items
-            const allCargoListed = allCargo.map(cargo => ({
-                name: `${cargo.commodity_name} (${cargo.price_sell_avg === 0 ? cargo.price_buy_avg : cargo.price_sell_avg}aUEC)`, // Include both ship name and model in the name
-                value: cargo.commodity_name // Use ship name as the value
-            }));
-
-            // Filter ships based on the focused value
-            const filtered = allCargoListed.filter(cargo =>
-                cargo.name.toLowerCase().includes(focusedValue.toLowerCase())
-            );
-
-            // Respond with up to 25 suggestions
-            await interaction.respond(filtered.slice(0, 25));
-        }
-        if (addOrRemove === 'remove' && optionName === 'cargo') {
-            const allCommodities = await getWarehousesByUserId(interaction.user.id); // Fetch all ships
-            const allCargoListed = allCommodities.map(cargo => ({
-                name: `${cargo.commodity_name} (${cargo.total_scu}scu/units)`, // Include both ship name and model in the name
-                value: cargo.commodity_name // Use ship name as the value
-            }));
-
-            // Filter ships based on the focused value
-            const filtered = allCargoListed.filter(cargo =>
-                cargo.name.toLowerCase().includes(focusedValue.toLowerCase())
-            );
-
-            // Respond with up to 25 suggestions
-            await interaction.respond(filtered.slice(0, 25));
-        }
     }
 };
 
