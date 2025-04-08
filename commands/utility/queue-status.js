@@ -138,7 +138,7 @@ function generatedEmbed(classData){
                 .setTitle(`${prestige.toString().toUpperCase()}`)
                 .setImage('https://i.imgur.com/1t53Jsc.png')
                 .setDescription(`\`\`\`\nThe below are individuals presently waiting in Queue for either a class or an assessment.\`\`\`\n`)
-                .setColor('#7199de');
+                .setColor('#ff0000');
             for(const classObj of classes){
                 let studentsList = classObj.students.map(s =>
                     `• ${s.nickname || s.username}`
