@@ -51,7 +51,7 @@ module.exports = {
                         .setCustomId('next')
                         .setLabel('Next')
                         .setStyle(ButtonStyle.Primary)
-                );
+            );
 
             // Send the first embed with navigation buttons
             let currentPage = 0;

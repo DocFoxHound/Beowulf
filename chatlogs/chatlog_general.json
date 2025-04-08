@@ -1,0 +1,2098 @@
+{
+  "header": {
+    "channel_name": "general",
+    "channel_category": "General Discussion"
+  },
+  "chat_log": [
+    {
+      "role": "user",
+      "content": "@dochound: 'asdf'",
+      "metadata": {
+        "channel": "general",
+        "user": "dochound",
+        "date": "2025-03-29T15:18:40.592Z",
+        "string_to_reference_user_in_response": "<@664023164350627843>"
+      }
+    },
+    {
+      "role": "user",
+      "content": "@dochound: 'asdfasdfasdf'",
+      "metadata": {
+        "channel": "general",
+        "user": "dochound",
+        "date": "2025-03-29T15:18:43.163Z",
+        "string_to_reference_user_in_response": "<@664023164350627843>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Shwibble shwabble was successfully added to the queue for RAPTOR II Solo Assessment.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-03-29T18:15:35.704Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nQueue List\n__RAPTOR Queue__: • **mercuriuss:** RAPTOR 1 Solo,  RAPTOR 1 Team,     \n• **leo_getz:** RAPTOR 1 Solo,  RAPTOR 1 Team,     \n• **dochound:** RAPTOR 1 Solo,      \n• **mohawkress1629:** RAPTOR 1 Solo,      \n• **okka:**   RAPTOR 2 Solo,\n__CORSAIR Queue__: • **mercuriuss:** CORSAIR 1 Turret,  CORSAIR 1 Torpedo,    \n• **leo_getz:** CORSAIR 1 Turret,  CORSAIR 1 Torpedo,    \n• **dochound:** CORSAIR 1 Turret,  CORSAIR 1 Torpedo,  CORSAIR 2 Ship Commander,\n__RAIDER Queue__: • **mercuriuss:** RAIDER 1 Swabbie,   RAIDER 1 Boarder,    \n• **leo_getz:** RAIDER 1 Swabbie,  RAIDER 1 Linemaster,     \n• **dochound:** RAIDER 1 Swabbie,  RAIDER 1 Linemaster,  RAIDER 1 Boarder,   RAIDER 2 Mate,  \n• **mohawkress1629:**   RAIDER 1 Boarder,\nContact an administrator if you believe there are any errors.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-03-29T18:16:19.223Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'An error occurred while fetching lessons from the bot.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-03-31T19:43:30.749Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'An error occurred while adding the game version. Please try again later.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-03-31T18:47:18.277Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Failed to add a new game version.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-03-31T18:48:11.935Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Failed to add a new game version.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-03-31T18:49:46.534Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Failed to add a new game version.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-03-31T18:50:57.616Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Failed to add a new game version.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-03-31T18:52:19.358Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Failed to add a new game version.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-03-31T18:56:30.340Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Failed to add a new game version.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-03-31T18:57:34.612Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Game Version updated to:4.1 and the trackers will now reflect progress made in this patch.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-03-31T18:59:13.435Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'The lesson has been uploaded.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-03-31T19:25:24.298Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'The lesson has been uploaded.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-03-31T19:29:35.049Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'The lesson has been uploaded.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-03-31T19:32:06.185Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'An error occurred while fetching lessons from the bot.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-03-31T19:38:49.053Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'An error occurred while fetching lessons from the bot.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-03-31T19:40:17.498Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'An error occurred while fetching lessons from the bot.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-03-31T19:41:49.077Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nLessons Learned\nHere are the lessons the bot has learned:\nLesson ID: 1743449525759: **Username:** DocHouuuund\n**Lesson:** asdfasdf\nLesson ID: 1743449525760: **Username:** DocHouuuund\n**Lesson:** This is another lesson\nPage 1 of 1'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-03-31T19:44:09.164Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'The lesson has been deleted.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-03-31T19:46:46.211Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nLessons Learned\nHere are the lessons the bot has learned:\nLesson ID: 1743449525760: **Username:** DocHouuuund\n**Lesson:** This is another lesson\nPage 1 of 1'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-03-31T19:46:58.538Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'The lesson has been uploaded.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-03-31T19:47:30.070Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'The lesson has been uploaded.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-03-31T19:47:40.655Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nLessons Learned\nHere are the lessons the bot has learned:\nLesson ID: 1743449525760: **Username:** DocHouuuund\n**Lesson:** This is another lesson\nLesson ID: 1743450449304: **Username:** DocHouuuund\n**Lesson:** Hahaha this is a great bot\nLesson ID: 1743450460229: **Username:** DocHouuuund\n**Lesson:** Everyone smells funny\nPage 1 of 1'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-03-31T19:47:47.151Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'The lesson has been deleted.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-03-31T19:48:02.656Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nLessons Learned\nHere are the lessons the bot has learned:\nLesson ID: 1743449525760: **Username:** DocHouuuund\n**Lesson:** This is another lesson\nLesson ID: 1743450460229: **Username:** DocHouuuund\n**Lesson:** Everyone smells funny\nPage 1 of 1'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-03-31T19:48:10.285Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "user",
+      "content": "@dochound: 'asdf'",
+      "metadata": {
+        "channel": "general",
+        "user": "dochound",
+        "date": "2025-04-01T17:52:36.203Z",
+        "string_to_reference_user_in_response": "<@664023164350627843>"
+      }
+    },
+    {
+      "role": "user",
+      "content": "@dochound: 'hjfuh4eiuhs'",
+      "metadata": {
+        "channel": "general",
+        "user": "dochound",
+        "date": "2025-04-01T17:52:42.589Z",
+        "string_to_reference_user_in_response": "<@664023164350627843>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nBlack Box Logs\nLogs for dochound in patch ALL\nLog ID: 1743528866787: **Ship Used:** Kraken Privateer\n**Ship Killed:** 600i Touring\n**Value:** 2000\n**Kill Count:** 2\n**Victims:** JimBob, Sammysam\nLog ID: 1743530362742: **Ship Used:** G12\n**Ship Killed:** Cyclone RC\n**Value:** 65\n**Kill Count:** 1\n**Victims:** Runner\nLog ID: 1743530392171: **Ship Used:** G12-R\n**Ship Killed:** Polaris\n**Value:** 1114\n**Kill Count:** 4\n**Victims:** Bill, JimBob, Jenner, Shopan, Unknaon\nLog ID: 1743530328144: **Ship Used:** P-52 Merlin\n**Ship Killed:** Carrack Expedition\n**Value:** 625\n**Kill Count:** 3\n**Victims:** Rainer, Jenner, Kyle'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-01T18:40:20.746Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nBlack Box Logs\nLogs for dochound in patch ALL\nLog ID: 1743528866787: **Ship Used:** Kraken Privateer\n**Ship Killed:** 600i Touring\n**Value:** 2000\n**Kill Count:** 2\n**Victims:** JimBob, Sammysam\nLog ID: 1743530362742: **Ship Used:** G12\n**Ship Killed:** Cyclone RC\n**Value:** 65\n**Kill Count:** 1\n**Victims:** Runner\nLog ID: 1743530392171: **Ship Used:** G12-R\n**Ship Killed:** Polaris\n**Value:** 1114\n**Kill Count:** 4\n**Victims:** Bill, JimBob, Jenner, Shopan, Unknaon\nLog ID: 1743530328144: **Ship Used:** P-52 Merlin\n**Ship Killed:** Carrack Expedition\n**Value:** 625\n**Kill Count:** 3\n**Victims:** Rainer, Jenner, Kyle'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-02T03:58:21.376Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nLeaderboard - Top Players by Kill Count (4.1)\n1. DocHound \"DochsHound\": **Kill Count:** 5'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-02T04:30:39.241Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nLeaderboard - Top Players by Kill Count (4.1)\n1. dochound: **Kill Count:** 5'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-02T08:25:45.111Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nLeaderboard - Top Players by Kill Count (4.1)\n1. dochound: **Kill Count:** 5'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-02T08:47:16.351Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nLeaderboard - Top Players by Kill Count (4.1)\n1. dochound: **Kill Count:** 11\n2. mohawkress1629: **Kill Count:** 1.5\n3. cowilco: **Kill Count:** 1.5'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-02T08:52:21.525Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nLeaderboard - Top Players by Kill Count (4.1)\n1. dochound: **Kill Count:** 11'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-02T09:03:32.515Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nLeaderboard - Top Players by Kill Count (4.1)\n1. DocHound \"DochsHound\": **Kill Count:** 11'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-02T09:09:41.105Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Players by Total Kills (Patch ALL)\n**IronPoint Total Kills:** NaN\n1. mohawkress1629: **Kill Count:** undefined\n2. adamn58: **Kill Count:** undefined\n3. dochound: **Kill Count:** undefined\n4. cowilco: **Kill Count:** undefined\n5. okka: **Kill Count:** undefined\n6. RoboHound: **Kill Count:** undefined'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-05T15:04:37.259Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nIndividual Stat Sheet (4.1)\n**Total Kills:** undefined\n**Total Value:** undefined\nHit ID: 1743530362742: **Kill Count:** 1\n**Value:** 65\n**Assists:** none\n**Victims:** Runner\nHit ID: 1743530392171: **Kill Count:** 4\n**Value:** 1114\n**Assists:** none\n**Victims:** Bill, JimBob, Jenner, Shopan, Unknaon\nHit ID: 1743583907474: **Kill Count:** 1\n**Value:** 195\n**Assists:** \n**Victims:** Persnickity\nHit ID: 1743582881422: **Kill Count:** 2\n**Value:** 725\n**Assists:** 456669070759034882\n**Victims:** LowVibe, Hammerer\nHit ID: 1743583498873: **Kill Count:** 1.5\n**Value:** 150\n**Assists:** 456669070759034882, 169038445187039233\n**Victims:** Shwarma Man, Henry, Unknown\nHit ID: 1743583537029: **Kill Count:** 1\n**Value:** 300\n**Assists:** \n**Victims:** NamelessMan\nHit ID: 1743583786920: **Kill Count:** 0.5\n**Value:** 150\n**Assists:** \n**Victims:** asdf'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-02T09:28:50.513Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nIndividual Stat Sheet (4.1)\n**Total Kills:** undefined\n**Total Value:** undefined\nHit ID: 1743530362742: **Kill Count:** 1\n**Value:** $$65.00\n**Assists:** none\n**Victims:** Runner\nHit ID: 1743530392171: **Kill Count:** 4\n**Value:** $$1,114.00\n**Assists:** none\n**Victims:** Bill, JimBob, Jenner, Shopan, Unknaon\nHit ID: 1743583907474: **Kill Count:** 1\n**Value:** $$195.00\n**Assists:** \n**Victims:** Persnickity\nHit ID: 1743582881422: **Kill Count:** 2\n**Value:** $$725.00\n**Assists:** 456669070759034882\n**Victims:** LowVibe, Hammerer\nHit ID: 1743583498873: **Kill Count:** 1.5\n**Value:** $$150.00\n**Assists:** 456669070759034882, 169038445187039233\n**Victims:** Shwarma Man, Henry, Unknown\nHit ID: 1743583537029: **Kill Count:** 1\n**Value:** $$300.00\n**Assists:** \n**Victims:** NamelessMan\nHit ID: 1743583786920: **Kill Count:** 0.5\n**Value:** $$150.00\n**Assists:** \n**Victims:** asdf'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-02T09:32:34.174Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nIndividual Stat Sheet (4.1)\n**Total Kills:** 11\n**Total Value:** 2699\nHit ID: 1743530362742: **Kill Count:** 1\n**Value:** $65.00\n**Assists:** none\n**Victims:** Runner\nHit ID: 1743530392171: **Kill Count:** 4\n**Value:** $1,114.00\n**Assists:** none\n**Victims:** Bill, JimBob, Jenner, Shopan, Unknaon\nHit ID: 1743583907474: **Kill Count:** 1\n**Value:** $195.00\n**Assists:** \n**Victims:** Persnickity\nHit ID: 1743582881422: **Kill Count:** 2\n**Value:** $725.00\n**Assists:** 456669070759034882\n**Victims:** LowVibe, Hammerer\nHit ID: 1743583498873: **Kill Count:** 1.5\n**Value:** $150.00\n**Assists:** 456669070759034882, 169038445187039233\n**Victims:** Shwarma Man, Henry, Unknown\nHit ID: 1743583537029: **Kill Count:** 1\n**Value:** $300.00\n**Assists:** \n**Victims:** NamelessMan\nHit ID: 1743583786920: **Kill Count:** 0.5\n**Value:** $150.00\n**Assists:** \n**Victims:** asdf'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-02T09:33:13.080Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nIndividual Stat Sheet (4.1)\n**Total Kills:** 11\n**Total Value:** $2,699.00\nHit ID: 1743530362742: **Kill Count:** 1\n**Value:** $65.00\n**Assists:** none\n**Victims:** Runner\nHit ID: 1743530392171: **Kill Count:** 4\n**Value:** $1,114.00\n**Assists:** none\n**Victims:** Bill, JimBob, Jenner, Shopan, Unknaon\nHit ID: 1743583907474: **Kill Count:** 1\n**Value:** $195.00\n**Assists:** \n**Victims:** Persnickity\nHit ID: 1743582881422: **Kill Count:** 2\n**Value:** $725.00\n**Assists:** 456669070759034882\n**Victims:** LowVibe, Hammerer\nHit ID: 1743583498873: **Kill Count:** 1.5\n**Value:** $150.00\n**Assists:** 456669070759034882, 169038445187039233\n**Victims:** Shwarma Man, Henry, Unknown\nHit ID: 1743583537029: **Kill Count:** 1\n**Value:** $300.00\n**Assists:** \n**Victims:** NamelessMan\nHit ID: 1743583786920: **Kill Count:** 0.5\n**Value:** $150.00\n**Assists:** \n**Victims:** asdf'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-02T09:33:36.134Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nIndividual Stat Sheet (4.1)\n**Total Kills:** 11\n**Total Value:** $2,699.00\nHit ID: 1743530362742: **Kill Count:** 1\n**Value:** $65.00\n**Assists:** none\n**Victims:** Runner\nHit ID: 1743530392171: **Kill Count:** 4\n**Value:** $1,114.00\n**Assists:** none\n**Victims:** Bill, JimBob, Jenner, Shopan, Unknaon\nHit ID: 1743583907474: **Kill Count:** 1\n**Value:** $195.00\n**Assists:** \n**Victims:** Persnickity\nHit ID: 1743582881422: **Kill Count:** 2\n**Value:** $725.00\n**Assists:** 456669070759034882\n**Victims:** LowVibe, Hammerer\nHit ID: 1743583498873: **Kill Count:** 1.5\n**Value:** $150.00\n**Assists:** 456669070759034882, 169038445187039233\n**Victims:** Shwarma Man, Henry, Unknown\nHit ID: 1743583537029: **Kill Count:** 1\n**Value:** $300.00\n**Assists:** \n**Victims:** NamelessMan\nHit ID: 1743583786920: **Kill Count:** 0.5\n**Value:** $150.00\n**Assists:** \n**Victims:** asdf'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-02T09:36:41.229Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nIndividual Stat Sheet (4.1)\n**Total Kills:** 11\n**Total Value:** $2,699.00\nHit ID: 1743530362742: **Kill Count:** 1\n**Value:** $65.00\n**Assists:** none\n**Victims:** Runner\nHit ID: 1743530392171: **Kill Count:** 4\n**Value:** $1,114.00\n**Assists:** none\n**Victims:** Bill, JimBob, Jenner, Shopan, Unknaon\nHit ID: 1743583907474: **Kill Count:** 1\n**Value:** $195.00\n**Assists:** None\n**Victims:** Persnickity\nHit ID: 1743582881422: **Kill Count:** 2\n**Value:** $725.00\n**Assists:** 456669070759034882\n**Victims:** LowVibe, Hammerer\nHit ID: 1743583498873: **Kill Count:** 1.5\n**Value:** $150.00\n**Assists:** 456669070759034882, 169038445187039233\n**Victims:** Shwarma Man, Henry, Unknown\nHit ID: 1743583537029: **Kill Count:** 1\n**Value:** $300.00\n**Assists:** None\n**Victims:** NamelessMan\nHit ID: 1743583786920: **Kill Count:** 0.5\n**Value:** $150.00\n**Assists:** None\n**Victims:** asdf'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-02T09:38:51.288Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nIndividual Stat Sheet (4.1)\n**Total Kills:** 11\n**Total Value:** $2,699.00\nHit ID: 1743530362742: **Kill Count:** 1\n**Value:** $65.00\n**Assists:** none\n**Victims:** Runner\nHit ID: 1743530392171: **Kill Count:** 4\n**Value:** $1,114.00\n**Assists:** none\n**Victims:** Bill, JimBob, Jenner, Shopan, Unknaon\nHit ID: 1743583907474: **Kill Count:** 1\n**Value:** $195.00\n**Assists:** None\n**Victims:** Persnickity\nHit ID: 1743582881422: **Kill Count:** 2\n**Value:** $725.00\n**Assists:** 456669070759034882\n**Victims:** LowVibe, Hammerer\nHit ID: 1743583498873: **Kill Count:** 1.5\n**Value:** $150.00\n**Assists:** 456669070759034882, 169038445187039233\n**Victims:** Shwarma Man, Henry, Unknown\nHit ID: 1743583537029: **Kill Count:** 1\n**Value:** $300.00\n**Assists:** None\n**Victims:** NamelessMan\nHit ID: 1743583786920: **Kill Count:** 0.5\n**Value:** $150.00\n**Assists:** None\n**Victims:** asdf'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-02T13:41:59.667Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nIndividual Stat Sheet (4.1)\n**Total Kills:** 11\n**Total Damage Cost:** $2,699.00\nHit ID: 1743530362742: **Kill Count:** 1\n**Damages Cost:** $65.00\n**Assists:** none\n**Victims:** Runner]n Patch: 4.1\nHit ID: 1743530392171: **Kill Count:** 4\n**Damages Cost:** $1,114.00\n**Assists:** none\n**Victims:** Bill, JimBob, Jenner, Shopan, Unknaon]n Patch: 4.1\nHit ID: 1743583907474: **Kill Count:** 1\n**Damages Cost:** $195.00\n**Assists:** None\n**Victims:** Persnickity]n Patch: 4.1\nHit ID: 1743582881422: **Kill Count:** 2\n**Damages Cost:** $725.00\n**Assists:** 456669070759034882\n**Victims:** LowVibe, Hammerer]n Patch: 4.1\nHit ID: 1743583498873: **Kill Count:** 1.5\n**Damages Cost:** $150.00\n**Assists:** 456669070759034882, 169038445187039233\n**Victims:** Shwarma Man, Henry, Unknown]n Patch: 4.1\nHit ID: 1743583537029: **Kill Count:** 1\n**Damages Cost:** $300.00\n**Assists:** None\n**Victims:** NamelessMan]n Patch: 4.1\nHit ID: 1743583786920: **Kill Count:** 0.5\n**Damages Cost:** $150.00\n**Assists:** None\n**Victims:** asdf]n Patch: 4.1'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-02T13:48:02.929Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nIndividual Stat Sheet (ALL)\n**Total Kills:** 16\n**Total Damage Cost:** $5,324.00\nHit ID: 1743528866787: **Kill Count:** 2\n**Damages Cost:** $2,000.00\n**Assists:** none\n**Victims:** JimBob, Sammysam\n**Patch:** 4.0\nHit ID: 1743530362742: **Kill Count:** 1\n**Damages Cost:** $65.00\n**Assists:** none\n**Victims:** Runner\n**Patch:** 4.1\nHit ID: 1743530392171: **Kill Count:** 4\n**Damages Cost:** $1,114.00\n**Assists:** none\n**Victims:** Bill, JimBob, Jenner, Shopan, Unknaon\n**Patch:** 4.1\nHit ID: 1743530328144: **Kill Count:** 3\n**Damages Cost:** $625.00\n**Assists:** none\n**Victims:** Rainer, Jenner, Kyle\n**Patch:** 4.0\nHit ID: 1743583907474: **Kill Count:** 1\n**Damages Cost:** $195.00\n**Assists:** None\n**Victims:** Persnickity\n**Patch:** 4.1\nHit ID: 1743582881422: **Kill Count:** 2\n**Damages Cost:** $725.00\n**Assists:** 456669070759034882\n**Victims:** LowVibe, Hammerer\n**Patch:** 4.1\nHit ID: 1743583498873: **Kill Count:** 1.5\n**Damages Cost:** $150.00\n**Assists:** 456669070759034882, 169038445187039233\n**Victims:** Shwarma Man, Henry, Unknown\n**Patch:** 4.1\nHit ID: 1743583537029: **Kill Count:** 1\n**Damages Cost:** $300.00\n**Assists:** None\n**Victims:** NamelessMan\n**Patch:** 4.1\nHit ID: 1743583786920: **Kill Count:** 0.5\n**Damages Cost:** $150.00\n**Assists:** None\n**Victims:** asdf\n**Patch:** 4.1'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-02T13:50:04.641Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nLeaderboard - Top Players by Kill Count (4.1)\n1. DocHound \"DochsHound\": **Kill Count:** 11\n2. TestBob: **Kill Count:** 1.5\n3. cowilco: **Kill Count:** 1.5'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-02T13:57:37.611Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nLeaderboard - Top Players by Kill Count (ALL)\n1. DocHound \"DochsHound\": **Kill Count:** 16\n2. TestBob: **Kill Count:** 1.5\n3. cowilco: **Kill Count:** 1.5'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-02T13:58:34.473Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nIndividual Stat Sheet (ALL)\n**Total Kills:** 3.5\n**Total Damage Cost:** $875.00\nHit ID: 1743582881422: **Kill Count:** 2\n**Damages Cost:** $725.00\n**Assists:** 456669070759034882\n**Victims:** LowVibe, Hammerer\n**Patch:** 4.1\nHit ID: 1743583498873: **Kill Count:** 1.5\n**Damages Cost:** $150.00\n**Assists:** 456669070759034882, 169038445187039233\n**Victims:** Shwarma Man, Henry, Unknown\n**Patch:** 4.1'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-02T16:48:44.027Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nIndividual Stat Sheet (4.1)\n**Total Kills:** 3.5\n**Total Damage Cost:** $875.00\nHit ID: 1743582881422: **Kill Count:** 2\n**Damages Cost:** $725.00\n**Assists:** 456669070759034882\n**Victims:** LowVibe, Hammerer\n**Patch:** 4.1\nHit ID: 1743583498873: **Kill Count:** 1.5\n**Damages Cost:** $150.00\n**Assists:** 456669070759034882, 169038445187039233\n**Victims:** Shwarma Man, Henry, Unknown\n**Patch:** 4.1'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-02T16:50:51.519Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nIndividual Stat Sheet (ALL)\n**Total Kills:** 3.5\n**Total Damage Cost:** $875.00\nHit ID: 1743582881422: **Kill Count:** 2\n**Damages Cost:** $725.00\n**Assists:** 456669070759034882\n**Victims:** LowVibe, Hammerer\n**Patch:** 4.1\nHit ID: 1743583498873: **Kill Count:** 1.5\n**Damages Cost:** $150.00\n**Assists:** 456669070759034882, 169038445187039233\n**Victims:** Shwarma Man, Henry, Unknown\n**Patch:** 4.1'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-02T16:51:04.225Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nLeaderboard - Top Players by Kill Count (4.1)\n1. DocHound \"DochsHound\": **Kill Count:** 11'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-02T16:51:21.283Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "user",
+      "content": "@dochound: 'you can't get blackboxadd to filter for customer player ships'",
+      "metadata": {
+        "channel": "general",
+        "user": "dochound",
+        "date": "2025-04-02T21:07:28.213Z",
+        "string_to_reference_user_in_response": "<@664023164350627843>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nLeaderboard - Top Players by Kill Count (4.1)\n1. DocHound \"DochsHound\": **Kill Count:** 3.5\n2. TestBob: **Kill Count:** 2.5'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-03T14:45:22.182Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nIndividual Stat Sheet (4.1)\n**Total Kills:** 3.5\n**Total Damage Cost:** $652.00\nHit ID: 1743691353876: **Kill Count:** 1.5\n**Damages Cost:** $557.00\n**Assists:** 456669070759034882\n**Victims:** Jimbob\n**Patch:** 4.1\nHit ID: 1743691371890: **Kill Count:** 1\n**Damages Cost:** $23.00\n**Assists:** None\n**Victims:** Limdis\n**Patch:** 4.1\nHit ID: 1743691432992: **Kill Count:** 1\n**Damages Cost:** $72.00\n**Assists:** None\n**Victims:** Hasses\n**Patch:** 4.1'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-03T14:45:48.020Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nIndividual Stat Sheet (4.1)\n**Total Kills:** 3.5\n**Total Damage Cost:** $652.00\nShip: Polaris: **Hit ID:** 1743691353876\n1.5 kill(s)\n$557.00 in damages\n**Assists:** 456669070759034882\n**Victims:** Jimbob\nShip: Aurora ES: **Hit ID:** 1743691371890\n1 kill(s)\n$23.00 in damages\n**Assists:** None\n**Victims:** Limdis\nShip: Avenger Titan Renegade: **Hit ID:** 1743691432992\n1 kill(s)\n$72.00 in damages\n**Assists:** None\n**Victims:** Hasses'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-03T14:57:12.394Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nIndividual Stat Sheet (4.1)\n**Total Kills:** 4.5\n**Total Damage Cost:** $677.00\nShip: Polaris: **Hit ID:** 1743691353876\n                        \n**Assists:** 456669070759034882\n                        \n**Victims:** Jimbob\n                        \n**Kills:** 1.5 \n                        \n$557.00\nShip: Aurora ES: **Hit ID:** 1743691371890\n                        \n**Assists:** None\n                        \n**Victims:** Limdis\n                        \n**Kill:** 1 \n                        \n$23.00\nShip: Avenger Titan Renegade: **Hit ID:** 1743691432992\n                        \n**Assists:** None\n                        \n**Victims:** Hasses\n                        \n**Kill:** 1 \n                        \n$72.00\nShip: P-52 Merlin: **Hit ID:** 1743692582644\n                        \n**Assists:** None\n                        \n**Victims:** Sir Squire\n                        \n**Kill:** 1 \n                        \n$25.00'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-03T15:03:12.429Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nIndividual Stat Sheet (4.1)\n**Total Kills:** 4.5\n**Total Damage Cost:** $677.00\nShip: Polaris: **Hit ID:** 1743691353876\n**Assists:** 456669070759034882\n**Victims:** Jimbob\n**Kills:** 1.5\n$557.00\nShip: Aurora ES: **Hit ID:** 1743691371890\n**Assists:** None\n**Victims:** Limdis\n**Kill:** 1\n$23.00\nShip: Avenger Titan Renegade: **Hit ID:** 1743691432992\n**Assists:** None\n**Victims:** Hasses\n**Kill:** 1\n$72.00\nShip: P-52 Merlin: **Hit ID:** 1743692582644\n**Assists:** None\n**Victims:** Sir Squire\n**Kill:** 1\n$25.00'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-03T15:04:20.962Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nIndividual Stat Sheet (4.1)\n**Total Kills:** 4.5\n**Total Damage Cost:** $677.00\nShip: Polaris: **Hit ID:** 1743691353876\n**Assists:** 456669070759034882\n**Victims:** Jimbob\n**Kills:** 1.5\n$557.00\nShip: Aurora ES: **Hit ID:** 1743691371890\n**Assists:** None\n**Victims:** Limdis\n**Kill:** 1\n$23.00\nShip: Avenger Titan Renegade: **Hit ID:** 1743691432992\n**Assists:** None\n**Victims:** Hasses\n**Kill:** 1\n$72.00\nShip: P-52 Merlin: **Hit ID:** 1743692582644\n**Assists:** None\n**Victims:** Sir Squire\n**Kill:** 1\n$25.00'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-03T15:11:43.540Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nIndividual Stat Sheet (4.1)\n**Total Kills:** 4.5\n**Total Damage Cost:** $677.00\nShip: Polaris: **Hit ID:** 1743691353876\n**Assists:** 456669070759034882\n**Victims:** Jimbob\n**Kills:** 1.5\n$557.00\nShip: Aurora ES: **Hit ID:** 1743691371890\n**Assists:** None\n**Victims:** Limdis\n**Kill:** 1\n$23.00\nShip: Avenger Titan Renegade: **Hit ID:** 1743691432992\n**Assists:** None\n**Victims:** Hasses\n**Kill:** 1\n$72.00\nShip: P-52 Merlin: **Hit ID:** 1743692582644\n**Assists:** None\n**Victims:** Sir Squire\n**Kill:** 1\n$25.00'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-03T15:12:38.304Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nIndividual Stat Sheet (4.1)\n**Total Kills:** 0\n**Total Damage Cost:** 0\nShip: Polaris: **Hit ID:** 1743691353876\n**Assists:** 456669070759034882\n**Victims:** Jimbob\n**Kills:** 1.5\n$557.00\nShip: Aurora ES: **Hit ID:** 1743691371890\n**Assists:** None\n**Victims:** Limdis\n**Kill:** 1\n$23.00\nShip: Avenger Titan Renegade: **Hit ID:** 1743691432992\n**Assists:** None\n**Victims:** Hasses\n**Kill:** 1\n$72.00\nShip: P-52 Merlin: **Hit ID:** 1743692582644\n**Assists:** None\n**Victims:** Sir Squire\n**Kill:** 1\n$25.00'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-03T15:13:52.193Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nIndividual Stat Sheet (4.1)\n**Total Kills:** 0\n**Total Damage Cost:** 0\nShip: Polaris: **Hit ID:** 1743691353876\n**Assists:** 456669070759034882\n**Victims:** Jimbob\n**Kills:** 1.5\n$557.00\nShip: Aurora ES: **Hit ID:** 1743691371890\n**Assists:** None\n**Victims:** Limdis\n**Kill:** 1\n$23.00\nShip: Avenger Titan Renegade: **Hit ID:** 1743691432992\n**Assists:** None\n**Victims:** Hasses\n**Kill:** 1\n$72.00\nShip: P-52 Merlin: **Hit ID:** 1743692582644\n**Assists:** None\n**Victims:** Sir Squire\n**Kill:** 1\n$25.00'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-03T15:16:58.886Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nIndividual Stat Sheet (4.1)\n**Total Kills:** 0\n**Total Damage Cost:** 0\nShip: Polaris: **Hit ID:** 1743691353876\n**Assists:** 456669070759034882\n**Victims:** Jimbob\n**Kills:** 1.5\n$557.00\nShip: Aurora ES: **Hit ID:** 1743691371890\n**Assists:** None\n**Victims:** Limdis\n**Kill:** 1\n$23.00\nShip: Avenger Titan Renegade: **Hit ID:** 1743691432992\n**Assists:** None\n**Victims:** Hasses\n**Kill:** 1\n$72.00\nShip: P-52 Merlin: **Hit ID:** 1743692582644\n**Assists:** None\n**Victims:** Sir Squire\n**Kill:** 1\n$25.00'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-03T15:17:56.421Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nIndividual Stat Sheet (4.1)\n**Total Kills:** 0\n**Total Damage Cost:** 0\nShip: Polaris: **Hit ID:** 1743691353876\n**Assists:** 456669070759034882\n**Victims:** Jimbob\n**Kills:** 1.5\n$557.00\nShip: Aurora ES: **Hit ID:** 1743691371890\n**Assists:** None\n**Victims:** Limdis\n**Kill:** 1\n$23.00\nShip: Avenger Titan Renegade: **Hit ID:** 1743691432992\n**Assists:** None\n**Victims:** Hasses\n**Kill:** 1\n$72.00\nShip: P-52 Merlin: **Hit ID:** 1743692582644\n**Assists:** None\n**Victims:** Sir Squire\n**Kill:** 1\n$25.00'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-03T15:18:56.557Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nIndividual Stat Sheet (4.1)\n**Total Kills:** 0\n**Total Damage Cost:** 0\nShip: Polaris: **Hit ID:** 1743691353876\n**Assists:** 456669070759034882\n**Victims:** Jimbob\n**Kills:** 1.5\n$557.00\nShip: Aurora ES: **Hit ID:** 1743691371890\n**Assists:** None\n**Victims:** Limdis\n**Kill:** 1\n$23.00\nShip: Avenger Titan Renegade: **Hit ID:** 1743691432992\n**Assists:** None\n**Victims:** Hasses\n**Kill:** 1\n$72.00\nShip: P-52 Merlin: **Hit ID:** 1743692582644\n**Assists:** None\n**Victims:** Sir Squire\n**Kill:** 1\n$25.00'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-03T15:20:01.715Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Players by Total Kills (Patch ALL)\n**IronPoint Total Kills:** NaN\n1. mohawkress1629: **Kill Count:** undefined\n2. adamn58: **Kill Count:** undefined\n3. dochound: **Kill Count:** undefined\n4. cowilco: **Kill Count:** undefined\n5. okka: **Kill Count:** undefined\n6. RoboHound: **Kill Count:** undefined'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-05T15:05:39.860Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nIndividual Stat Sheet (4.1)\n**Total Kills:** 0\n**Total Damage Cost:** 0\nShip: Polaris: **Hit ID:** 1743691353876\n**Assists:** 456669070759034882\n**Victims:** Jimbob\n**Kills:** 1.5\n$557.00\nShip: Aurora ES: **Hit ID:** 1743691371890\n**Assists:** None\n**Victims:** Limdis\n**Kill:** 1\n$23.00\nShip: Avenger Titan Renegade: **Hit ID:** 1743691432992\n**Assists:** None\n**Victims:** Hasses\n**Kill:** 1\n$72.00\nShip: P-52 Merlin: **Hit ID:** 1743692582644\n**Assists:** None\n**Victims:** Sir Squire\n**Kill:** 1\n$25.00'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-03T15:20:40.715Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nIndividual Stat Sheet (4.1)\n**Total Kills:** 0\n**Total Damage Cost:** 0\nShip: Polaris: **Hit ID:** 1743691353876\n**Assists:** 456669070759034882\n**Victims:** Jimbob\n**Kills:** 1.5\n$557.00\nShip: Aurora ES: **Hit ID:** 1743691371890\n**Assists:** None\n**Victims:** Limdis\n**Kill:** 1\n$23.00\nShip: Avenger Titan Renegade: **Hit ID:** 1743691432992\n**Assists:** None\n**Victims:** Hasses\n**Kill:** 1\n$72.00\nShip: P-52 Merlin: **Hit ID:** 1743692582644\n**Assists:** None\n**Victims:** Sir Squire\n**Kill:** 1\n$25.00'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-03T15:21:15.258Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nIndividual Stat Sheet (4.1)\n**Total Kills:** 0\n**Total Damage Cost:** 0\nShip: Polaris: **Hit ID:** 1743691353876\n**Assists:** 456669070759034882\n**Victims:** Jimbob\n**Kills:** 1.5\n$557.00\nShip: Aurora ES: **Hit ID:** 1743691371890\n**Assists:** None\n**Victims:** Limdis\n**Kill:** 1\n$23.00\nShip: Avenger Titan Renegade: **Hit ID:** 1743691432992\n**Assists:** None\n**Victims:** Hasses\n**Kill:** 1\n$72.00\nShip: P-52 Merlin: **Hit ID:** 1743692582644\n**Assists:** None\n**Victims:** Sir Squire\n**Kill:** 1\n$25.00'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-03T15:24:22.586Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nIndividual Stat Sheet (4.1)\n**Total Kills:** 0\n**Total Damage Cost:** 0\nShip: Polaris: **Hit ID:** 1743691353876\n**Assists:** 456669070759034882\n**Victims:** Jimbob\n**Kills:** 1.5\n$557.00\nShip: Aurora ES: **Hit ID:** 1743691371890\n**Assists:** None\n**Victims:** Limdis\n**Kill:** 1\n$23.00\nShip: Avenger Titan Renegade: **Hit ID:** 1743691432992\n**Assists:** None\n**Victims:** Hasses\n**Kill:** 1\n$72.00\nShip: P-52 Merlin: **Hit ID:** 1743692582644\n**Assists:** None\n**Victims:** Sir Squire\n**Kill:** 1\n$25.00'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-03T15:24:58.684Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "user",
+      "content": "@dochound: '664023164350627843'",
+      "metadata": {
+        "channel": "general",
+        "user": "dochound",
+        "date": "2025-04-03T15:41:57.505Z",
+        "string_to_reference_user_in_response": "<@664023164350627843>"
+      }
+    },
+    {
+      "role": "user",
+      "content": "@dochound: '664023164350627843'",
+      "metadata": {
+        "channel": "general",
+        "user": "dochound",
+        "date": "2025-04-03T15:42:01.744Z",
+        "string_to_reference_user_in_response": "<@664023164350627843>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nIndividual Stat Sheet (4.1)\n**Total Kills:** 4.75\n**Total Damage Cost:** $677.00\nShip: Polaris: **Hit ID:** 1743691353876\n**Assists:** mohawkress1629\n**Victims:** Jimbob\n**Kills:** 1.5\n$557.00\nShip: Aurora ES: **Hit ID:** 1743691371890\n**Assists:** None\n**Victims:** Limdis\n**Kill:** 1\n$23.00\nShip: Avenger Titan Renegade: **Hit ID:** 1743691432992\n**Assists:** None\n**Victims:** Hasses\n**Kill:** 1\n$72.00\nShip: P-52 Merlin: **Hit ID:** 1743692582644\n**Assists:** None\n**Victims:** Sir Squire\n**Kill:** 1\n$25.00\nShip: Cyclone RN: **Hit ID:** 1743694061190\n**Assists:** mohawkress1629, okka, cowilco\n**Victims:** Unlucky\n**Kills:** 0.25\n$0.00'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-03T15:44:43.968Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nShip Totals (Patch: 4.1)\n**Total Kills:** 4.75\n**Total Damage Cost:** $677.00\nZipper: **Total Kills:** 2.5\n**Damages Done:** $580.00\nHorney: **Total Kills:** 1.25\n**Damages Done:** $72.00\nBow: **Total Kills:** 1\n**Damages Done:** $25.00'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-03T15:53:38.945Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nShip Totals (Patch: 4.1)\n**Total Kills:** 4.75\n**Total Damage Cost:** $677.00\nZipper: **Total Kills:** 2.5\n**Damages Done:** $580.00\nHorney: **Total Kills:** 1.25\n**Damages Done:** $72.00\nBow: **Total Kills:** 1\n**Damages Done:** $25.00'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-03T15:55:34.181Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nLeaderboard - Top Players by Kill Count (4.1)\n1. DocHound \"DochsHound\": **Kill Count:** 4.75\n2. TestBob: **Kill Count:** 2.5'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-03T16:00:24.439Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Players by Total Kills (Patch 4.1)\n**Total Kills:** 7.25\n1. DocHound \"DochsHound\": **Kill Count:** 4.75\n2. TestBob: **Kill Count:** 2.5'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-03T16:03:03.624Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Players by Total Kills (Patch 4.1)\n**IronPoint Total Kills:** 7.25\n1. DocHound \"DochsHound\": **Kill Count:** 4.75\n2. TestBob: **Kill Count:** 2.5'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-03T16:03:45.149Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nShip Totals (Patch: 4.1)\n**Total Kills:** 4.75\n**Total Damage Cost:** $677.00\nZipper: **Total Kills:** 2.5\n**Damages Done:** $580.00\nHorney: **Total Kills:** 1.25\n**Damages Done:** $72.00\nBow: **Total Kills:** 1\n**Damages Done:** $25.00'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-03T16:04:59.800Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Players by Total Kills (Patch ALL)\n**IronPoint Total Kills:** 8.75\n1. DocHound \"DochsHound\": **Kill Count:** 5.25\n2. TestBob: **Kill Count:** 2.5\n3. adamn58: **Kill Count:** 1'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-03T16:50:40.789Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nShip Totals (Patch: ALL)\n**Total Kills:** 1.5\n**Total Damage Cost:** $132.00\nAre you not entertained?: **Total Kills:** 1\n**Damages Done:** $132.00\nHorney: **Total Kills:** 0.5\n**Damages Done:** $0.00'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-03T16:51:42.838Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Players by Total Kills (Patch ALL)\n**IronPoint Total Kills:** NaN\n1. mohawkress1629: **Kill Count:** undefined\n2. adamn58: **Kill Count:** undefined\n3. dochound: **Kill Count:** undefined\n4. cowilco: **Kill Count:** undefined\n5. okka: **Kill Count:** undefined\n6. RoboHound: **Kill Count:** undefined'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-05T15:06:45.013Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Fleet Players by Shared Kills (Patch ALL)\n**IronPoint Total Kills:** 43\n1. dochound: **Kill Count:** undefined\n2. mohawkress1629: **Kill Count:** undefined\n3. okka: **Kill Count:** undefined\n4. cowilco: **Kill Count:** undefined\n5. adamn58: **Kill Count:** undefined\n6. RoboHound: **Kill Count:** undefined\n1. dochound: **Times Commanding:** 4\n2. mohawkress1629: **Times Commanding:** 2\n3. adamn58: **Times Commanding:** 1\n4. cowilco: **Times Commanding:** 1\n5. okka: **Times Commanding:** 1\n6. RoboHound: **Times Commanding:** 0\n1. mohawkress1629: **Times as Crew:** 5\n2. cowilco: **Times as Crew:** 4\n3. okka: **Times as Crew:** 4\n4. dochound: **Times as Crew:** 2\n5. RoboHound: **Times as Crew:** 1\n6. adamn58: **Times as Crew:** 0'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-05T15:51:08.341Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Fleet Players by Shared Kills (Patch ALL)\n**IronPoint Total Kills:** 43\n1. dochound: **Kill Count:** undefined\n2. mohawkress1629: **Kill Count:** undefined\n3. okka: **Kill Count:** undefined\n4. cowilco: **Kill Count:** undefined\n5. adamn58: **Kill Count:** undefined\n6. RoboHound: **Kill Count:** undefined\n1. dochound: **Times Commanding:** 4\n2. mohawkress1629: **Times Commanding:** 2\n3. adamn58: **Times Commanding:** 1\n4. cowilco: **Times Commanding:** 1\n5. okka: **Times Commanding:** 1\n6. RoboHound: **Times Commanding:** 0\n1. mohawkress1629: **Times as Crew:** 5\n2. cowilco: **Times as Crew:** 4\n3. okka: **Times as Crew:** 4\n4. dochound: **Times as Crew:** 2\n5. RoboHound: **Times as Crew:** 1\n6. adamn58: **Times as Crew:** 0'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-05T16:07:24.690Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Fleet Players by Shared Kills (Patch ALL)\n**IronPoint Total Kills:** 43\n1. dochound: **Kill Count:** undefined\n2. mohawkress1629: **Kill Count:** undefined\n3. okka: **Kill Count:** undefined\n4. cowilco: **Kill Count:** undefined\n5. adamn58: **Kill Count:** undefined\n6. RoboHound: **Kill Count:** undefined\n1. dochound: **Times Commanding:** 4\n2. mohawkress1629: **Times Commanding:** 2\n3. adamn58: **Times Commanding:** 1\n4. cowilco: **Times Commanding:** 1\n5. okka: **Times Commanding:** 1\n6. RoboHound: **Times Commanding:** 0\n1. mohawkress1629: **Times as Crew:** 5\n2. cowilco: **Times as Crew:** 4\n3. okka: **Times as Crew:** 4\n4. dochound: **Times as Crew:** 2\n5. RoboHound: **Times as Crew:** 1\n6. adamn58: **Times as Crew:** 0'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-05T16:09:30.989Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Fleet Players by Shared Kills (Patch ALL)\n**IronPoint Total Kills:** 43\n1. dochound: **Kill Count:** undefined\n2. mohawkress1629: **Kill Count:** undefined\n3. okka: **Kill Count:** undefined\n4. cowilco: **Kill Count:** undefined\n5. adamn58: **Kill Count:** undefined\n6. RoboHound: **Kill Count:** undefined\n1. dochound: **Times Commanding:** 4\n2. mohawkress1629: **Times Commanding:** 2\n3. adamn58: **Times Commanding:** 1\n4. cowilco: **Times Commanding:** 1\n5. okka: **Times Commanding:** 1\n6. RoboHound: **Times Commanding:** 0\n1. mohawkress1629: **Times as Crew:** 5\n2. cowilco: **Times as Crew:** 4\n3. okka: **Times as Crew:** 4\n4. dochound: **Times as Crew:** 2\n5. RoboHound: **Times as Crew:** 1\n6. adamn58: **Times as Crew:** 0'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-05T16:10:14.114Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Fleet Players by Shared Kills (Patch ALL)\n**IronPoint Total Kills:** 43\n1. dochound: **Kill Count:** undefined\n2. mohawkress1629: **Kill Count:** undefined\n3. okka: **Kill Count:** undefined\n4. cowilco: **Kill Count:** undefined\n5. adamn58: **Kill Count:** undefined\n6. RoboHound: **Kill Count:** undefined\n1. dochound: **Times Commanding:** 4\n2. mohawkress1629: **Times Commanding:** 2\n3. adamn58: **Times Commanding:** 1\n4. cowilco: **Times Commanding:** 1\n5. okka: **Times Commanding:** 1\n6. RoboHound: **Times Commanding:** 0\n1. mohawkress1629: **Times as Crew:** 5\n2. cowilco: **Times as Crew:** 4\n3. okka: **Times as Crew:** 4\n4. dochound: **Times as Crew:** 2\n5. RoboHound: **Times as Crew:** 1\n6. adamn58: **Times as Crew:** 0'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-05T16:10:44.367Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Fleet Players by Shared Kills (Patch ALL)\n**IronPoint Total Kills:** 43\n1. dochound: **Kill Count:** undefined\n2. mohawkress1629: **Kill Count:** undefined\n3. okka: **Kill Count:** undefined\n4. cowilco: **Kill Count:** undefined\n5. adamn58: **Kill Count:** undefined\n6. RoboHound: **Kill Count:** undefined\n1. dochound: **Times Commanding:** 4\n2. mohawkress1629: **Times Commanding:** 2\n3. adamn58: **Times Commanding:** 1\n4. cowilco: **Times Commanding:** 1\n5. okka: **Times Commanding:** 1\n6. RoboHound: **Times Commanding:** 0\n1. mohawkress1629: **Times as Crew:** 5\n2. cowilco: **Times as Crew:** 4\n3. okka: **Times as Crew:** 4\n4. dochound: **Times as Crew:** 2\n5. RoboHound: **Times as Crew:** 1\n6. adamn58: **Times as Crew:** 0'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-05T16:11:19.791Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Fleet Players by Shared Kills (Patch ALL)\n**IronPoint Total Kills:** 43\n1. dochound: **Kill Count:** undefined\n2. mohawkress1629: **Kill Count:** undefined\n3. okka: **Kill Count:** undefined\n4. cowilco: **Kill Count:** undefined\n5. adamn58: **Kill Count:** undefined\n6. RoboHound: **Kill Count:** undefined'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-05T16:19:49.601Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Discerning Pirates (Patch ALL)\nThe following are the top Pirates by Market Value of items stolen. These are the best at finding the best loot.\n1. cowilco: **Total Value:** 23,238,560 aUEC\n2. mohawkress1629: **Total Value:** 23,222,807 aUEC\n3. dochound: **Total Value:** 23,000,154 aUEC\n4. okka: **Total Value:** 320,813 aUEC\n5. RoboHound: **Total Value:** 62,975 aUEC'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-06T20:15:11.499Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Ships in the Fleet (Patch ALL)\nThe following ships are the most effective in the IronPoint Fleet. They are measured by their Total Damage Done divided by their Total Kills.\n                \n**IronPoint Total Kills:** 10\n                \n**IronPoint Total Damage Cost:** $7,503.00\n1. SuperMegaBobPol: **Ship Type:** Polaris\n                    \n**Kill Count:** 8\n                    \n**Total Damage Done:** $6,389.00\n                    \n**Top Commanders:** 664023164350627843 (2), 825112725759459398 (1), 456669070759034882 (1)\n                    \n**Top Crew:** 169038445187039233 (4), 168441130755555328 (4), 456669070759034882 (3)\n                    \n**Top Org Victims:** ORG1 (1), ORG3 (1), ORG7 (1)\n2. Polly: **Ship Type:** Polaris\n                    \n**Kill Count:** 2\n                    \n**Total Damage Done:** $1,114.00\n                    \n**Top Commanders:** 664023164350627843 (1), 168441130755555328 (1)\n                    \n**Top Crew:** \n                    \n**Top Org Victims:** ORG6 (1), ORG9 (1)'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-05T16:56:08.808Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Ships in the Fleet (Patch ALL)\nThe following ships are the most effective in the IronPoint Fleet. They are measured by their Total Damage Done divided by their Total Kills.\n                __IronPoint Total Kills:__ 10\n                __IronPoint Total Damage Cost:__ $7,503.00\n1. SuperMegaBobPol: **Ship Type:** Polaris\n                    **Kill Count:** 8\n                    **Total Damage Done:** $6,389.00\n                    **Top Commanders:** 664023164350627843 (2), 825112725759459398 (1), 456669070759034882 (1)\n                    **Top Crew:** 169038445187039233 (4), 168441130755555328 (4), 456669070759034882 (3)\n                    **Top Org Victims:** ORG1 (1), ORG3 (1), ORG7 (1)\n2. Polly: **Ship Type:** Polaris\n                    **Kill Count:** 2\n                    **Total Damage Done:** $1,114.00\n                    **Top Commanders:** 664023164350627843 (1), 168441130755555328 (1)\n                    **Top Crew:** \n                    **Top Org Victims:** ORG6 (1), ORG9 (1)'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-05T16:57:44.136Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Ships in the Fleet (Patch ALL)\nThe following ships are the most effective in the IronPoint Fleet. They are measured by their Total Damage Done divided by their Total Kills.\n                __IronPoint Total Kills:__ 10\n                __IronPoint Total Damage Cost:__ $7,503.00\n1. SuperMegaBobPol: **Ship Type:** Polaris\n                    **Kill Count:** 8\n                    **Total Damage Done:** $6,389.00\n                    **Top Commanders:** [object Object] (5)\n                    **Top Crew:** cowilco (4), okka (4), mohawkress1629 (3)\n                    **Top Org Victims:** ORG1 (1), ORG3 (1), ORG7 (1)\n2. Polly: **Ship Type:** Polaris\n                    **Kill Count:** 2\n                    **Total Damage Done:** $1,114.00\n                    **Top Commanders:** [object Object] (2)\n                    **Top Crew:** \n                    **Top Org Victims:** ORG6 (1), ORG9 (1)'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-05T17:01:02.425Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Ships in the Fleet (Patch ALL)\nThe following ships are the most effective in the IronPoint Fleet. They are measured by their Total Damage Done divided by their Total Kills.\n                __IronPoint Total Kills:__ 10\n                __IronPoint Total Damage Cost:__ $7,503.00\n1. SuperMegaBobPol: **Ship Type:** Polaris\n                    **Kill Count:** 8\n                    **Total Damage Done:** $6,389.00\n                    **Top Commanders:** dochound (2), adamn58 (1), mohawkress1629 (1)\n                    **Top Crew:** cowilco (4), okka (4), mohawkress1629 (3)\n                    **Top Org Victims:** ORG1 (1), ORG3 (1), ORG7 (1)\n2. Polly: **Ship Type:** Polaris\n                    **Kill Count:** 2\n                    **Total Damage Done:** $1,114.00\n                    **Top Commanders:** dochound (1), okka (1)\n                    **Top Crew:** \n                    **Top Org Victims:** ORG6 (1), ORG9 (1)'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-05T17:01:42.289Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Ships in the Fleet (Patch ALL)\nThe following ships are the most effective in the IronPoint Fleet. They are measured by their Total Damage Done divided by their Total Kills.\n                __IronPoint Total Damage Cost:__ $7,503.00\n                __IronPoint Total Kills:__ 10\n1. SuperMegaBobPol: **Ship Type:** Polaris\n                    **Kill Count:** 8\n                    **Total Damage Done:** $6,389.00\n                    **Top Commanders:** dochound (2), adamn58 (1), mohawkress1629 (1)\n                    **Top Crew:** cowilco (4), okka (4), mohawkress1629 (3)\n                    **Top Org Victims:** ORG1 (1), ORG3 (1), ORG7 (1)\n2. Polly: **Ship Type:** Polaris\n                    **Kill Count:** 2\n                    **Total Damage Done:** $1,114.00\n                    **Top Commanders:** dochound (1), okka (1)\n                    **Top Crew:** \n                    **Top Org Victims:** ORG6 (1), ORG9 (1)'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-05T18:15:38.578Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Ships in the Fleet (Patch ALL)\nThe following ships are the most effective in the IronPoint Fleet. They are measured by their Total Damage Done divided by their Total Kills.\n                __IronPoint Total Damage Cost:__ $7,503.00\n                __IronPoint Total Kills:__ 10\n1. SuperMegaBobPol: **Ship Type:** Polaris\n                    **Kill Count:** 8\n                    **Total Damage Done:** $6,389.00\n                    **Top Commanders:** dochound (2), adamn58 (1), mohawkress1629 (1)\n                    **Top Crew:** cowilco (4), okka (4), mohawkress1629 (3)\n                    **Top Org Victims:** ORG1 (1), ORG3 (1), ORG7 (1)\n2. Polly: **Ship Type:** Polaris\n                    **Kill Count:** 2\n                    **Total Damage Done:** $1,114.00\n                    **Top Commanders:** dochound (1), okka (1)\n                    **Top Crew:** \n                    **Top Org Victims:** ORG6 (1), ORG9 (1)'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-05T18:16:03.281Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Discerning Pirates (Patch ALL)\nThe following are the top Pirates by Market Value of items stolen. These are the best at finding the best loot.\n1. cowilco: **Total Value:** 23,238,560 aUEC\n2. mohawkress1629: **Total Value:** 23,222,807 aUEC\n3. dochound: **Total Value:** 23,000,154 aUEC\n4. okka: **Total Value:** 320,813 aUEC\n5. RoboHound: **Total Value:** 62,975 aUEC'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-06T20:15:48.898Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Ships in the Fleet (Patch ALL)\nThe following ships are the most effective in the IronPoint Fleet. They are measured by their Total Damage Done divided by their Total Kills.\n                __IronPoint Total Damage Cost:__ $7,503.00\n                __IronPoint Total Kills:__ 10\n1. SuperMegaBobPol: **Ship Type:** Polaris\n                    **Kill Count:** 8\n                    **Total Damage Done:** $6,389.00\n                    **Top Commanders:** dochound (2), adamn58 (1), mohawkress1629 (1)\n                    **Top Crew:** cowilco (4), okka (4), mohawkress1629 (3)\n                    **Top Org Victims:** ORG1 (1), ORG3 (1), ORG7 (1)\n2. Polly: **Ship Type:** Polaris\n                    **Kill Count:** 2\n                    **Total Damage Done:** $1,114.00\n                    **Top Commanders:** dochound (1), okka (1)\n                    **Top Crew:** \n                    **Top Org Victims:** ORG6 (1), ORG9 (1)'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-05T18:20:51.263Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Ships in the Fleet (Patch ALL)\nThe following ships are the most effective in the IronPoint Fleet. They are measured by their Total Damage Done divided by their Total Kills.\n                __IronPoint Total Damage Cost:__ $7,503.00\n                __IronPoint Total Kills:__ 10\n1. SuperMegaBobPol: **Ship Type:** Polaris\n                    **Kill Count:** 8\n                    **Total Damage Done:** $6,389.00\n                    **Top Commanders:** dochound (2), adamn58 (1), mohawkress1629 (1)\n                    **Top Crew:** cowilco (4), okka (4), mohawkress1629 (3)\n                    **Top Org Victims:** ORG1 (1), ORG3 (1), ORG7 (1)\n2. Polly: **Ship Type:** Polaris\n                    **Kill Count:** 2\n                    **Total Damage Done:** $1,114.00\n                    **Top Commanders:** dochound (1), okka (1)\n                    **Top Crew:** \n                    **Top Org Victims:** ORG6 (1), ORG9 (1)'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-05T18:21:43.817Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Ships in the Fleet (Patch ALL)\nThe following ships are the most effective in the IronPoint Fleet. They are measured by their Total Damage Done divided by their Total Kills.\n                __IronPoint Total Damage Cost:__ $7,503.00\n                __IronPoint Total Kills:__ 10\n1. SuperMegaBobPol: **Ship Type:** Polaris\n                    **Kill Count:** 8\n                    **Total Damage Done:** $6,389.00\n                    **Top Commanders:** dochound (2), adamn58 (1), mohawkress1629 (1)\n                    **Top Crew:** cowilco (4), okka (4), mohawkress1629 (3)\n                    **Top Org Victims:** ORG1 (1), ORG3 (1), ORG7 (1)\n2. Polly: **Ship Type:** Polaris\n                    **Kill Count:** 2\n                    **Total Damage Done:** $1,114.00\n                    **Top Commanders:** dochound (1), okka (1)\n                    **Top Crew:** \n                    **Top Org Victims:** ORG6 (1), ORG9 (1)'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-05T18:22:29.153Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Ships in the Fleet (Patch ALL)\nThe following ships are the most effective in the IronPoint Fleet. They are measured by their Total Damage Done divided by their Total Kills.\n                __IronPoint Total Damage Cost:__ $7,503.00\n                __IronPoint Total Kills:__ 10\n1. SuperMegaBobPol: **Ship Type:** Polaris\n                    **Kill Count:** 8\n                    **Total Damage Done:** $6,389.00\n                    **Top Commanders:** dochound (2), adamn58 (1), mohawkress1629 (1)\n                    **Top Crew:** cowilco (4), okka (4), mohawkress1629 (3)\n                    **Top Org Victims:** ORG1 (1), ORG3 (1), ORG7 (1)\n2. Polly: **Ship Type:** Polaris\n                    **Kill Count:** 2\n                    **Total Damage Done:** $1,114.00\n                    **Top Commanders:** dochound (1), okka (1)\n                    **Top Crew:** \n                    **Top Org Victims:** ORG6 (1), ORG9 (1)'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-05T18:47:50.902Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Ships in the Fleet (Patch ALL)\nThe following ships are the most effective in the IronPoint Fleet. They are measured by their Total Damage Done divided by their Total Kills.\n                __IronPoint Total Damage Cost:__ $10,173.00\n                __IronPoint Total Kills:__ 16\n1. SuperMegaBobPol: **Ship Type:** Polaris\n                    **Kill Count:** 8\n                    **Total Damage Done:** $6,389.00\n                    **Top Commanders:** dochound (2), adamn58 (1), mohawkress1629 (1)\n                    **Top Crew:** cowilco (4), okka (4), mohawkress1629 (3)\n                    **Top Org Victims:** ORG1 (1), ORG3 (1), ORG7 (1)\n2. Polly: **Ship Type:** Polaris\n                    **Kill Count:** 8\n                    **Total Damage Done:** $3,784.00\n                    **Top Commanders:** dochound (2), okka (1), cowilco (1)\n                    **Top Crew:** mohawkress1629 (2), okka (2), RoboHound (1)\n                    **Top Org Victims:** ORG1 (2), ORG6 (1), ORG9 (1)'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-05T18:50:30.114Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Ships in the Fleet (Patch ALL)\nThe following ships are the most effective in the IronPoint Fleet. They are measured by their Total Damage Done divided by their Total Kills.\n                __IronPoint Total Damage Cost:__ $10,173.00\n                __IronPoint Total Kills:__ 16\n1. SuperMegaBobPol: **Ship Type:** Polaris\n                    **Kill Count:** 8\n                    **Total Damage Done:** $6,389.00\n                    **Top Commanders:** dochound (2), adamn58 (1), mohawkress1629 (1)\n                    **Top Crew:** cowilco (4), okka (4), mohawkress1629 (3)\n                    **Top Org Victims:** ORG1 (1), ORG3 (1), ORG7 (1)\n2. Polly: **Ship Type:** Polaris\n                    **Kill Count:** 8\n                    **Total Damage Done:** $3,784.00\n                    **Top Commanders:** dochound (2), okka (1), cowilco (1)\n                    **Top Crew:** mohawkress1629 (2), okka (2), RoboHound (1)\n                    **Top Org Victims:** ORG1 (2), ORG6 (1), ORG9 (1)'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-05T18:53:07.311Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Discerning Pirates (Patch ALL)\nThe following are the top Pirates by Market Value of items stolen. These are the best at finding the best loot.\n1. cowilco: **Total Value:** 23,238,560 aUEC\n2. mohawkress1629: **Total Value:** 23,222,807 aUEC\n3. dochound: **Total Value:** 23,000,154 aUEC\n4. okka: **Total Value:** 320,813 aUEC\n5. RoboHound: **Total Value:** 62,975 aUEC'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-06T20:16:30.200Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Ships in the Fleet (Patch ALL)\nThe following ships are the most effective in the IronPoint Fleet. They are measured by their Total Damage Done divided by their Total Kills.\n                __IronPoint Total Damage Cost:__ $10,173.00\n                __IronPoint Total Kills:__ 16\n1. SuperMegaBobPol: **Ship Type:** Polaris\n                    **Kill Count:** 8\n                    **Total Damage Done:** $6,389.00\n                    **Top Commanders:** dochound (2), adamn58 (1), mohawkress1629 (1)\n                    **Top Crew:** cowilco (4), okka (4), mohawkress1629 (3)\n                    **Top Org Victims:** ORG1 (1), ORG3 (1), ORG7 (1)\n2. Polly: **Ship Type:** Polaris\n                    **Kill Count:** 8\n                    **Total Damage Done:** $3,784.00\n                    **Top Commanders:** dochound (2), okka (1), cowilco (1)\n                    **Top Crew:** mohawkress1629 (2), okka (2), RoboHound (1)\n                    **Top Org Victims:** ORG1 (2), ORG6 (1), ORG9 (1)'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-05T18:54:39.753Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Hit Log Created! \nTotal Value: 5900aUEC \nTotal Split Value: 2950aUEC \nTotal SCU: 20\n            **THE SPLIT VALUE DOESN'T EQUATE TO TOTAL INCOME**, just the worth of the items on the market. Split profits or cargo responsibly with your team.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-06T12:09:54.360Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Hit Log Created by mohawkress1629! \nTotal Value: 7557aUEC \nTotal Split Value: 7557aUEC \nTotal SCU: 3 \nPlayers:  \n**THE SPLIT VALUE DOESN'T EQUATE TO TOTAL INCOME**, just the worth of the items on the market. Split profits or cargo responsibly with your team.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-06T12:14:08.523Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Hit Log Created by mohawkress1629! \nTotal Value: 68625000aUEC \nTotal Split Value: 22875000aUEC \nTotal SCU: 300 \nPlayers: cowilco,DocHound \"DochsHound\" \n**THE SPLIT VALUE DOESN'T EQUATE TO TOTAL INCOME**, just the worth of the items on the market. Split profits or cargo responsibly with your team.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-06T12:14:31.651Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Hit Log Created by dochound! \nTotal Value: 29500aUEC \nTotal Split Value: 14750aUEC \nTotal SCU: 100 \nPlayers: cowilco \n**THE SPLIT VALUE DOESN'T EQUATE TO TOTAL INCOME**, just the worth of the items on the market. Split profits or cargo responsibly with your team.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-06T12:18:37.386Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Hit Log Created by dochound! \nTotal Value: 251900aUEC \nTotal Split Value: 62975aUEC \nTotal SCU: 100 \nPlayers: cowilco, Beowulf, Okka \"Mendicant Bias\" \n**THE SPLIT VALUE DOESN'T EQUATE TO TOTAL INCOME**, just the worth of the items on the market. Split profits or cargo responsibly with your team.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-06T12:18:54.029Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Pirates with Discerning Eyes (Patch ALL)\nThe following are the top Pirates by Market Value of items stolen. These are the best at finding the best loot.\n1. cowilco: **Total Value of Stolen Items:** 23238560.416666668\n2. mohawkress1629: **Total Value of Stolen Items:** 23222806.916666668\n3. dochound: **Total Value of Stolen Items:** 23000153.75\n4. okka: **Total Value of Stolen Items:** 320812.9166666666\n5. RoboHound: **Total Value of Stolen Items:** 62975'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-06T19:43:55.190Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Discerning Pirates (Patch ALL)\nThe following are the top Pirates by Market Value of items stolen. These are the best at finding the best loot.\n1. cowilco: **Total Value:** 23,238,560\n2. mohawkress1629: **Total Value:** 23,222,807\n3. dochound: **Total Value:** 23,000,154\n4. okka: **Total Value:** 320,813\n5. RoboHound: **Total Value:** 62,975'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-06T19:51:44.982Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Discerning Pirates (Patch ALL)\nThe following are the top Pirates by Market Value of items stolen. These are the best at finding the best loot.\n1. cowilco: **Total Value:** 23,238,560aUEC\n2. mohawkress1629: **Total Value:** 23,222,807aUEC\n3. dochound: **Total Value:** 23,000,154aUEC\n4. okka: **Total Value:** 320,813aUEC\n5. RoboHound: **Total Value:** 62,975aUEC'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-06T19:52:37.939Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Discerning Pirates (Patch 4.1)\nThe following are the top Pirates by Market Value of items stolen. These are the best at finding the best loot.\n1. cowilco: **Total Value:** 23,238,560 aUEC\n2. mohawkress1629: **Total Value:** 23,222,807 aUEC\n3. dochound: **Total Value:** 23,000,154 aUEC\n4. okka: **Total Value:** 320,813 aUEC\n5. RoboHound: **Total Value:** 62,975 aUEC'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-06T19:58:21.459Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Discerning Pirates (Patch ALL)\nThe following are the top Pirates by Market Value of items stolen. These are the best at finding the best loot.\n1. cowilco: **Total Value:** 23,238,560 aUEC\n2. mohawkress1629: **Total Value:** 23,222,807 aUEC\n3. dochound: **Total Value:** 23,000,154 aUEC\n4. okka: **Total Value:** 320,813 aUEC\n5. RoboHound: **Total Value:** 62,975 aUEC'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-06T20:14:29.670Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Discerning Pirates (Patch ALL)\nThe following are the top Pirates by Market Value of items stolen. These are the best at finding the best loot.\n1. cowilco: **Total Value:** 23,238,560 aUEC\n2. mohawkress1629: **Total Value:** 23,222,807 aUEC\n3. dochound: **Total Value:** 23,000,154 aUEC\n4. okka: **Total Value:** 320,813 aUEC\n5. RoboHound: **Total Value:** 62,975 aUEC'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-06T20:14:49.960Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Discerning Pirates (Patch ALL)\nThe following are the top Pirates by Market Value of items stolen. These are the best at finding the best loot.\n1. cowilco: **Total Value:** 23,238,560 aUEC\n2. mohawkress1629: **Total Value:** 23,222,807 aUEC\n3. dochound: **Total Value:** 23,000,154 aUEC\n4. okka: **Total Value:** 320,813 aUEC\n5. RoboHound: **Total Value:** 62,975 aUEC'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-06T20:22:17.334Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Fluorine) added by dochound! \nAmount: 20 scu/per \nAverage Market Price per Item: 295aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-07T09:15:16.805Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Fluorine) added by dochound! \nAmount: 5 scu/units \nAverage Market Price per Unit: 295aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-07T09:34:21.011Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Fluorine) added by dochound! \nAmount: 5 scu/units \nAverage Market Price per Unit: 295aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-07T09:35:22.156Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Fluorine) added by dochound! \nAmount: 5 scu/units \nAverage Market Price per Unit: 295aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-07T09:36:17.521Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Fluorine) added by dochound! \nAmount: 5 scu/units \nAverage Market Price per Unit: 295aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-07T09:38:04.610Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Fluorine) updated by dochound! \nAmount: NaN scu/units \nAverage Market Price per Unit: 295aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-07T09:39:37.058Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "user",
+      "content": "@okka: 'egg'",
+      "metadata": {
+        "channel": "general",
+        "user": "okka",
+        "date": "2025-04-07T14:21:55.799Z",
+        "string_to_reference_user_in_response": "<@168441130755555328>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Ships in the Fleet (Patch ALL)\nThe following ships are the most effective in the IronPoint Fleet. They are measured by their Total Damage Done divided by their Total Kills.\n                __IronPoint Total Damage Cost:__ $10,173.00\n                __IronPoint Total Kills:__ 16\n1. SuperMegaBobPol: **Ship Type:** Polaris\n                    **Kill Count:** 8\n                    **Total Damage Done:** $6,389.00\n                    **Top Commanders:** dochound (2), adamn58 (1), mohawkress1629 (1)\n                    **Top Crew:** cowilco (4), okka (4), mohawkress1629 (3)\n                    **Top Org Victims:** ORG1 (1), ORG3 (1), ORG7 (1)\n2. Polly: **Ship Type:** Polaris\n                    **Kill Count:** 8\n                    **Total Damage Done:** $3,784.00\n                    **Top Commanders:** dochound (2), okka (1), cowilco (1)\n                    **Top Crew:** mohawkress1629 (2), okka (2), RoboHound (1)\n                    **Top Org Victims:** ORG1 (2), ORG6 (1), ORG9 (1)'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-07T14:22:41.120Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'PlayerShip log added by okka successfully!'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-07T14:23:03.264Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'PlayerShip log added by spectre_pc successfully!'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-07T14:23:13.914Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'PlayerShip log added by mercuriuss successfully!'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-07T14:23:37.387Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'PlayerShip log added by leo_getz successfully!'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-07T14:24:05.700Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Ship Log (1744035887924) added by okka successfully!'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-07T14:24:48.214Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Ships in the Fleet (Patch ALL)\nThe following ships are the most effective in the IronPoint Fleet. They are measured by their Total Damage Done divided by their Total Kills.\n                __IronPoint Total Damage Cost:__ $15,695.00\n                __IronPoint Total Kills:__ 23\n1. SuperMegaBobPol: **Ship Type:** Polaris\n                    **Kill Count:** 8\n                    **Total Damage Done:** $6,389.00\n                    **Top Commanders:** dochound (2), adamn58 (1), mohawkress1629 (1)\n                    **Top Crew:** cowilco (4), okka (4), mohawkress1629 (3)\n                    **Top Org Victims:** ORG1 (1), ORG3 (1), ORG7 (1)\n2. Right In the Perseus: **Ship Type:** Perseus\n                    **Kill Count:** 7\n                    **Total Damage Done:** $5,522.00\n                    **Top Commanders:** okka (1)\n                    **Top Crew:** dochound (1), RoboHound (1), mercuriuss (1)\n                    **Top Org Victims:** Gribbleswhwabbies (1)\n3. Polly: **Ship Type:** Polaris\n                    **Kill Count:** 8\n                    **Total Damage Done:** $3,784.00\n                    **Top Commanders:** dochound (2), okka (1), cowilco (1)\n                    **Top Crew:** mohawkress1629 (2), okka (2), RoboHound (1)\n                    **Top Org Victims:** ORG1 (2), ORG6 (1), ORG9 (1)'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-07T14:25:08.576Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Ships in the Fleet (Patch ALL)\nThe following ships are the most effective in the IronPoint Fleet. They are measured by their Total Damage Done divided by their Total Kills.\n                __IronPoint Total Damage Cost:__ $15,695.00\n                __IronPoint Total Kills:__ 23\n1. SuperMegaBobPol: **Ship Type:** Polaris\n                    **Kill Count:** 8\n                    **Total Damage Done:** $6,389.00\n                    **Top Commanders:** dochound (2), adamn58 (1), mohawkress1629 (1)\n                    **Top Crew:** cowilco (4), okka (4), mohawkress1629 (3)\n                    **Top Org Victims:** ORG1 (1), ORG3 (1), ORG7 (1)\n2. Right In the Perseus: **Ship Type:** Perseus\n                    **Kill Count:** 7\n                    **Total Damage Done:** $5,522.00\n                    **Top Commanders:** okka (1)\n                    **Top Crew:** dochound (1), RoboHound (1), mercuriuss (1)\n                    **Top Org Victims:** Gribbleswhwabbies (1)\n3. Polly: **Ship Type:** Polaris\n                    **Kill Count:** 8\n                    **Total Damage Done:** $3,784.00\n                    **Top Commanders:** dochound (2), okka (1), cowilco (1)\n                    **Top Crew:** mohawkress1629 (2), okka (2), RoboHound (1)\n                    **Top Org Victims:** ORG1 (2), ORG6 (1), ORG9 (1)'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-07T14:26:01.204Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'PlayerShip log added by leo_getz successfully!'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-07T14:30:22.601Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Ship Log (1744036226451) added by spectre_pc successfully!'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-07T14:30:26.733Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nTop Ships in the Fleet (Patch ALL)\nThe following ships are the most effective in the IronPoint Fleet. They are measured by their Total Damage Done divided by their Total Kills.\n                __IronPoint Total Damage Cost:__ $16,780.00\n                __IronPoint Total Kills:__ 26\n1. SuperMegaBobPol: **Ship Type:** Polaris\n                    **Kill Count:** 8\n                    **Total Damage Done:** $6,389.00\n                    **Top Commanders:** dochound (2), adamn58 (1), mohawkress1629 (1)\n                    **Top Crew:** cowilco (4), okka (4), mohawkress1629 (3)\n                    **Top Org Victims:** ORG1 (1), ORG3 (1), ORG7 (1)\n2. Right In the Perseus: **Ship Type:** Perseus\n                    **Kill Count:** 8\n                    **Total Damage Done:** $6,247.00\n                    **Top Commanders:** okka (1), spectre_pc (1)\n                    **Top Crew:** dochound (1), RoboHound (1), mercuriuss (1)\n                    **Top Org Victims:** Gribbleswhwabbies (1), unknown (1)\n3. Polly: **Ship Type:** Polaris\n                    **Kill Count:** 8\n                    **Total Damage Done:** $3,784.00\n                    **Top Commanders:** dochound (2), okka (1), cowilco (1)\n                    **Top Crew:** mohawkress1629 (2), okka (2), RoboHound (1)\n                    **Top Org Victims:** ORG1 (2), ORG6 (1), ORG9 (1)\n4. The Purple Pirate: **Ship Type:** Polaris\n                    **Kill Count:** 2\n                    **Total Damage Done:** $360.00\n                    **Top Commanders:** mercuriuss (2)\n                    **Top Crew:** dochound (1), RoboHound (1)\n                    **Top Org Victims:** AVS (1), unknown (1)'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-07T14:31:08.778Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Ship Log (1744036311042) added by leo_getz successfully!'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-07T14:31:51.493Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Medical Supplies) added by mohawkress1629! \nAmount: 450 scu/units \nAverage Market Price per Unit: 2519aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-07T20:25:29.381Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Quantainium) added by mohawkress1629! \nAmount: 1200 scu/units \nAverage Market Price per Unit: 25504aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-07T20:25:49.726Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nAll Commodities\nFluorine: **Total SCU:** 19\nMedical Supplies: **Total SCU:** 450\nQuantainium: **Total SCU:** 1200\nSouvenirs: **Total SCU:** 3'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-07T20:58:21.409Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nAll Commodities\nFluorine: 19scu/units\nMedical Supplies: 450scu/units\nQuantainium: 1200scu/units\nSouvenirs: 3scu/units'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-07T21:00:30.578Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nAll Commodities\nFluorine: 19scu/units\nMedical Supplies: 450scu/units\nQuantainium: 1200scu/units\nSouvenirs: 3scu/units'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-07T21:00:54.161Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nAll Commodities\nFluorine: **Total SCU:** 19\nMedical Supplies: **Total SCU:** 450\nQuantainium: **Total SCU:** 1200\nSouvenirs: **Total SCU:** 3'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-07T21:01:15.141Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nAll Commodities\nFluorine: 19scu/units\nMedical Supplies: 450scu/units\nQuantainium: 1200scu/units\nSouvenirs: 3scu/units'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T03:32:50.758Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nCommodity Stats: Fluorine\nFluorine: **Users:** dochound\n19scu/units'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T04:03:14.330Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nCommodity Stats: Medical Supplies\nMedical Supplies: **Users:** mohawkress1629\n450scu/units'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T04:03:44.175Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nCommodity Stats: Quantainium\nQuantainium: **Users:** mohawkress1629\n1200scu/units'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T04:03:53.337Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nCommodity Stats: Souvenirs\nSouvenirs: **Users:** dochound\n3scu/units'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T04:04:00.500Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Fluorine) added by mohawkress1629! \nAmount: 200 scu/units \nAverage Market Price per Unit: 295aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T04:04:11.701Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nCommodity Stats: Fluorine\nFluorine: **Users:** dochound\n19scu/units'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T04:04:26.337Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nCommodity Stats: Fluorine\nFluorine: **Users:** dochound, mohawkress1629\n219scu/units'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T04:07:11.026Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nAll Commodities\nFluorine: 219scu/units\nMedical Supplies: 450scu/units\nQuantainium: 1200scu/units\nSouvenirs: 3scu/units'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T04:08:33.914Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nAll Commodities\nFluorine: **219** scu/units\ndochound, mohawkress1629\nMedical Supplies: **450** scu/units\nmohawkress1629\nQuantainium: **1200** scu/units\nmohawkress1629\nSouvenirs: **3** scu/units\ndochound'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T04:13:08.725Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nPlayer Stats: mohawkress1629\nmohawkress1629: **Medical Supplies:** 450scu/units\n**Quantainium:** 1200scu/units\n**Fluorine:** 200scu/units'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T04:16:21.879Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nAll Commodities\nFluorine: **219** scu/units\ndochound, mohawkress1629\nMedical Supplies: **450** scu/units\nmohawkress1629\nQuantainium: **1200** scu/units\nmohawkress1629\nSouvenirs: **3** scu/units\ndochound'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:13:02.503Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nPlayer Stats: dochound\ndochound: **Fluorine:** 19scu/units\n**Souvenirs:** 3scu/units'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:13:30.076Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nAll Commodities\nFluorine: **219** scu/units\ndochound, mohawkress1629\nMedical Supplies: **450** scu/units\nmohawkress1629\nQuantainium: **1200** scu/units\nmohawkress1629\nSouvenirs: **3** scu/units\ndochound'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:16:37.295Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Omnapoxy) added by dochound! \nAmount: 1 scu/units \nAverage Market Price per Unit: 2309aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:16:51.616Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Pitambu) added by dochound! \nAmount: 2 scu/units \nAverage Market Price per Unit: 22601aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:16:58.210Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Aphorite) added by dochound! \nAmount: 3 scu/units \nAverage Market Price per Unit: 228750aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:17:05.312Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Atlasium) added by dochound! \nAmount: 4 scu/units \nAverage Market Price per Unit: 64894aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:17:12.480Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Heart of the Woods) added by dochound! \nAmount: 5 scu/units \nAverage Market Price per Unit: 1751aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:17:18.382Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Compboard) added by dochound! \nAmount: 6 scu/units \nAverage Market Price per Unit: 16694aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:17:27.912Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Silicon) added by dochound! \nAmount: 7 scu/units \nAverage Market Price per Unit: 169aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:17:34.800Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Pressurized Ice) added by dochound! \nAmount: 8 scu/units \nAverage Market Price per Unit: 728aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:17:41.720Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Construction Materials) added by dochound! \nAmount: 9 scu/units \nAverage Market Price per Unit: 1840aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:17:48.648Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Gasping Weevil Eggs) added by dochound! \nAmount: 9 scu/units \nAverage Market Price per Unit: 17927aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:17:55.475Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Revenant Pod) added by dochound! \nAmount: 10 scu/units \nAverage Market Price per Unit: 1506aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:18:06.190Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Dolivine) added by dochound! \nAmount: 9 scu/units \nAverage Market Price per Unit: 119000aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:18:17.025Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Human Food Bars) added by dochound! \nAmount: 10 scu/units \nAverage Market Price per Unit: 480aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:18:25.335Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Scrap) added by dochound! \nAmount: 11 scu/units \nAverage Market Price per Unit: 1426aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:18:31.378Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Corundum) added by dochound! \nAmount: 12 scu/units \nAverage Market Price per Unit: 349aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:18:41.295Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Thermalfoam) added by dochound! \nAmount: 13 scu/units \nAverage Market Price per Unit: 2842aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:18:47.904Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Thermalfoam) updated by dochound! \nAmount: 27 scu/units \nAverage Market Price per Unit: 2842aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:18:54.394Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Detatrine) added by dochound! \nAmount: 15 scu/units \nAverage Market Price per Unit: 3599aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:19:00.724Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Detatrine) updated by dochound! \nAmount: 31 scu/units \nAverage Market Price per Unit: 3599aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:19:05.777Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Mercury) added by dochound! \nAmount: 17 scu/units \nAverage Market Price per Unit: 135aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:19:14.348Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Audio Visual Equipment) added by dochound! \nAmount: 18 scu/units \nAverage Market Price per Unit: 17791aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:19:19.069Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nAll Commodities\nFluorine: **219** scu/units\ndochound, mohawkress1629\nMedical Supplies: **450** scu/units\nmohawkress1629\nQuantainium: **1200** scu/units\nmohawkress1629\nSouvenirs: **3** scu/units\ndochound\nOmnapoxy: **1** scu/units\ndochound\nPitambu: **2** scu/units\ndochound\nAphorite: **3** scu/units\ndochound\nAtlasium: **4** scu/units\ndochound\nHeart of the Woods: **5** scu/units\ndochound\nCompboard: **6** scu/units\ndochound\nSilicon: **7** scu/units\ndochound\nPressurized Ice: **8** scu/units\ndochound\nConstruction Materials: **9** scu/units\ndochound\nGasping Weevil Eggs: **9** scu/units\ndochound\nRevenant Pod: **10** scu/units\ndochound\nDolivine: **9** scu/units\ndochound\nHuman Food Bars: **10** scu/units\ndochound\nScrap: **11** scu/units\ndochound\nCorundum: **12** scu/units\ndochound\nThermalfoam: **27** scu/units\ndochound\nDetatrine: **31** scu/units\ndochound\nMercury: **17** scu/units\ndochound\nAudio Visual Equipment: **18** scu/units\ndochound'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:19:22.182Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Omnapoxy) updated by dochound! \nAmount: 5 scu/units \nAverage Market Price per Unit: 2309aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:19:41.704Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Omnisky III Cannon) added by dochound! \nAmount: 15 scu/units \nAverage Market Price per Unit: 14845aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:19:54.822Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Omnisky IX Cannon) added by dochound! \nAmount: 16 scu/units \nAverage Market Price per Unit: 75145aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:20:02.815Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Omnisky XII Cannon) added by dochound! \nAmount: 16 scu/units \nAverage Market Price per Unit: 169080aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:20:11.817Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Omnisky XVIII Cannon) added by dochound! \nAmount: 17 scu/units \nAverage Market Price per Unit: 855965aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:20:24.658Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Omnisky XV Cannon) added by dochound! \nAmount: 18 scu/units \nAverage Market Price per Unit: 380430aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:20:35.620Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Omnisky VI Cannon) added by dochound! \nAmount: 18 scu/units \nAverage Market Price per Unit: 33400aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:20:45.913Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Omnitrek Jacket Permafrost) added by dochound! \nAmount: 19 scu/units \nAverage Market Price per Unit: 6912aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:21:01.426Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Omnitrek Jacket Frost Point) added by dochound! \nAmount: 19 scu/units \nAverage Market Price per Unit: 6912aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:21:13.632Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Omnitrek Jacket Backwoods) added by dochound! \nAmount: 20 scu/units \nAverage Market Price per Unit: 6912aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:21:25.118Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nAll Commodities\nFluorine: **219** scu/units\ndochound, mohawkress1629\nMedical Supplies: **450** scu/units\nmohawkress1629\nQuantainium: **1200** scu/units\nmohawkress1629\nSouvenirs: **3** scu/units\ndochound\nPitambu: **2** scu/units\ndochound\nAphorite: **3** scu/units\ndochound\nAtlasium: **4** scu/units\ndochound\nHeart of the Woods: **5** scu/units\ndochound\nCompboard: **6** scu/units\ndochound\nSilicon: **7** scu/units\ndochound\nPressurized Ice: **8** scu/units\ndochound\nConstruction Materials: **9** scu/units\ndochound\nGasping Weevil Eggs: **9** scu/units\ndochound\nRevenant Pod: **10** scu/units\ndochound\nDolivine: **9** scu/units\ndochound\nHuman Food Bars: **10** scu/units\ndochound\nScrap: **11** scu/units\ndochound\nCorundum: **12** scu/units\ndochound\nThermalfoam: **27** scu/units\ndochound\nDetatrine: **31** scu/units\ndochound\nMercury: **17** scu/units\ndochound\nAudio Visual Equipment: **18** scu/units\ndochound\nOmnapoxy: **5** scu/units\ndochound\nOmnisky III Cannon: **15** scu/units\ndochound\nOmnisky IX Cannon: **16** scu/units\ndochound'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:21:28.045Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nPlayer Stats: dochound\ndochound: **Fluorine:** 19scu/units\n**Souvenirs:** 3scu/units\n**Pitambu:** 2scu/units\n**Aphorite:** 3scu/units\n**Atlasium:** 4scu/units\n**Heart of the Woods:** 5scu/units\n**Compboard:** 6scu/units\n**Silicon:** 7scu/units\n**Pressurized Ice:** 8scu/units\n**Construction Materials:** 9scu/units\n**Gasping Weevil Eggs:** 9scu/units\n**Revenant Pod:** 10scu/units\n**Dolivine:** 9scu/units\n**Human Food Bars:** 10scu/units\n**Scrap:** 11scu/units\n**Corundum:** 12scu/units\n**Thermalfoam:** 27scu/units\n**Detatrine:** 31scu/units\n**Mercury:** 17scu/units\n**Audio Visual Equipment:** 18scu/units\n**Omnapoxy:** 5scu/units\n**Omnisky III Cannon:** 15scu/units\n**Omnisky IX Cannon:** 16scu/units\n**Omnisky XII Cannon:** 16scu/units\n**Omnisky XVIII Cannon:** 17scu/units\n**Omnisky XV Cannon:** 18scu/units\n**Omnisky VI Cannon:** 18scu/units\n**Omnitrek Jacket Permafrost:** 19scu/units\n**Omnitrek Jacket Frost Point:** 19scu/units\n**Omnitrek Jacket Backwoods:** 20scu/units'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:24:37.049Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Maze) added by dochound! \nAmount: 1 scu/units \nAverage Market Price per Unit: 181699aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:25:06.654Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Emod Stabilizer 2) added by dochound! \nAmount: 1 scu/units \nAverage Market Price per Unit: 389aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:25:16.312Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Emod Stabilizer 3) added by dochound! \nAmount: 1 scu/units \nAverage Market Price per Unit: 454aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:25:22.798Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (Emod Stabilizer 1) added by dochound! \nAmount: 2 scu/units \nAverage Market Price per Unit: 260aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:25:30.300Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: 'Warehouse item (ZeroRush) added by dochound! \nAmount: 1 scu/units \nAverage Market Price per Unit: 18900aUEC.'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:25:40.337Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nPlayer Stats: dochound\ndochound: **Fluorine:** 19 scu/units\n**Souvenirs:** 3 scu/units\n**Pitambu:** 2 scu/units\n**Aphorite:** 3 scu/units\n**Atlasium:** 4 scu/units\n**Heart of the Woods:** 5 scu/units\n**Compboard:** 6 scu/units\n**Silicon:** 7 scu/units\n**Pressurized Ice:** 8 scu/units\n**Construction Materials:** 9 scu/units\n**Gasping Weevil Eggs:** 9 scu/units\n**Revenant Pod:** 10 scu/units\n**Dolivine:** 9 scu/units\n**Human Food Bars:** 10 scu/units\n**Scrap:** 11 scu/units\n**Corundum:** 12 scu/units\n**Thermalfoam:** 27 scu/units\n**Detatrine:** 31 scu/units\n**Mercury:** 17 scu/units\n**Audio Visual Equipment:** 18 scu/units\n**Omnapoxy:** 5 scu/units\n**Omnisky III Cannon:** 15 scu/units\n**Omnisky IX Cannon:** 16 scu/units\n**Omnisky XII Cannon:** 16 scu/units\n**Omnisky XVIII Cannon:** 17 scu/units\n**Omnisky XV Cannon:** 18 scu/units\n**Omnisky VI Cannon:** 18 scu/units\n**Omnitrek Jacket Permafrost:** 19 scu/units\n**Omnitrek Jacket Frost Point:** 19 scu/units\n**Omnitrek Jacket Backwoods:** 20 scu/units\n**Maze:** 1 scu/units\ndochound (cont.): **Emod Stabilizer 2:** 1 scu/units\n**Emod Stabilizer 3:** 1 scu/units\n**Emod Stabilizer 1:** 2 scu/units\n**ZeroRush:** 1 scu/units'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:31:38.470Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nAll Commodities\nFluorine: **219** scu/units\ndochound, mohawkress1629\nMedical Supplies: **450** scu/units\nmohawkress1629\nQuantainium: **1200** scu/units\nmohawkress1629\nSouvenirs: **3** scu/units\ndochound\nPitambu: **2** scu/units\ndochound\nAphorite: **3** scu/units\ndochound\nAtlasium: **4** scu/units\ndochound\nHeart of the Woods: **5** scu/units\ndochound\nCompboard: **6** scu/units\ndochound\nSilicon: **7** scu/units\ndochound\nPressurized Ice: **8** scu/units\ndochound\nConstruction Materials: **9** scu/units\ndochound\nGasping Weevil Eggs: **9** scu/units\ndochound\nRevenant Pod: **10** scu/units\ndochound\nDolivine: **9** scu/units\ndochound\nHuman Food Bars: **10** scu/units\ndochound\nScrap: **11** scu/units\ndochound\nCorundum: **12** scu/units\ndochound\nThermalfoam: **27** scu/units\ndochound\nDetatrine: **31** scu/units\ndochound\nMercury: **17** scu/units\ndochound\nAudio Visual Equipment: **18** scu/units\ndochound\nOmnapoxy: **5** scu/units\ndochound\nOmnisky III Cannon: **15** scu/units\ndochound\nOmnisky IX Cannon: **16** scu/units\ndochound'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:32:09.608Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nAll Commodities\nAphorite: **3** scu/units\ndochound\nAtlasium: **4** scu/units\ndochound\nAudio Visual Equipment: **18** scu/units\ndochound\nCompboard: **6** scu/units\ndochound\nConstruction Materials: **9** scu/units\ndochound\nCorundum: **12** scu/units\ndochound\nDetatrine: **31** scu/units\ndochound\nDolivine: **9** scu/units\ndochound\nEmod Stabilizer 1: **2** scu/units\ndochound\nEmod Stabilizer 2: **1** scu/units\ndochound\nEmod Stabilizer 3: **1** scu/units\ndochound\nFluorine: **219** scu/units\ndochound, mohawkress1629\nGasping Weevil Eggs: **9** scu/units\ndochound\nHeart of the Woods: **5** scu/units\ndochound\nHuman Food Bars: **10** scu/units\ndochound\nMaze: **1** scu/units\ndochound\nMedical Supplies: **450** scu/units\nmohawkress1629\nMercury: **17** scu/units\ndochound\nOmnapoxy: **5** scu/units\ndochound\nOmnisky III Cannon: **15** scu/units\ndochound\nOmnisky IX Cannon: **16** scu/units\ndochound\nOmnisky VI Cannon: **18** scu/units\ndochound\nOmnisky XII Cannon: **16** scu/units\ndochound\nOmnisky XV Cannon: **18** scu/units\ndochound\nOmnisky XVIII Cannon: **17** scu/units\ndochound'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T08:47:00.794Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nSearch by Item: Fluorine\ndochound: **19** scu/units\nmohawkress1629: **200** scu/units'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T09:09:39.250Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nWarehouse Item List, Alphabetical\nAphorite: **3** scu/units\ndochound\nAtlasium: **4** scu/units\ndochound\nAudio Visual Equipment: **18** scu/units\ndochound\nCompboard: **6** scu/units\ndochound\nConstruction Materials: **9** scu/units\ndochound\nCorundum: **12** scu/units\ndochound\nDetatrine: **31** scu/units\ndochound\nDolivine: **9** scu/units\ndochound\nEmod Stabilizer 1: **2** scu/units\ndochound\nEmod Stabilizer 2: **1** scu/units\ndochound\nEmod Stabilizer 3: **1** scu/units\ndochound\nFluorine: **219** scu/units\ndochound, mohawkress1629\nGasping Weevil Eggs: **9** scu/units\ndochound\nHeart of the Woods: **5** scu/units\ndochound\nHuman Food Bars: **10** scu/units\ndochound\nMaze: **1** scu/units\ndochound\nMedical Supplies: **450** scu/units\nmohawkress1629\nMercury: **17** scu/units\ndochound\nOmnapoxy: **5** scu/units\ndochound\nOmnisky III Cannon: **15** scu/units\ndochound\nOmnisky IX Cannon: **16** scu/units\ndochound\nOmnisky VI Cannon: **18** scu/units\ndochound\nOmnisky XII Cannon: **16** scu/units\ndochound\nOmnisky XV Cannon: **18** scu/units\ndochound\nOmnisky XVIII Cannon: **17** scu/units\ndochound\nAll Commodities'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T09:30:16.895Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nWarehouse Item List, Alphabetical\nAphorite: **3** scu/units\ndochound\nAtlasium: **4** scu/units\ndochound\nAudio Visual Equipment: **18** scu/units\ndochound\nCompboard: **6** scu/units\ndochound\nConstruction Materials: **9** scu/units\ndochound\nCorundum: **12** scu/units\ndochound\nDetatrine: **31** scu/units\ndochound\nDolivine: **9** scu/units\ndochound\nEmod Stabilizer 1: **2** scu/units\ndochound\nEmod Stabilizer 2: **1** scu/units\ndochound\nEmod Stabilizer 3: **1** scu/units\ndochound\nFluorine: **219** scu/units\ndochound, mohawkress1629\nGasping Weevil Eggs: **9** scu/units\ndochound\nHeart of the Woods: **5** scu/units\ndochound\nHuman Food Bars: **10** scu/units\ndochound\nMaze: **1** scu/units\ndochound\nMedical Supplies: **450** scu/units\nmohawkress1629\nMercury: **17** scu/units\ndochound\nOmnapoxy: **5** scu/units\ndochound\nOmnisky III Cannon: **15** scu/units\ndochound\nOmnisky IX Cannon: **16** scu/units\ndochound\nOmnisky VI Cannon: **18** scu/units\ndochound\nOmnisky XII Cannon: **16** scu/units\ndochound\nOmnisky XV Cannon: **18** scu/units\ndochound\nOmnisky XVIII Cannon: **17** scu/units\ndochound\nAll Commodities'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T09:31:31.112Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nWarehouse Item List, Alphabetical\nAphorite: **3** scu/units\ndochound\nAtlasium: **4** scu/units\ndochound\nAudio Visual Equipment: **18** scu/units\ndochound\nCompboard: **6** scu/units\ndochound\nConstruction Materials: **9** scu/units\ndochound\nCorundum: **12** scu/units\ndochound\nDetatrine: **31** scu/units\ndochound\nDolivine: **9** scu/units\ndochound\nEmod Stabilizer 1: **2** scu/units\ndochound\nEmod Stabilizer 2: **1** scu/units\ndochound\nEmod Stabilizer 3: **1** scu/units\ndochound\nFluorine: **219** scu/units\ndochound, mohawkress1629\nGasping Weevil Eggs: **9** scu/units\ndochound\nHeart of the Woods: **5** scu/units\ndochound\nHuman Food Bars: **10** scu/units\ndochound\nMaze: **1** scu/units\ndochound\nMedical Supplies: **450** scu/units\nmohawkress1629\nMercury: **17** scu/units\ndochound\nOmnapoxy: **5** scu/units\ndochound\nOmnisky III Cannon: **15** scu/units\ndochound\nOmnisky IX Cannon: **16** scu/units\ndochound\nOmnisky VI Cannon: **18** scu/units\ndochound\nOmnisky XII Cannon: **16** scu/units\ndochound\nOmnisky XV Cannon: **18** scu/units\ndochound\nOmnisky XVIII Cannon: **17** scu/units\ndochound\nAll Commodities'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T09:39:06.245Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "user",
+      "content": "@dochound: '```test```'",
+      "metadata": {
+        "channel": "general",
+        "user": "dochound",
+        "date": "2025-04-08T09:39:40.486Z",
+        "string_to_reference_user_in_response": "<@664023164350627843>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\nWarehouse Item List, Alphabetical\n```\nWarehouse Item List, Alphabetical\n```\nAphorite: **3** scu/units\ndochound\nAtlasium: **4** scu/units\ndochound\nAudio Visual Equipment: **18** scu/units\ndochound\nCompboard: **6** scu/units\ndochound\nConstruction Materials: **9** scu/units\ndochound\nCorundum: **12** scu/units\ndochound\nDetatrine: **31** scu/units\ndochound\nDolivine: **9** scu/units\ndochound\nEmod Stabilizer 1: **2** scu/units\ndochound\nEmod Stabilizer 2: **1** scu/units\ndochound\nEmod Stabilizer 3: **1** scu/units\ndochound\nFluorine: **219** scu/units\ndochound, mohawkress1629\nGasping Weevil Eggs: **9** scu/units\ndochound\nHeart of the Woods: **5** scu/units\ndochound\nHuman Food Bars: **10** scu/units\ndochound\nMaze: **1** scu/units\ndochound\nMedical Supplies: **450** scu/units\nmohawkress1629\nMercury: **17** scu/units\ndochound\nOmnapoxy: **5** scu/units\ndochound\nOmnisky III Cannon: **15** scu/units\ndochound\nOmnisky IX Cannon: **16** scu/units\ndochound\nOmnisky VI Cannon: **18** scu/units\ndochound\nOmnisky XII Cannon: **16** scu/units\ndochound\nOmnisky XV Cannon: **18** scu/units\ndochound\nOmnisky XVIII Cannon: **17** scu/units\ndochound\nAll Commodities'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T09:42:36.081Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\n```\nWarehouse Item List, Alphabetical\n```\nAphorite: **3** scu/units\ndochound\nAtlasium: **4** scu/units\ndochound\nAudio Visual Equipment: **18** scu/units\ndochound\nCompboard: **6** scu/units\ndochound\nConstruction Materials: **9** scu/units\ndochound\nCorundum: **12** scu/units\ndochound\nDetatrine: **31** scu/units\ndochound\nDolivine: **9** scu/units\ndochound\nEmod Stabilizer 1: **2** scu/units\ndochound\nEmod Stabilizer 2: **1** scu/units\ndochound\nEmod Stabilizer 3: **1** scu/units\ndochound\nFluorine: **219** scu/units\ndochound, mohawkress1629\nGasping Weevil Eggs: **9** scu/units\ndochound\nHeart of the Woods: **5** scu/units\ndochound\nHuman Food Bars: **10** scu/units\ndochound\nMaze: **1** scu/units\ndochound\nMedical Supplies: **450** scu/units\nmohawkress1629\nMercury: **17** scu/units\ndochound\nOmnapoxy: **5** scu/units\ndochound\nOmnisky III Cannon: **15** scu/units\ndochound\nOmnisky IX Cannon: **16** scu/units\ndochound\nOmnisky VI Cannon: **18** scu/units\ndochound\nOmnisky XII Cannon: **16** scu/units\ndochound\nOmnisky XV Cannon: **18** scu/units\ndochound\nOmnisky XVIII Cannon: **17** scu/units\ndochound\nAll Commodities'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T09:43:06.921Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\n```\ndochound\n```\ndochound: **Fluorine:** 19 scu/units\n**Souvenirs:** 3 scu/units\n**Pitambu:** 2 scu/units\n**Aphorite:** 3 scu/units\n**Atlasium:** 4 scu/units\n**Heart of the Woods:** 5 scu/units\n**Compboard:** 6 scu/units\n**Silicon:** 7 scu/units\n**Pressurized Ice:** 8 scu/units\n**Construction Materials:** 9 scu/units\n**Gasping Weevil Eggs:** 9 scu/units\n**Revenant Pod:** 10 scu/units\n**Dolivine:** 9 scu/units\n**Human Food Bars:** 10 scu/units\n**Scrap:** 11 scu/units\n**Corundum:** 12 scu/units\n**Thermalfoam:** 27 scu/units\n**Detatrine:** 31 scu/units\n**Mercury:** 17 scu/units\n**Audio Visual Equipment:** 18 scu/units\n**Omnapoxy:** 5 scu/units\n**Omnisky III Cannon:** 15 scu/units\n**Omnisky IX Cannon:** 16 scu/units\n**Omnisky XII Cannon:** 16 scu/units\n**Omnisky XVIII Cannon:** 17 scu/units\n**Omnisky XV Cannon:** 18 scu/units\n**Omnisky VI Cannon:** 18 scu/units\n**Omnitrek Jacket Permafrost:** 19 scu/units\n**Omnitrek Jacket Frost Point:** 19 scu/units\n**Omnitrek Jacket Backwoods:** 20 scu/units\n**Maze:** 1 scu/units\ndochound (cont.): **Emod Stabilizer 2:** 1 scu/units\n**Emod Stabilizer 3:** 1 scu/units\n**Emod Stabilizer 1:** 2 scu/units\n**ZeroRush:** 1 scu/units\nSearch by Player'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T09:43:19.436Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "assistant",
+      "content": "@RoboHound: '\n```\nFluorine\n```\ndochound: **19** scu/units\nmohawkress1629: **200** scu/units\nSearch by Item'",
+      "metadata": {
+        "channel": "general",
+        "user": "RoboHound",
+        "date": "2025-04-08T09:43:38.917Z",
+        "string_to_reference_user_in_response": "<@1327355010329088120>"
+      }
+    },
+    {
+      "role": "user",
+      "content": "@dochound: '<@156924379786117120> <@168441130755555328> is this efficient?'",
+      "metadata": {
+        "channel": "general",
+        "user": "dochound",
+        "date": "2025-04-08T09:44:03.821Z",
+        "string_to_reference_user_in_response": "<@664023164350627843>"
+      }
+    }
+  ]
+}
