@@ -178,7 +178,7 @@ async function queueEmbed(interaction, status){
             .setAuthor({ name: `${targetUser.username}'s Badges`, iconURL: 'https://i.imgur.com/2Sv1Df5.png' })
             .setThumbnail('https://i.imgur.com/UoZsrrM.png')
             .setTitle(`Patch ${patch}`)
-            .setImage('https://i.imgur.com/6wRYEg5.png')
+            .setImage('https://i.imgur.com/1t53Jsc.png')
             .setTitle(`Queue List`)
             .setColor('#ff0000')
             .setThumbnail(guildIconUrl)
@@ -311,8 +311,10 @@ async function topHandlers(client, interaction, timeframe){
             });
 
             const embed = new EmbedBuilder()
-                .setTitle(`Top Handlers`)
-                .setDescription(`${quarterDescription ? quarterDescription : "All time"}, ${year ? year : ""} \nEnding: ${endDescription ? endDescription : "Today"}`)
+                .setAuthor({ name: `Top Handlers`, iconURL: 'https://i.imgur.com/26NGG4H.png' })
+                .setThumbnail('https://i.imgur.com/UoZsrrM.png')
+                .setTitle(`${quarterDescription ? quarterDescription : "All time"}, ${year ? year : ""} \nEnding: ${endDescription ? endDescription : "Today"}`)
+                .setImage('https://i.imgur.com/fTVYbwu.png')
                 .setColor('#ff0000')
                 .setThumbnail(guildIconUrl)
                 .setTimestamp()
@@ -332,8 +334,10 @@ async function topHandlers(client, interaction, timeframe){
             });
 
             const embed = new EmbedBuilder()
-                .setTitle(`Top Handlers`)
-                .setDescription(`${quarterDescription ? quarterDescription : "All time"}, ${year ? year : ""} \nEnding: ${endDescription ? endDescription : "Today"}`)
+                .setAuthor({ name: `Top Handlers`, iconURL: 'https://i.imgur.com/26NGG4H.png' })
+                .setThumbnail('https://i.imgur.com/UoZsrrM.png')
+                .setTitle(`${quarterDescription ? quarterDescription : "All time"}, ${year ? year : ""} \nEnding: ${endDescription ? endDescription : "Today"}`)
+                .setImage('https://i.imgur.com/fTVYbwu.png')
                 .setColor('#ff0000')
                 .setThumbnail(guildIconUrl)
                 .setTimestamp()
