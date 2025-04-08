@@ -1,26 +1,12 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { checkUserListForUser } = require('../../userlist-functions/userlist-controller.js');
-const { progressBar } = require('../../common/progress-bar.js');
-const progressEmbed = require('../../common/embeds.js').progressEmbed;
-const { getClasses, getClassById } = require('../../api/classApi.js');
-const { getUsersInQueue, getUserById, editUserInQueue } = require('../../api/queueApi.js');
+const { getClasses} = require('../../api/classApi.js');
+const { getUsersInQueue} = require('../../api/queueApi.js');
 
 module.exports = {
     data: new SlashCommandBuilder()
     
-        .setName('queue-status2')
+        .setName('queue-status')
         .setDescription('View who is waiting in queue for a class or an assessment.'),
-        // .addStringOption(option => 
-        //     option.setName('view')
-        //         .setDescription('The view to display')
-        //         .setRequired(true)
-        //         .addChoices(
-        //             { name: 'Prestige Category', value: 'prestige' },
-        //             { name: 'Each Class/Assessment', value: 'full-layout' },
-        //             { name: 'RAPTOR', value: 'raptor' },
-        //             { name: 'CORSAIR', value: 'corsair' },
-        //             { name: 'RAIDER', value: 'raider' },
-        //         )),
                     
     async execute(interaction) {
         try {
