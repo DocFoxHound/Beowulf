@@ -175,6 +175,10 @@ async function queueEmbed(interaction, status){
         });
 
         const embed = new EmbedBuilder()
+            .setAuthor({ name: `${targetUser.username}'s Badges`, iconURL: 'https://i.imgur.com/2Sv1Df5.png' })
+            .setThumbnail('https://i.imgur.com/UoZsrrM.png')
+            .setTitle(`Patch ${patch}`)
+            .setImage('https://i.imgur.com/6wRYEg5.png')
             .setTitle(`Queue List`)
             .setColor('#ff0000')
             .setThumbnail(guildIconUrl)

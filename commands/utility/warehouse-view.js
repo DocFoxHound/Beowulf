@@ -276,6 +276,7 @@ function generateEmbed(data, option, title, author) {
 
         const embed = new EmbedBuilder()
             // .setTitle(title)
+            .setThumbnail('https://i.imgur.com/UoZsrrM.png')
             .setAuthor({ name: author, iconURL: 'https://i.imgur.com/CaymfS8.png' })
             .setDescription(`\`\`\`\n${title}\n\`\`\``)
             .setColor('#0099ff')

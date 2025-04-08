@@ -213,9 +213,12 @@ function createLeaderboardEmbeds(topTotalValue, topStolenCargo, topPirateActs, p
 
         // Top players by value earned
         const topStolenValueEmbed = new EmbedBuilder()
-            .setTitle(`Top Discerning Pirates (Patch ${patch})`)
-            .setImage('attachment://chart.png')
-            .setDescription(`The following are the top Pirates by Market Value of items stolen. These are the best at finding the best loot.\n\n`)
+            .setThumbnail('https://i.imgur.com/UoZsrrM.png')
+            .setAuthor({ name: `Top Discerning Pirates`, iconURL: 'https://i.imgur.com/SBKHSKb.png' })
+            .setTitle(`Patch ${patch}`)
+            .setImage('https://i.imgur.com/7k9oEu5.png')
+            // .setImage('attachment://chart.png')
+            .setDescription(`\`\`\`\nThe following are the top Pirates by Market Value of items stolen. These are the best at finding the best loot.\n\n\`\`\``)
             .setColor('#b519ff');
             sortedByTopTotalValue.forEach(([username, stats], index) => {
 
@@ -230,14 +233,17 @@ function createLeaderboardEmbeds(topTotalValue, topStolenCargo, topPirateActs, p
 
         // Top players by total stolen cargo
         const topStolenCargoEmbed = new EmbedBuilder()
-            .setTitle(`Top Kleptomaniacs (Patch ${patch})`)
-            .setDescription(`The following list are the players who stole the most amount of cargo. This is measured in SCU and individual items pilfered.\n\n`)
+            .setThumbnail('https://i.imgur.com/UoZsrrM.png')
+            .setAuthor({ name: `Top Kleptomaniacss`, iconURL: 'https://i.imgur.com/SBKHSKb.png' })
+            .setTitle(`Patch ${patch}`)
+            .setImage('https://i.imgur.com/7k9oEu5.png')
+            .setDescription(`\`\`\`\nThe following list are the players who stole the most amount of cargo. This is measured in SCU and individual items pilfered.\n\`\`\`\n`)
             .setColor('#b519ff');
         sortedByTopStolenCargo.forEach(([username, stats], index) => {
 
             topStolenCargoEmbed.addFields({
                 name: `${index + 1}. ${username}`,
-                value: `**Total Items Stolen:** ${Math.round(stats.total_scu)}\n`,
+                value: `Total Items Stolen: ${Math.round(stats.total_scu)}\n`,
                 inline: false
             });
         });
@@ -245,8 +251,11 @@ function createLeaderboardEmbeds(topTotalValue, topStolenCargo, topPirateActs, p
 
         // Top players by pirate acts
         const topPirateActsEmbed = new EmbedBuilder()
-            .setTitle(`Top Thugs (Patch ${patch})`)
-            .setDescription(`The following are the members that pirated the most. Not necessarily the richest or most efficient, but definitely the most active.\n\n`)
+            .setThumbnail('https://i.imgur.com/UoZsrrM.png')
+            .setAuthor({ name: `Top Thugs`, iconURL: 'https://i.imgur.com/SBKHSKb.png' })
+            .setTitle(`Patch ${patch}`)
+            .setImage('https://i.imgur.com/7k9oEu5.png')
+            .setDescription(`\`\`\`\nThe following are the members that pirated the most. Not necessarily the richest or most efficient, but definitely the most active.\n\n\`\`\``)
             .setColor('#b519ff');
             sortedByTopPiracyActs.forEach(([username, stats], index) => {
 

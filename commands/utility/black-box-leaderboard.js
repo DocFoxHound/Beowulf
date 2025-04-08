@@ -219,8 +219,11 @@ function createLeaderboardEmbeds(leaderboardData, patch) {
 
         // Top players by kill count
         const killsEmbed = new EmbedBuilder()
-            .setTitle(`Top Players by Total Kills (Patch ${patch})`)
-            .setDescription(`**IronPoint Total Kills:** ${sortedByKills.reduce((acc, [_, stats]) => acc + stats.kill_count, 0)}`)
+            .setThumbnail('https://i.imgur.com/UoZsrrM.png')
+            .setAuthor({ name: `Top Players by Total Kills`, iconURL: 'https://i.imgur.com/vRqPoqk.png' })
+            .setTitle(`Patch ${patch}`)
+            .setImage('https://i.imgur.com/HhnpGnN.png')
+            .setDescription(`\`\`\`\nIronPoint Total Kills: ${sortedByKills.reduce((acc, [_, stats]) => acc + stats.kill_count, 0)}\`\`\`\n`)
             .setColor('#7199de');
         sortedByKills.forEach(([username, stats], index) => {
             killsEmbed.addFields({
@@ -233,8 +236,11 @@ function createLeaderboardEmbeds(leaderboardData, patch) {
 
         // Top players by value
         const valueEmbed = new EmbedBuilder()
-            .setTitle(`Top Players by Damage Done (Patch ${patch})`)
-            .setDescription(`**IronPoint Total Damage Cost:** ${formatToCurrency(sortedByValue.reduce((acc, [_, stats]) => acc + stats.value, 0))}`)
+            .setThumbnail('https://i.imgur.com/UoZsrrM.png')
+            .setAuthor({ name: `Top Players by Damage Done`, iconURL: 'https://i.imgur.com/vRqPoqk.png' })
+            .setTitle(`Patch ${patch}`)
+            .setImage('https://i.imgur.com/HhnpGnN.png')
+            .setDescription(`\`\`\`\nIronPoint Total Damage Cost: ${formatToCurrency(sortedByValue.reduce((acc, [_, stats]) => acc + stats.value, 0))}\`\`\`\n`)
             .setColor('#7199de');
         sortedByValue.forEach(([username, stats], index) => {
             valueEmbed.addFields({
@@ -277,7 +283,7 @@ function createIndividualEmbeds(individualData, patch, user) {
             individualShipEntryArray.push({
                 name: shipName,
                 value: `**Total Kills:** ${stats.kill_count}\n**Damages Done:** ${formatToCurrency(stats.value)}`,
-                inline: false
+                inline: true
             })
         }
 
@@ -287,9 +293,12 @@ function createIndividualEmbeds(individualData, patch, user) {
 
             // Create an embed for the current page
             const embed = new EmbedBuilder()
-                .setTitle(`Ship Totals (Patch: ${patch})`)
+                .setThumbnail('https://i.imgur.com/UoZsrrM.png')
+                .setAuthor({ name: `Ship Totals`, iconURL: 'https://i.imgur.com/vRqPoqk.png' })
+                .setTitle(`Patch ${patch}`)
+                .setImage('https://i.imgur.com/HhnpGnN.png')
                 .setColor('#7199de')
-                .setDescription(`**Total Kills:** ${totalKills}\n**Total Damage Cost:** ${totalValue}`)
+                .setDescription(`\`\`\`\nTotal Kills: ${totalKills}\nTotal Damage Cost: ${totalValue}\`\`\`\n`)
                 .addFields(currentFields);
 
             embeds.push(embed);
@@ -304,10 +313,10 @@ function createIndividualEmbeds(individualData, patch, user) {
                 const killOrKills = hit.kill_count === 1 ? 'Kill' : 'Kills';
 
                 hitsFields.push({
-                    name: `Ship: ${hit.ship_killed || 'Unknown'}`.slice(0, 256),
+                    name: `${hit.ship_killed || 'Unknown'}`.slice(0, 256),
                     // name: `Hit ID: ${hit.id || 'Unknown'}`.slice(0, 256),
                     value: `**Hit ID:** ${hit.id || 'Unknown'}\n**Assists:** ${assists || 'None'}\n**Victims:** ${victims || 'None'}\n**${killOrKills}:** ${hit.kill_count || 0}\n${formatToCurrency(hit.value || 0)}`.slice(0, 1024),
-                    inline: false
+                    inline: true
                 });
             });
         });
@@ -318,7 +327,10 @@ function createIndividualEmbeds(individualData, patch, user) {
 
             // Create an embed for the current page
             const embed = new EmbedBuilder()
-                .setTitle(`Hit History (Patch: ${patch})`)
+                .setThumbnail('https://i.imgur.com/UoZsrrM.png')
+                .setAuthor({ name: `Hit History`, iconURL: 'https://i.imgur.com/vRqPoqk.png' })
+                .setTitle(`Patch ${patch}`)
+                .setImage('https://i.imgur.com/HhnpGnN.png')
                 .setColor('#7199de')
                 .addFields(currentFields);
 

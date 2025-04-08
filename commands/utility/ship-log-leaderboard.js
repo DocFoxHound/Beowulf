@@ -208,52 +208,6 @@ async function generateCrewData(shipLogs) {
     }
 }
 
-// Helper function to generate individual data
-async function generateIndividualData(blackBoxLogs, user) {
-    try{
-        const username = user.username;
-        const leaderboard = {};
-
-        for (const log of blackBoxLogs) {
-            const hitId = log.id;
-            const shipUsedObject = await getPlayerShipByEntryId(log.ship_used);
-            const assistsList = [];
-            if(log.assists.length > 0){
-                for(const assist of log.assists){
-                    const assistUser = await getUserById(assist);
-                    assistsList.push(assistUser.username);
-                }
-            }
-
-            if (!leaderboard[username]) {
-                leaderboard[username] = { 
-                    kill_count: 0, 
-                    value: 0, 
-                    victims: [],
-                    hits: [],
-                };
-            }
-
-            leaderboard[username].kill_count += log.kill_count;
-            leaderboard[username].value += log.value;
-            leaderboard[username].hits.push({
-                id: hitId,
-                kill_count: log.kill_count,
-                ship_used: shipUsedObject.custom_name,
-                ship_killed: log.ship_killed,
-                value: log.value,
-                assists: assistsList || "none",
-                victims: log.victims,
-                patch: log.patch,
-            });
-        }
-        return leaderboard;
-    }catch(error){
-        console.error('Error generating individual data:', error);
-        return null;  // Return null if there's an error
-    }
-}
-
 // Helper function to create leaderboard embeds
 function createLeaderboardEmbeds(leaderboardData, commanderData, crewData, patch) {
     try{
@@ -267,10 +221,12 @@ function createLeaderboardEmbeds(leaderboardData, commanderData, crewData, patch
 
         // Top players by kill count
         const topShipsEmbed = new EmbedBuilder()
-            .setTitle(`Top Ships in the Fleet (Patch ${patch})`)
-            .setDescription(`The following ships are the most effective in the IronPoint Fleet. They are measured by their Total Damage Done divided by their Total Kills.
-                __IronPoint Total Damage Cost:__ ${formatToCurrency(sortedByDamages.reduce((acc, [_, stats]) => acc + stats.totalDamage, 0))}
-                __IronPoint Total Kills:__ ${sortedByKills.reduce((acc, [_, stats]) => acc + stats.totalKills, 0)}\n\n`)
+            .setThumbnail('https://i.imgur.com/UoZsrrM.png')
+            .setAuthor({ name: `Top Ships in the Fleet`, iconURL: 'https://i.imgur.com/QHdkPrB.png' })
+            .setTitle(`Patch ${patch}`)
+            .setImage('https://i.imgur.com/g8GdSLJ.png')
+            .setDescription(`\`\`\`\nThe following ships are the most effective in the IronPoint Fleet. They are measured by their Total Damage Done divided by their Total Kills.
+                \n-Total Damages: ${formatToCurrency(sortedByDamages.reduce((acc, [_, stats]) => acc + stats.totalDamage, 0))}\n-Total Kills: ${sortedByKills.reduce((acc, [_, stats]) => acc + stats.totalKills, 0)}\n\n\`\`\``)
             .setColor('#689e81');
             sortedByTopShip.forEach(([username, stats], index) => {
                 // Get top 3 commanders
@@ -322,11 +278,12 @@ function createLeaderboardEmbeds(leaderboardData, commanderData, crewData, patch
 
         // Top Commanders by value
         const topCommandersEmbed = new EmbedBuilder()
-            .setTitle(`Top Commanders (Patch ${patch})`)
-            .setDescription(`The following list are the top commanders in the IronPoint fleet. They are measured by their effectiveness as a commander and take the following metrics into account:
-                __Combat Output:__ Using total kills and total damages done.
-                __Leadership Load:__ Taking into account how many crew they have commanded.
-                __Initiative:__ The numbers of times they have commanded a ship.\n\n`)
+            .setThumbnail('https://i.imgur.com/UoZsrrM.png')
+            .setAuthor({ name: `Top Commanders in the Fleet`, iconURL: 'https://i.imgur.com/QHdkPrB.png' })
+            .setTitle(`Patch ${patch}`)
+            .setImage('https://i.imgur.com/g8GdSLJ.png')
+            .setDescription(`\`\`\`\nThe following list are the top commanders in the IronPoint fleet. They are measured by their effectiveness as a commander and take the following metrics into account:
+                \n-Combat Output: Using total kills and total damages done.\n-Leadership Load: Taking into account how many crew they have commanded.\n-Initiative: The numbers of times they have commanded a ship.\`\`\`\n\n`)
             .setColor('#3e6606');
         sortedByTopCommanders.forEach(([username, stats], index) => {
             // Get top 3 ships
@@ -355,13 +312,13 @@ function createLeaderboardEmbeds(leaderboardData, commanderData, crewData, patch
 
         // Top Crew by value
         const topCrewEmbed = new EmbedBuilder()
-            .setTitle(`Top Crew Members (Patch ${patch})`)
-            .setDescription(`The following are the top Crew Members of the IronPoint fleet. Their effectiveness as a Crew Member is measured using the following metrics:
-                __Crewed Instances:__ How many times they've joined a ship crew.
-                __Unique Ships:__ How many distinct ships have been served on.
-                __Shared Kills:__ The sum of all kills divided by the numbers of crew on the ship.
-                __Shared Damages:__ The sum of all damages dealt to another org divided by the numbers of crew on the ship.
-                \n\n`)
+            .setThumbnail('https://i.imgur.com/UoZsrrM.png')
+            .setAuthor({ name: `Top Crew Members in the Fleet`, iconURL: 'https://i.imgur.com/QHdkPrB.png' })
+            .setTitle(`Patch ${patch}`)
+            .setImage('https://i.imgur.com/g8GdSLJ.png')
+            .setDescription(`\`\`\`\nThe following are the top Crew Members of the IronPoint fleet. Their effectiveness as a Crew Member is measured using the following metrics:
+                \n-Crewed Instances: How many times they've joined a ship crew.\n-Unique Ships: How many distinct ships have been served on.\n-Shared Kills: The sum of all kills divided by the numbers of crew on the ship.\n-Shared Damages: The sum of all damages dealt to another org divided by the numbers of crew on the ship.
+                \`\`\`\n\n`)
             .setColor('#3e6606');
             sortedByTopCrew.forEach(([username, stats], index) => {
                 // Get top 3 ships
@@ -393,87 +350,6 @@ function createLeaderboardEmbeds(leaderboardData, commanderData, crewData, patch
     }catch(error){
         console.error('Error creating leaderboard embeds:', error);
         return null;  // Return null if there's an error
-    }
-}
-
-// Helper function to create individual stat sheet embeds
-function createIndividualEmbeds(individualData, patch, user) {
-    try {
-        const embeds = [];
-        const fieldsPerPage = 25; // Discord's limit for fields per embed
-
-        // Calculate total kills and total value
-        const totalKills = individualData[user.username].kill_count || 0;
-        const totalValue = formatToCurrency(individualData[user.username].value || 0);
-
-        const individualShipTotals = {};
-        for(const hit of individualData[user.username].hits){
-            const shipName = hit.ship_used;
-            if (!individualShipTotals[shipName]) {
-                individualShipTotals[shipName] = { kill_count: 0, value: 0 };
-            }
-            individualShipTotals[shipName].kill_count += hit.kill_count;
-            individualShipTotals[shipName].value += hit.value;
-        }
-
-        const individualShipEntryArray = []
-        for(const shipName in individualShipTotals){
-            const stats = individualShipTotals[shipName];
-            individualShipEntryArray.push({
-                name: shipName,
-                value: `**Total Kills:** ${stats.kill_count}\n**Damages Done:** ${formatToCurrency(stats.value)}`,
-                inline: false
-            })
-        }
-
-        // Make fields for each hit in the hitsFields thing and make some pages, too
-        for (let i = 0; i < individualShipEntryArray.length; i += fieldsPerPage) {
-            const currentFields = individualShipEntryArray.slice(i, i + fieldsPerPage);
-
-            // Create an embed for the current page
-            const embed = new EmbedBuilder()
-                .setTitle(`Ship Totals (Patch: ${patch})`)
-                .setColor('#3e6606')
-                .setDescription(`**Total Kills:** ${totalKills}\n**Total Damage Cost:** ${totalValue}`)
-                .addFields(currentFields);
-
-            embeds.push(embed);
-        }
-
-        // Prepare the fields for the hits lists
-        const hitsFields = [];
-        Object.entries(individualData).forEach(([username, stats]) => {
-            stats.hits.forEach(hit => {
-                const assists = Array.isArray(hit.assists) ? hit.assists.join(', ') : hit.assists;
-                const victims = hit.victims.join(', ');
-                const killOrKills = hit.kill_count === 1 ? 'Kill' : 'Kills';
-
-                hitsFields.push({
-                    name: `Ship: ${hit.ship_killed || 'Unknown'}`.slice(0, 256),
-                    // name: `Hit ID: ${hit.id || 'Unknown'}`.slice(0, 256),
-                    value: `**Hit ID:** ${hit.id || 'Unknown'}\n**Assists:** ${assists || 'None'}\n**Victims:** ${victims || 'None'}\n**${killOrKills}:** ${hit.kill_count || 0}\n${formatToCurrency(hit.value || 0)}`.slice(0, 1024),
-                    inline: false
-                });
-            });
-        });
-
-        // Make fields for each hit in the hitsFields thing and make some pages, too
-        for (let i = 0; i < hitsFields.length; i += fieldsPerPage) {
-            const currentFields = hitsFields.slice(i, i + fieldsPerPage);
-
-            // Create an embed for the current page
-            const embed = new EmbedBuilder()
-                .setTitle(`Hit History (Patch: ${patch})`)
-                .setColor('#3e6606')
-                .addFields(currentFields);
-
-            embeds.push(embed);
-        }
-
-        return embeds;
-    } catch (error) {
-        console.error('Error creating individual stat sheet embeds:', error);
-        return null; // Return null if there's an error
     }
 }
 

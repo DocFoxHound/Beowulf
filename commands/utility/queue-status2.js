@@ -7,7 +7,7 @@ const queueEmbed = require('../../common/embeds.js').queueEmbed;
 module.exports = {
     data: new SlashCommandBuilder()
     
-        .setName('queue-status')
+        .setName('queue-status2')
         .setDescription('View who is waiting in queue for a class or an assessment.'),
         // .addStringOption(option => 
         //     option.setName('view')
