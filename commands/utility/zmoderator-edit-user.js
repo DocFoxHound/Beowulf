@@ -1,17 +1,20 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { getAvailableClasses } = require('../../queue-functions/get-available-classes');
-const { updateUserClassStatus, checkUserListForUser, userlistApi } = require('../../userlist-functions/userlist-controller');
+const { updateUserClassStatus, checkUserListForUserById, userlistApi } = require('../../userlist-functions/userlist-controller');
+const { getUserById } = require("../../api/userlistApi");
 const { queueController } = require('../../queue-functions/queue-controller');
+const { queueControllerForSlashCommands } = require('../../queue-functions/queue-controller');
 const { logHandler } = require('../../completed-queue-functions/completed-queue-handler');
 const { getClasses } = require('../../api/classApi');
+const queueApi = require('../../api/queueApi');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('zmoderator-edit-user')
         .setDescription('Edit a user status for a specific class')
-        .addUserOption(option => 
+        .addStringOption(option => 
             option.setName('target')
-                .setDescription('The user to edit')
+                .setDescription('@ the user to edit')
                 .setRequired(true))
         .addStringOption(option => 
             option.setName('class')
@@ -23,21 +26,23 @@ module.exports = {
                 .setDescription('The completion status')
                 .setRequired(true)
                 .addChoices(
-                    { name: 'Mark Complete', value: 'completed' },
+                    { name: 'Mark Complete (requires completed_by)', value: 'completed' },
                     { name: 'Mark Incomplete', value: 'not_completed' },
-                    { name: 'Add player to Queue', value: 'queue_add' },
-                    { name: 'Remove player from a Queue', value: 'queue_remove'}
+                    { name: 'Add to Queue', value: 'queue_add' },
+                    { name: 'Remove from Queue', value: 'queue_remove'}
                 ))
         .addUserOption(option =>
             option
                 .setName('completed_by')
                 .setDescription('Required ONLY for "Mark Complate"')
-                .setRequired(true)
+                .setRequired(false)
             ),
     
     async execute(interaction, client, openai) {
         try {
             // Check if the user has the required permissions
+            const target = interaction.options.getString('target').replace(/\D/g, '');
+            const targetUser = await getUserById(target);
             const member = interaction.member;
             const moderatorRoles = process.env.LIVE_ENVIRONMENT === "true" ? process.env.MODERATOR_ROLES.split(',') : process.env.TEST_MODERATOR_ROLES.split(',');
             const hasPermission = member.roles.cache.some(role => moderatorRoles.includes(role.id));
@@ -50,7 +55,6 @@ module.exports = {
             }
             
             // Extract options
-            const targetUser = interaction.options.getUser('target');
             const className = interaction.options.getString('class');
             const status = interaction.options.getString('status');
             const handler = interaction.options.getUser('completed_by');
@@ -64,7 +68,7 @@ module.exports = {
             ).id;
             
             // Get the user data
-            const userData = await checkUserListForUser(targetUser);
+            const userData = await checkUserListForUserById(target);
             
             if (!userData) {
                 return interaction.reply({ 
@@ -84,12 +88,10 @@ module.exports = {
                 // Set the class status to completed (true)
                 try{
                     await updateUserClassStatus(userData, className, true);
-                    // await logHandler(userData, completedBy, classId, true);
-                    try{
-                        response = await queueController(className, interaction.user, openai, client, false, "slash-edituser", "completed", guild, targetUser, handler);
-                    }catch(e){
-                        response = `The user may not be in a queue: ${e.message}`
-                    }
+                    await interaction.reply({ 
+                        content: "User was marked as completed",
+                        ephemeral: true 
+                    });
                 }catch(error){
                     console.log(`Error in edit-user command: ${error.message}`);
                     return interaction.reply({ 
@@ -97,21 +99,15 @@ module.exports = {
                         ephemeral: true 
                     });
                 }
-                await interaction.reply({ 
-                    content: response,
-                    ephemeral: true 
-                });
+                
             } else if (status === 'not_completed') {
                 // Set the class status to not completed (false)
                 try{
-                    //find any logs for this user and this class
-                    //delete those logs
-                    try{
-                        response = await queueController(className, targetUser, openai, client, false, "slash-edituser", "not_completed", guild);
-                    }catch(e){
-                        response = `The user may not be in a queue: , ${e.message}`
-                    }
                     await updateUserClassStatus(userData, className, false);
+                    return interaction.reply({ 
+                        content: "User was marked as incomplete.",
+                        ephemeral: true 
+                    });
                 }catch(error){
                     response = `Error in edit-user command: ${error.message}`;
                     return interaction.reply({ 
@@ -119,18 +115,12 @@ module.exports = {
                         ephemeral: true 
                     });
                 }
-                await interaction.reply({ 
-                    content: response,
-                    ephemeral: true 
-                });
             }else if(status === 'queue_add'){
-                await interaction.reply(await queueController(className, interaction.user, openai, client, true, "slash-edituser"));
+                await interaction.reply(await queueControllerForSlashCommands(className, targetUser, handler, openai, client, true, null, "other", interaction));
+                                                                            //className, targetUser, handler, openai, client, addOrRemove, classStatus, selfOrOther, interaction
             }else if(status === 'queue_remove'){
                 const guild = interaction.guild
-                //find any logs for this user and this class
-                //delete those logs
-                await interaction.reply(await queueController(className, interaction.user, openai, client, false, "slash-edituser", "not_completed", guild));
-                //runOrClassName, messageOrUser, openai, client, addToQueue, slashCommand, classCompletedOrIncomplete, guild
+                await interaction.reply(await queueControllerForSlashCommands(className, targetUser, handler, openai, client, false, null, "other", interaction));
             }
         } catch (error) {
             response = `Error in edit-user command: ${error.message}`;
@@ -144,28 +134,131 @@ module.exports = {
     async autocomplete(interaction) {
         try {
             const focusedOption = interaction.options.getFocused(true);
+            const target = interaction.options.getString('target').replace(/\D/g, '');
+            const targetUser = await getUserById(target);
+            const queueUserData = await queueApi.getUserById(target);
+
             let choices = [];
-            
+
             if (focusedOption.name === 'class') {
-                // Get available classes
-                const availableClasses = await getAvailableClasses(interaction.user, interaction.guild, "all");
-                
-                // Filter classes based on the focused value
-                choices = availableClasses
-                    .filter(className => 
-                        className.toLowerCase().includes(focusedOption.value.toLowerCase())
+                if (!targetUser) {
+                    await interaction.respond([]);
+                    return;
+                }
+
+                // Fetch all classes and generate classData
+                const allClasses = await getClasses();
+                let classData = await generateClassData(allClasses);
+                sortClassesAlphabetically(classData); // Sort classes alphabetically by name
+
+
+                // Generate queue data for the target user
+                await generateQueueDataForUser(targetUser, classData);
+
+                // Format the autocomplete choices
+                for (const prestige in classData) {
+                    const classes = classData[prestige];
+                    for (const classObj of classes) {
+                        let inQueueString = "";
+                        if(queueUserData[classObj.name] === true){
+                            inQueueString = " - In Queue)";
+                        }
+                        const completionStatus = classObj.completed ? 'Completed' : `Not Completed${inQueueString}`;
+                        choices.push({
+                            name: `${classObj.name || classObj.name} (${completionStatus})`,
+                            value: classObj.name
+                        });
+                    }
+                }
+
+                // Filter choices based on the focused value
+                choices = choices
+                    .filter(choice =>
+                        choice.name.toLowerCase().includes(focusedOption.value.toLowerCase())
                     )
-                    .map(className => ({
-                        name: className,
-                        value: className
-                    }))
                     .slice(0, 25); // Limit to 25 choices
             }
-            
+
             await interaction.respond(choices);
         } catch (error) {
-            console.log(`Error in edit-user autocomplete: ${error.message}`);
+            console.error('Error in autocomplete function:', error);
             await interaction.respond([]);
         }
     }
 };
+
+async function generateClassData(allClasses) {
+    const classData = {};
+    try {
+        for (const log of allClasses) {
+            if (!classData[log.prestige_category]) {
+                classData[log.prestige_category] = [];
+            }
+
+            classData[log.prestige_category].push({
+                id: log.id,
+                name: log.name,
+                alt_name: log.alt_name,
+                description: log.description,
+                ai_function_class_names: log.ai_function_class_names,
+                prerequisites: log.prerequisites,
+                thumbnail_url: log.thumbnail_url,
+                completed: false,
+                value: 0,
+                level: log.level
+            });
+        }
+        return classData;
+    }catch(error){
+        console.error('Error generating leaderboard data:', error);
+        return null;  // Return null if there's an error
+    }
+}
+
+async function generateQueueData(allUsers, classData) {
+    try{
+        for(const prestige in classData){
+            const classes = classData[prestige];
+            for(const classObj of classes){
+                for(const user of allUsers){
+                    if(user[classObj.name] === true){
+                        classObj.students.push({
+                            id: user.id,
+                            username: user.username,
+                            nickname: user.nickname,
+                            createdAt: user.createdAt
+                        });
+                    }
+                }
+            }
+        }
+    }catch(error){
+        console.error('Error generating queue data:', error);
+        return null;  // Return null if there's an error
+    }
+}
+
+async function generateQueueDataForUser(targetUser, classData) {
+    try {
+        for (const prestige in classData) {
+            const classes = classData[prestige];
+            for (const classObj of classes) {
+                // Check if the target user has completed the class
+                if (targetUser[classObj.name] === true) {
+                    classObj.completed = true;
+                } else {
+                    classObj.completed = false;
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error generating queue data for user:', error);
+        return null; // Return null if there's an error
+    }
+}
+
+function sortClassesAlphabetically(classData) {
+    for (const prestige in classData) {
+        classData[prestige].sort((a, b) => a.name.localeCompare(b.name));
+    }
+}

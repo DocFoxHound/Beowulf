@@ -213,8 +213,7 @@ async function generateClassData(allClasses) {
                 thumbnail_url: log.thumbnail_url,
                 completed: false,
                 value: 0,
-                level: log.level,
-                thumbnail_url: log.thumbnail_url
+                level: log.level
             });
         }
         return classData;

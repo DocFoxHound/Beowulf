@@ -6,46 +6,39 @@ const editQueue = require("../api/queueApi").editQueue;
 const prestigeRoles = require("../api/prestige-roles-api")
 const lodash = require('lodash');
 
-async function createNewUser(userData, client, guildId){
-    console.log("Create New User")
-    newUser = {
+async function createNewUser(userData, client, guildId) {
+    console.log("Create New User");
+
+    const classData = await generateDynamicClassFields(); // Dynamically fetch class data
+    const newUser = {
         id: '',
         username: null,
         nickname: null,
         corsair_level: 0,
         raptor_level: 0,
         raider_level: 0,
-        raptor_1_solo: false,
-        raptor_1_team: false,
-        raptor_2_solo: false,
-        raptor_2_team: false,
-        raptor_3_solo: false,
-        raptor_3_team: false,
-        corsair_1_turret: false,
-        corsair_1_torpedo: false,
-        corsair_2_ship_commander: false,
-        corsair_2_wing_commander: false,
-        corsair_3_fleet_commander: false,
-        raider_1_swabbie: false,
-        raider_1_linemaster: false,
-        raider_1_boarder: false,
-        raider_2_powdermonkey: false,
-        raider_2_mate: false,
-        raider_3_sailmaster: false,
         rank: null
+    };
+
+    // Dynamically add class fields based on the database data
+    for (const [category, classes] of Object.entries(classData)) {
+        for (const classObj of classes) {
+            const fieldName = `${category}_${classObj.name.toLowerCase().replace(/\s+/g, '_')}`;
+            newUser[fieldName] = false; // Default to false (not completed)
+        }
     }
 
-    //check if user is still in discord
+    // Check if the user is still in Discord
     const guild = await client.guilds.fetch(guildId);
-    member = null;
-    try{
+    let member = null;
+    try {
         member = await guild.members.fetch(userData.id);
-    }catch{
+    } catch {
         member = null;
     }
-    // const discordUser = await client.users.fetch(userData.id);
-    if(member){
-        console.log("Adding user from Discord to DB")
+
+    if (member) {
+        console.log("Adding user from Discord to DB");
         const memberRoles = member.roles.cache.map(role => role.id);
         newUser.id = userData.id;
         newUser.username = userData.username;
@@ -53,219 +46,43 @@ async function createNewUser(userData, client, guildId){
         newUser.corsair_level = getCorsairRank(memberRoles, false) || 0;
         newUser.raptor_level = getRaptorRank(memberRoles, false) || 0;
         newUser.raider_level = getRaiderRank(memberRoles, false) || 0;
-        newUser.raptor_1_solo = userData.raptor_1_solo;
-        newUser.raptor_1_team = userData.raptor_1_team;
-        newUser.raptor_2_solo = userData.raptor_2_solo;
-        newUser.raptor_2_team = userData.raptor_2_team;
-        newUser.raptor_3_solo = userData.raptor_3_solo;
-        newUser.raptor_3_team = userData.raptor_3_team;
-        newUser.corsair_1_turret = userData.corsair_1_turret;
-        newUser.corsair_1_torpedo = userData.corsair_1_torpedo;
-        newUser.corsair_2_ship_commander = userData.corsair_2_ship_commander;
-        newUser.corsair_2_wing_commander = userData.corsair_2_wing_commander;
-        newUser.corsair_3_fleet_commander = userData.corsair_3_fleet_commander;
-        newUser.raider_1_swabbie = userData.raider_1_swabbie;
-        newUser.raider_1_linemaster = userData.raider_1_linemaster;
-        newUser.raider_1_boarder = userData.raider_1_boarder;
-        newUser.raider_2_powdermonkey = userData.raider_2_powdermonkey;
-        newUser.raider_2_mate = userData.raider_2_mate;
-        newUser.raider_3_sailmaster = userData.raider_3_sailmaster;
         newUser.rank = getUserRank(memberRoles) || null;
 
         userlistApi.createUser(newUser);
-    }else{ //if for some reason there's an error OR the person isn't in the discord anymore, do this;
-        console.log("Adding user from queue to DB")
+    } else {
+        console.log("Adding user from queue to DB");
         newUser.id = userData.id;
         newUser.username = userData.username;
         newUser.nickname = userData.nickname || null;
-        userlistApi.createUser(user);
+        userlistApi.createUser(newUser);
     }
-    
 }
 
 async function updatedUserListData(userData){
 
 }
 
-async function updateUserClassStatus(userDataForUserList, requestedClass, classCompleted) {
-    console.log("Update User Class Status")
-    // const classList = await getClasses();
-    // let classToEdit;
-    // for(const clss of classList){
-    //     if(clss.name.toLowerCase() === requestedClass.toLowerCase() || clss.aliases.includes(requestedClass.toLowerCase())){
-    //         classToEdit = clss;
-    //         // if(classCompleted){
-    //         //     userDataForUserList.classes[requestedClass] = true;
-    //         // }else{
-    //         //     userDataForUserList.classes[requestedClass] = false;
-    //         // }
-    //     }
-    // }
-    // console.log(userDataForUserList[classToEdit.name]);
-    // userDataForUserList[classToEdit.name] = classCompleted;
-    switch (requestedClass.toLowerCase()){
-        case "raptor_1_solo":
-            userDataForUserList.raptor_1_solo = classCompleted;
-            break;
-        case "dogfighting":
-            userDataForUserList.raptor_1_solo = classCompleted;
-            break;
-        case "dogfighting 101":
-            userDataForUserList.raptor_1_solo = classCompleted;
-            break;
-        case "raptor_1_team":
-            userDataForUserList.raptor_1_team = classCompleted;
-            break;
-        case "teamfighting":
-            userDataForUserList.raptor_1_team = classCompleted;
-            break;
-        case "teamfighting 101":
-            userDataForUserList.raptor_1_team = classCompleted;
-            break;
-        case "raptor_2_solo":
-            userDataForUserList.raptor_2_solo = classCompleted;
-            break;
-        case "solo2":
-            userDataForUserList.raptor_2_solo = classCompleted;
-            break;
-        case "raptor ii solo assessment":
-            userDataForUserList.raptor_2_solo = classCompleted;
-            break;
-        case "raptor_2_team":
-            userDataForUserList.raptor_2_team = classCompleted;
-            break; 
-        case "team2":
-            userDataForUserList.raptor_2_team = classCompleted;
-            break;    
-        case "raptor ii team assessment":
-            userDataForUserList.raptor_2_team = classCompleted;
-            break;   
-        case "raptor_3_solo":
-            userDataForUserList.raptor_3_solo = classCompleted;
-            break;
-        case "solo3":
-            userDataForUserList.raptor_3_solo = classCompleted;
-            break;
-        case "raptor iii solo assessment":
-            userDataForUserList.raptor_3_solo = classCompleted;
-            break;
-        case "raptor_3_team":
-            userDataForUserList.raptor_3_team = classCompleted;
-            break;
-        case "team3":
-            userDataForUserList.raptor_3_team = classCompleted;
-            break;
-        case "raptor iii team assessment":
-            userDataForUserList.raptor_3_team = classCompleted;
-            break;
-        case "corsair_1_turret":
-            userData.corsair_1_turret = classCompleted;
-        case "turret":
-            userData.corsair_1_turret = classCompleted;
-        case "turret assessment":
-            userDataForUserList.corsair_1_turret = classCompleted;
-            break;
-        case "corsair_1_torpedo":
-            userDataForUserList.corsair_1_torpedo = classCompleted;
-            break;
-        case "torpedo":
-            userDataForUserList.corsair_1_torpedo = classCompleted;
-            break;
-        case "torpedo assessment":
-            userDataForUserList.corsair_1_torpedo = classCompleted;
-            break;
-        case "corsair_2_ship_commander":
-            userDataForUserList.corsair_2_ship_commander = classCompleted;
-            break;
-        case "ship commander":
-            userDataForUserList.corsair_2_ship_commander = classCompleted;
-            break;
-        case "ship":
-            userDataForUserList.corsair_2_ship_commander = classCompleted;
-            break;
-        case "ship commander assessment":
-            userDataForUserList.corsair_2_ship_commander = classCompleted;
-            break;
-        case "corsair_2_wing_commander":
-            userDataForUserList.corsair_2_wing_commander = classCompleted;
-            break;
-        case "wing commander":
-            userDataForUserList.corsair_2_wing_commander = classCompleted;
-            break;
-        case "wing commander assessment":
-            userDataForUserList.corsair_2_wing_commander = classCompleted;
-            break;
-        case "wing":
-            userDataForUserList.corsair_2_wing_commander = classCompleted;
-            break;
-        case "corsair_3_fleet_commander":
-            userDataForUserList.corsair_3_fleet_commander = classCompleted;
-            break;
-        case "fleet commander":
-            userDataForUserList.corsair_3_fleet_commander = classCompleted;
-            break;
-        case "fleet":
-            userDataForUserList.corsair_3_fleet_commander = classCompleted;
-            break;
-        case "fleet commander assessment":
-            userDataForUserList.corsair_3_fleet_commander = classCompleted;
-            break;
-        case "raider_1_swabbie":
-            userDataForUserList.raider_1_swabbie = classCompleted;
-            break;
-        case "swabbie":
-            userDataForUserList.raider_1_swabbie = classCompleted;
-            break;
-        case "swabbie assessment":
-            userDataForUserList.raider_1_swabbie = classCompleted;
-            break;
-        case "raider_1_linemaster":
-            userDataForUserList.raider_1_linemaster = classCompleted;
-            break;
-        case "line master":
-            userDataForUserList.raider_1_linemaster = classCompleted;
-            break;
-        case "line master assessment":
-            userData.raider_1_linemaster = classCompleted;
-            break;
-        case "raider_1_boarder":
-            userDataForUserList.raider_1_boarder = classCompleted;
-            break;
-        case "boarder":
-            userDataForUserList.raider_1_boarder = classCompleted;
-            break;
-        case "boarding assessment":
-            userDataForUserList.raider_1_boarder = classCompleted;
-            break;
-        case "raider_2_powdermonkey":
-            userDataForUserList.raider_2_powdermonkey = classCompleted;
-            break;
-        case "powder monkey":
-            userDataForUserList.raider_2_powdermonkey = classCompleted;
-            break;
-        case "powder monkey assessment":
-            userDataForUserList.raider_2_powdermonkey = classCompleted;
-            break;
-        case "raider_2_mate":
-            userDataForUserList.raider_2_mate = classCompleted;
-            break;
-        case "mate":
-            userDataForUserList.raider_2_mate = classCompleted;
-            break;
-        case "mate assessment":
-            userDataForUserList.raider_2_mate = classCompleted;
-            break;
-        case "raider_3_sailmaster":
-            userDataForUserList.raider_3_sailmaster = classCompleted;
-            break;
-        case "sail master":
-            userDataForUserList.raider_3_sailmaster = classCompleted;
-            break;
-        case "sail master assessment":
-            userDataForUserList.raider_3_sailmaster = classCompleted;
-            break;
+async function updateUserClassStatus(userlistData, className, classCompleted) {
+    console.log("Update User Class Status");
+
+    const classData = await generateDynamicClassFields(); // Dynamically fetch class data
+
+    // Find the matching class in the database
+    for (const [category, classes] of Object.entries(classData)) {
+        for (const classObj of classes) {
+            if (
+                classObj.name.toLowerCase() === className.toLowerCase() ||
+                classObj.alt_name.toLowerCase() === className.toLowerCase()
+            ) {
+                const fieldName = `${classObj.name.toLowerCase().replace(/\s+/g, '_')}`;
+                userlistData[fieldName] = classCompleted; // Update the class status
+                return await userlistApi.editUser(userlistData.id, userlistData);
+            }
+        }
     }
-    return await userlistApi.editUser(userDataForUserList.id, userDataForUserList);
+
+    console.log(`Class "${className}" not found in the database.`);
+    return null;
 }
 
 async function getUserRank(memberRoles) {
@@ -412,6 +229,18 @@ async function checkUserListForUser(targetUserData){
 }
 
 //checks if the user is in a queue already or not
+async function checkUserListForUserById(userId){
+    const user = await userlistApi.getUserById(userId);
+    //if the user is in the database, we'll return the user data
+    if(user){
+        return user;
+    //if the user IS NOT in the database, we have to create a new queue entry for them
+    }else{
+        return null;
+    }
+}
+
+//checks if the user is in a queue already or not
 async function checkUserListForUserByNameOrId(username){
     const users = await getUsers();
         user = null;
@@ -430,6 +259,21 @@ async function checkUserListForUserByNameOrId(username){
         
 }
 
+async function generateDynamicClassFields() {
+    const allClasses = await getClasses(); // Fetch all classes from the database
+    const classData = {};
+
+    // Organize classes by their prestige category
+    for (const classObj of allClasses) {
+        if (!classData[classObj.prestige_category]) {
+            classData[classObj.prestige_category] = [];
+        }
+        classData[classObj.prestige_category].push(classObj);
+    }
+
+    return classData;
+}
+
 module.exports = {
     checkUserListForUser,
     createNewUser,
@@ -442,5 +286,7 @@ module.exports = {
     getRaiderRankDb,
     getUserRank,
     checkUserListForUserByNameOrId,
-    updatedUserListData
+    updatedUserListData,
+    generateDynamicClassFields,
+    checkUserListForUserById
 }
