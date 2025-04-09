@@ -1,5 +1,4 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { getAvailableClasses } = require('../../queue-functions/get-available-classes');
 const { updateUserClassStatus, checkUserListForUserById, userlistApi } = require('../../userlist-functions/userlist-controller');
 const { getUserById } = require("../../api/userlistApi");
 const { queueController } = require('../../queue-functions/queue-controller');
