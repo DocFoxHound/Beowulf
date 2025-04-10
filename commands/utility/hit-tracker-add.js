@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('@discordjs/builders');
+const { SlashCommandBuilder, EmbedBuilder } = require('@discordjs/builders');
 const { getAllGameVersions } = require('../../api/gameVersionApi');
 const { getAllSummarizedItems, getAllSummarizedCommodities, getSummarizedItemById } = require('../../api/uexApi');
 const { createHitLog } = require('../../api/hitTrackerApi');
@@ -155,8 +155,25 @@ module.exports = {
             }
 
             await createHitLog(hitLog);
-            message = `Hit Log (${parentId}) Created by ${interaction.user.username}! \nTotal Value: ${totalValue}aUEC \nTotal Split Value: ${totalCutValue}aUEC \nTotal SCU: ${cargoList.reduce((acc, item) => acc + item.scuAmount, 0)} \nPlayers: ${assistedPlayerNames.join(', ')} \n**THE SPLIT VALUE DOESN'T EQUATE TO TOTAL INCOME**, just the worth of the items on the market. Split profits or cargo responsibly with your team.`;
-            await interaction.reply({ content: message, ephemeral: false });
+
+            // Create an embed for the response
+            const embed = new EmbedBuilder()
+                .setThumbnail('https://i.imgur.com/SBKHSKb.png')
+                .setAuthor({ name: `Hit Log Created by ${interaction.user.username}`, iconURL: 'https://i.imgur.com/iAypxY2.png' })
+                .setTitle(`Patch ${latestPatch}`)
+                .setImage('https://i.imgur.com/8eoJvJI.png')
+                .setDescription(`**Hit Log ID:** ${parentId}`)
+                .addFields(
+                    { name: 'Total Value', value: `${totalValue} aUEC`, inline: true },
+                    { name: 'Total Split Value', value: `${totalCutValue} aUEC`, inline: true },
+                    { name: 'Total SCU', value: `${cargoList.reduce((acc, item) => acc + item.scuAmount, 0)} SCU`, inline: true },
+                    { name: 'Crew', value: assistedPlayerNames.join(', ') || 'None', inline: false }
+                )
+                .setFooter({ text: 'The split value does not equate to total income. Split profits or cargo responsibly with your team.' })
+                // .setColor('#FF0000')
+                .setTimestamp();
+
+            await interaction.reply({ embeds: [embed], ephemeral: false });
         }catch(error){
             console.error('Error retrieving cargo types and amounts:', error);
             await interaction.reply({ content: 'There was an error adding the Hit Tracker Log.', ephemeral: true });

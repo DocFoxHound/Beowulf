@@ -42,7 +42,6 @@ module.exports = {
                     const embed = new EmbedBuilder()
                         .setAuthor({ name: `${targetUser.username}'s Badges`, iconURL: 'https://i.imgur.com/JvvqhbV.png' })
                         .setThumbnail('https://i.imgur.com/UoZsrrM.png')
-                        .setTitle(`Patch ${patch}`)
                         .setImage('https://i.imgur.com/6wRYEg5.png')
                         .setTitle(` `)
                         .setColor('#ff0000')
