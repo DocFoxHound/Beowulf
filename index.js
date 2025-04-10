@@ -303,11 +303,11 @@ client.on("error", (e) => {
 // Attempt to auto-reconnect on disconnection
 client.on("disconnect", () => {
   console.log("Disconnected! Trying to reconnect...");
-  client.login(process.env.LIVE_ENVIRONMENT === "true" ? process.env.CLIENT_ID : process.env.TEST_CLIENT_ID);
+  client.login(process.env.LIVE_ENVIRONMENT === "true" ? process.env.CLIENT_TOKEN : process.env.TEST_CLIENT_TOKEN);
 });
 
 //logs the bot in
-client.login(process.env.LIVE_ENVIRONMENT === "true" ? process.env.CLIENT_ID : process.env.TEST_CLIENT_ID);
+client.login(process.env.LIVE_ENVIRONMENT === "true" ? process.env.CLIENT_TOKEN : process.env.TEST_CLIENT_TOKEN);
 
 async function generateClassData(allClasses) {
   const classData = {};
