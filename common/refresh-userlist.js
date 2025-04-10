@@ -69,7 +69,7 @@ async function refreshUserlist(client, openai) {
                 await createUser(newUser);
             }
         });
-
+        console.log("Userlist refreshed successfully.");
         return "Userlist updated.";
     } catch (error) {
         console.error('Error refreshing userlist: ', error);

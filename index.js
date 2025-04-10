@@ -136,6 +136,7 @@ client.on("ready", async () => {
   // processUEXData("items_by_terminal"); //do NOT await this, it takes forever
   // await trimChatLogs();
   // await loadChatlogs(client, openai)
+  // refreshUserlist(client, openai)
   preloadedDbTables = await preloadFromDb();
 
   // setInterval(() => userCache.clear(),
