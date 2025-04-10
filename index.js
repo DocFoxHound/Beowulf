@@ -141,13 +141,16 @@ client.on("ready", async () => {
   // setInterval(() => userCache.clear(),
   //   21600000 // Clear cache every 6 hours, avoids excessive memory bloat
   // );
-  setInterval(() => processUEXData("terminal_prices"), //do NOT await this, it takes forever
+  setInterval(() => processUEXData("terminal_prices"), 
     86400000 //every 24 hours
   );
-  setInterval(() => processUEXData("other_tables"), //do NOT await this, it takes forever
+  setInterval(() => processUEXData("items_by_terminal"), 
+    87480000 //every 24.3 hours
+  );
+  setInterval(() => processUEXData("other_tables"),
     674800000 //every 7 days
   );
-  setInterval(async () => preloadedDbTables = preloadFromDb(), //do NOT await this, it takes forever
+  setInterval(async () => preloadedDbTables = preloadFromDb(),
     21600000 //every 6 hours
   );
   setInterval(() => queueReminderCheck(openai, client, null),

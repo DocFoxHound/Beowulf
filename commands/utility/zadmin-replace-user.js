@@ -47,7 +47,7 @@ module.exports = {
             const updatedUserData = {
                 id: newUserData.id,
                 username: newUserData.username,
-                nickname: newUserData.nickname,
+                nickname: newUserData.nickname || null,
                 rank: newUserData.rank,
             };
 

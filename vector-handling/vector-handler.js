@@ -166,6 +166,7 @@ async function loadChatlogs(client, openai){
 }
 
 async function trimChatLogs(){
+  console.log("Trimming chat logs.")
   const chatLog = await getMessages();
   let channelNames = [];
   try{
