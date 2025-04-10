@@ -5,7 +5,7 @@ const { newLoadUserList } = require('../../common/refresh-userlist');
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('zadmin-clear-chatlogs')
+        .setName('zchiefs-clear-chatlogs')
         .setDescription("Admin tool: Clears the chat logs in the bot's database."),
     
     /**

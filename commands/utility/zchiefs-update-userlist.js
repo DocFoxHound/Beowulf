@@ -5,7 +5,7 @@ const { newLoadUserList } = require('../../common/refresh-userlist');
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('zadmin-update-db-userlist')
+        .setName('zchiefs-update-db-userlist')
         .setDescription('Admin tool: Updates the userlist in the database')
         .addStringOption(option => 
             option.setName('type')

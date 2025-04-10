@@ -4,7 +4,7 @@ const { createGameVersion } = require('../../api/gameVersionApi');
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('zadmin-update-game-version')
+        .setName('zchiefs-update-game-version')
         .setDescription('Only use sparsely to update the major game version.')
         .addStringOption(option => 
             option.setName('version')

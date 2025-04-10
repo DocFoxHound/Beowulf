@@ -9,7 +9,7 @@ const { getClasses } = require('../../api/classApi');
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('zadmin-replace-user')
+        .setName('zchiefs-replace-user')
         .setDescription('Admin tool: Carry progress from old account to new account')
         .addUserOption(option => 
             option.setName('old-account')
