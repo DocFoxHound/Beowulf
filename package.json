@@ -15,12 +15,15 @@
   "homepage": "https://github.com/Kevin8675/ChatGPT-Discord-Bot#readme",
   "dependencies": {
     "axios": "^1.7.9",
+    "body-parser": "^2.2.0",
     "chart.js": "^4.4.8",
     "chartjs-node-canvas": "^5.0.0",
     "discord.js": "^14.7.1",
     "dotenv": "^16.0.3",
+    "express": "^5.1.0",
     "lodash": "^4.17.21",
     "openai": "^4.78.1",
+    "pm2": "^6.0.5",
     "string-progressbar": "^1.0.4"
   },
   "scripts": {
