@@ -27,7 +27,7 @@ module.exports = {
     // Call your signup logic from the external file
     try {
       // await queueController(interaction.user.id, className);
-      await interaction.reply(await queueControllerForSlashCommands(className, interaction.user, handlerUser,  openai, client, addOrRemove, classStatus, selfOrOther, interaction));
+      await interaction.reply({ content: await queueControllerForSlashCommands(className, interaction.user, handlerUser,  openai, client, addOrRemove, classStatus, selfOrOther, interaction), ephemeral: true});
     } catch (error) {
       console.error(error);
       await interaction.reply({ content: 'There was an error signing you up for the class.', ephemeral: true });
@@ -47,8 +47,8 @@ module.exports = {
         // Respond with up to 25 suggestions
         await interaction.respond(
             filtered.map(classObj => {
-                // Check if the user is already in the queue for this class
-                const inQueue = userQueueData[classObj.name] === true;
+                // Check if the userQueueData exists and if the user is already in the queue for this class
+                const inQueue = userQueueData && userQueueData[classObj.name] === true;
                 return {
                     name: `${classObj.name}${inQueue ? ' (In Queue)' : ''}`, // Append " - In Queue" if true
                     value: classObj.name
