@@ -1,7 +1,5 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const { CommandInteraction } = require('discord.js');
-const { getAllShips } = require('../../api/uexApi');
-const { deleteShipLog, getShipLogsByUserId, getAssistantShipLogs, getShipLogByEntryId, getShipLogsByCommanderId } = require('../../api/shipLogApi');
+const { deleteShipLog, getCrewShipLogs, getShipLogByEntryId, getShipLogsByCommanderId } = require('../../api/shipLogApi');
 const { getUserById } = require('../../api/userlistApi');
 
 const command = new SlashCommandBuilder()
@@ -46,7 +44,7 @@ module.exports = {
     async autocomplete(interaction) {
         const focusedValue = interaction.options.getFocused(); // Get the focused option value
         const allPrimaryBlackBoxLogs = await getShipLogsByCommanderId(interaction.user.id); // Fetch all black box logs
-        const allSecondaryBlackBoxLogs = await getAssistantShipLogs(interaction.user.id); // Fetch all assistant black box logs
+        const allSecondaryBlackBoxLogs = await getCrewShipLogs(interaction.user.id); // Fetch all assistant black box logs
         const allBlackBoxesCombined = [...allPrimaryBlackBoxLogs, ...allSecondaryBlackBoxLogs]; // Combine both logs
 
         // Combine ship_used and victims[] into a single searchable array
