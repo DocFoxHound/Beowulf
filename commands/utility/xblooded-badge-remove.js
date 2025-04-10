@@ -4,7 +4,7 @@ const { deleteBadge } = require('../../api/badgeApi');
 const { getBadgesByUserId } = require('../../api/badgeApi');
 
 module.exports = {
-    data: new SlashCommandBuilder().setName('badge-remove')
+    data: new SlashCommandBuilder().setName('xblooded-badge-remove')
         .setDescription('Remove a badge from a user')
         .addUserOption(option =>
         option

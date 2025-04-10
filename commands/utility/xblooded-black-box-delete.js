@@ -1,14 +1,11 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const { CommandInteraction } = require('discord.js');
-const { getAllShips } = require('../../api/uexApi');
-const { deleteShipLog, getAllShipLogs, getAssistantShipLogs, getShipLogByEntryId, getShipLogsByCommanderId } = require('../../api/shipLogApi');
-const { getUserById } = require('../../api/userlistApi');
+const { deleteBlackBox, getAllBlackBoxes, getBlackBoxByEntryId } = require('../../api/blackBoxApi');
 
 const command = new SlashCommandBuilder()
-    .setName('z-moderator-ship-log-remove')
-    .setDescription('Remove a kill log for your ship to the Black Box.')
+    .setName('xblooded-black-box-remove')
+    .setDescription('Add a kill log for your ship to the Black Box.')
     .addStringOption(option => 
-        option.setName('log')
+        option.setName('kill')
             .setDescription('The kill log you want to remove')
             .setRequired(true)
             .setAutocomplete(true));
@@ -27,32 +24,32 @@ module.exports = {
             });
         }
         // Get the needed variables
-        const killLog = interaction.options.getString('log');
+        const killLog = interaction.options.getString('kill');
         // const allBlackBoxLogs = await getBlackBoxesByUserId(interaction.user.id); // Fetch all black box logs
 
         // Call your delete logic from the external file
         try {
             const channelId = process.env.LIVE_ENVIRONMENT === "true" ? process.env.AUDIT_CHANNEL : process.env.TEST_AUDIT_CHANNEL; // Replace with actual channel ID
             const channel = await client.channels.fetch(channelId);
-            const logRecord = await getShipLogByEntryId(killLog); // Fetch the kill log record
+            const logRecord = await getBlackBoxByEntryId(killLog); // Fetch the kill log record
             if (channel && channel.isTextBased()) {
-            await channel.send(`The following Ship Log was deleted by ${interaction.user.username}: \n` + JSON.stringify(logRecord));
+            await channel.send(`The following black box was deleted by ${interaction.user.username}: \n` + JSON.stringify(logRecord));
             }
-
-            await deleteShipLog(killLog); // Pass the selected kill log ID
-            await interaction.reply({ content: `Ship Log deleted successfullyby a moderator: ${interaction.user.username}!`, ephemeral: false });
+            
+            await deleteBlackBox(killLog); // Pass the selected kill log ID
+            await interaction.reply({ content: `Black Box log deleted successfully by an admin: ${interaction.user.username}!`, ephemeral: false });
         } catch (error) {
             console.error(error);
-            await interaction.reply({ content: 'There was an error deleting the Ship Log.', ephemeral: true });
+            await interaction.reply({ content: 'There was an error deleting the Black Box log.', ephemeral: true });
         }
     },
     async autocomplete(interaction) {
         const focusedValue = interaction.options.getFocused(); // Get the focused option value
-        const allPrimaryBlackBoxLogs = await getAllShipLogs(interaction.user.id); // Fetch all black box logs
+        const allPrimaryBlackBoxLogs = await getAllBlackBoxes(); // Fetch all black box logs
 
         // Combine ship_used and victims[] into a single searchable array
         const allBlackBoxLogsListed = allPrimaryBlackBoxLogs.map(log => ({
-            name: `${log.ship_used} - Victims: ${log.victim_orgs.join(', ')}`,
+            name: `${log.id} - Victims: ${log.victims.join(', ')}`,
             value: log.id // Use the log ID as the value for selection
         }));
 

@@ -4,7 +4,7 @@ const { createBadge } = require('../../api/badgeApi');
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('badge-add')
+        .setName('xblooded-badge-add')
         .setDescription('Add a new badge to a user')
         .addUserOption(option => 
             option.setName('target')

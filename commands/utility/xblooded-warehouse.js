@@ -5,7 +5,7 @@ const { getUserById } = require('../../api/userlistApi');
 const { createWarehouse, getWarehousesByUserId, getWarehousesByUserAndCommodity, deleteWarehouse, editWarehouse } = require('../../api/warehouseApi');
 
 const command = new SlashCommandBuilder()
-    .setName('zmoderator-warehouse-remove')
+    .setName('xblooded-warehouse-remove')
     .setDescription('Add items to the Org warehouse.')
     .addStringOption(option => 
         option.setName('owner')

@@ -4,7 +4,7 @@ const { getAllLessonsLearned } = require('../../api/lessonsLearnedApi.js');
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('zmoderator-learn-view')
+        .setName('xblooded-learn-view')
         .setDescription('Displays all of the lessons that the bot has learned over time.'),
     
     /**
