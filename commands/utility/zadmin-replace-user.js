@@ -5,6 +5,8 @@ const { newLoadUserList } = require('../../common/refresh-userlist');
 const { getUserById } = require('../../api/userlistApi');
 const { editUser } = require('../../api/userlistApi');
 const { deleteUser } = require('../../api/userlistApi');
+const { getClasses } = require('../../api/classApi');
+const { generateClassData } = require('../../common/classUtils');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -37,30 +39,31 @@ module.exports = {
             const newAccount = interaction.options.getUser('new-account');
             const oldUserData = await getUserById(oldAccount.id);
             const newUserData = await getUserById(newAccount.id);
+
+            // Fetch all classes dynamically
+            const allClasses = await getClasses();
+            const classData = await generateClassData(allClasses); // Organize classes by category
+
+            // Initialize the updatedUserData object
             const updatedUserData = {
                 id: newUserData.id,
-                username: newUserData.user.username,
+                username: newUserData.username,
                 nickname: newUserData.nickname,
-                raptor_1_solo: oldAccount.raptor_1_solo,
-                raptor_1_team: oldAccount.raptor_1_team,
-                raptor_2_solo: oldAccount.raptor_2_solo,
-                raptor_2_team: oldAccount.raptor_2_team,
-                raptor_3_solo: oldAccount.raptor_3_solo,
-                raptor_3_team: oldAccount.raptor_3_team,
-                corsair_1_turret: oldAccount.corsair_1_turret,
-                corsair_1_torpedo: oldAccount.corsair_1_torpedo,
-                corsair_2_ship_commander: oldAccount.corsair_2_ship_commander,
-                corsair_2_wing_commander: oldAccount.corsair_2_wing_commander,
-                corsair_3_fleet_commander: oldAccount.corsair_3_fleet_commander,
-                raider_1_swabbie: oldAccount.raider_1_swabbie,
-                raider_1_linemaster: oldAccount.raider_1_linemaster,
-                raider_1_boarder: oldAccount.raider_1_boarder,
-                raider_2_powdermonkey: oldAccount.raider_2_powdermonkey,
-                raider_2_mate: oldAccount.raider_2_mate,
-                raider_3_sailmaster: oldAccount.raider_3_sailmaster
+                rank: newUserData.rank,
+            };
+
+            // Dynamically populate fields for each class category
+            for (const [category, classes] of Object.entries(classData)) {
+                for (const classObj of classes) {
+                    // Add a field for each class in the category
+                    updatedUserData[classObj.name] = oldUserData[classObj.name] || false; // Default to false if not completed
+                }
             }
+
+            // Update the new user's data and delete the old user
             await editUser(newUserData.id, updatedUserData);
             await deleteUser(oldUserData.id);
+
             await interaction.reply(`Successfully switched progress from ${oldAccount.username} to ${newAccount.username}.`);
         } catch (error) {
             console.error('Error switching users:', error);
@@ -68,3 +71,31 @@ module.exports = {
         }
     }
 };
+
+async function generateClassData(allClasses) {
+    const classData = {};
+    try {
+        for (const log of allClasses) {
+            if (!classData[log.prestige_category]) {
+                classData[log.prestige_category] = [];
+            }
+
+            classData[log.prestige_category].push({
+                id: log.id,
+                name: log.name,
+                alt_name: log.alt_name,
+                description: log.description,
+                ai_function_class_names: log.ai_function_class_names,
+                prerequisites: log.prerequisites,
+                thumbnail_url: log.thumbnail_url,
+                completed: false,
+                value: 0,
+                level: log.level
+            });
+        }
+        return classData;
+    }catch(error){
+        console.error('Error generating leaderboard data:', error);
+        return null;  // Return null if there's an error
+    }
+}

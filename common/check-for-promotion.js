@@ -1,8 +1,4 @@
 const { editUser } = require("../api/userlistApi")
-const { getUserById } = require("../api/userlistApi")
-const { getRaptorRankDb } = require("../userlist-functions/userlist-controller")
-const { getCorsairRankDb } = require("../userlist-functions/userlist-controller")
-const { getRaiderRankDb } = require("../userlist-functions/userlist-controller")
 const { notifyPrestigePromotion } = require("../common/bot-notify")
 const { notifyRankPromotion } = require("../common/bot-notify")
 const { getPrestiges } = require("../api/prestige-roles-api")
