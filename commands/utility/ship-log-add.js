@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const { CommandInteraction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+const { CommandInteraction, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, EmbedBuilder } = require('discord.js');
 const { getAllShips } = require('../../api/uexApi');
 const { createShipLog } = require('../../api/shipLogApi');
 const { getAllGameVersions } = require('../../api/gameVersionApi');
@@ -144,7 +144,7 @@ module.exports = {
             // Create description input
             const descriptionInput = new TextInputBuilder()
                 .setCustomId('description')
-                .setLabel('Cover the following topics: What was the mission? What happened? What was the outcome? Where can you improve?')
+                .setLabel('Cover: Mission, Outcome, Improvements')
                 .setStyle(TextInputStyle.Paragraph)
                 .setRequired(true)
                 .setMaxLength(4000);
@@ -190,8 +190,27 @@ module.exports = {
                 });
 
                 if (logChannel && logChannel.isTextBased()) {
-                    const logMessage = `🛳️ **New Ship Log Entry**\n**ID:** ${parentId}\n**Submitted by:** <@${interaction.user.id}>\n**Commander:** <@${commander}>\n**Crew:** ${assistedPlayers.map(id => `<@${id}>`).join(', ')}\n**Ship Used:** ${shipUsedName.custom_name} (the ${shipUsedName.ship_model})\n**Kills:** ${killAmount}\n**Total Value:** $${totalPrice.toLocaleString()}\n**Description:** ${modalDescription}`;
-                    await logChannel.send({ content: logMessage });
+                    const embed = new EmbedBuilder()
+                        .setAuthor({ name: `New Ship Log Entry`, iconURL: 'https://i.imgur.com/QHdkPrB.png' })
+                        .setThumbnail('https://i.imgur.com/UoZsrrM.png')
+                        .setTitle(`Ship Log (${parentId})`)
+                        .setImage('https://i.imgur.com/PUdhTOd.png')
+                        .setDescription(`A new ship log entry has been submitted.`)
+                        .addFields(
+                            { name: 'ID', value: `${parentId}`, inline: true },
+                            { name: 'Submitted by', value: `<@${interaction.user.id}>`, inline: true },
+                            { name: 'Commander', value: `<@${commander}>`, inline: true },
+                            { name: 'Crew', value: assistedPlayers.map(id => `<@${id}>`).join(', ') || 'None', inline: false },
+                            { name: 'Ship Used', value: `${shipUsedName.custom_name} (the ${shipUsedName.ship_model})`, inline: false },
+                            { name: 'Kills', value: `${killAmount}`, inline: true },
+                            { name: 'Total Value', value: `$${totalPrice.toLocaleString()}`, inline: true },
+                            { name: 'Description', value: modalDescription || 'No description provided.', inline: false }
+                        )
+                        .setColor('#ff0000')
+                        .setTimestamp()
+                        .setFooter({ text: 'Ship Log System' });
+
+                    await logChannel.send({ embeds: [embed] });
                 }
 
                 await submitted.followUp({ content: `Ship Log (${parentId}) added by ${interaction.user.username} successfully!`, ephemeral: false });
