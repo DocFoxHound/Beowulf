@@ -214,29 +214,6 @@ async function generateClassData(allClasses) {
     }
 }
 
-async function generateQueueData(allUsers, classData) {
-    try{
-        for(const prestige in classData){
-            const classes = classData[prestige];
-            for(const classObj of classes){
-                for(const user of allUsers){
-                    if(user[classObj.name] === true){
-                        classObj.students.push({
-                            id: user.id,
-                            username: user.username,
-                            nickname: user.nickname,
-                            createdAt: user.createdAt
-                        });
-                    }
-                }
-            }
-        }
-    }catch(error){
-        console.error('Error generating queue data:', error);
-        return null;  // Return null if there's an error
-    }
-}
-
 async function generateQueueDataForUser(targetUser, classData) {
     try {
         for (const prestige in classData) {

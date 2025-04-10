@@ -29,6 +29,7 @@ const { refreshUserlist } = require("./common/refresh-userlist.js");
 const { saveMessage } = require("./common/message-saver.js");
 const { loadChatlogs } = require("./vector-handling/vector-handler.js");
 const { trimChatLogs } = require("./vector-handling/vector-handler.js");
+const { getClasses } = require('./api/classApi.js');
 // const checkQueue = require("./queue-functions/queue-check.js")
 
 // Initialize dotenv config file
@@ -215,100 +216,84 @@ client.on(Events.InteractionCreate, async interaction => {
 });
 
 // Event Listener: new member joins the server
-client.on(Events.GuildMemberAdd, async member => {
-  const user = await getUserById(member.user.id) || null;
-  if(!user){
-    console.log(`Trouble adding ${member.user.username} to the UserList.`);
-    return;
-  }
-  if(user.id){
-    console.log(`User ${member.user.username} is already in the UserList.`);
-    return;
-  }else{
-    const newUser = {
-      id: member.user.id,
-      username: member.user.username,
-      nickname: null,
-      corsair_level: 0,
-      raptor_level: 0,
-      raider_level: 0,
-      raptor_1_solo: false,
-      raptor_1_team: false,
-      raptor_2_solo: false,
-      raptor_2_team: false,
-      raptor_3_solo: false,
-      raptor_3_team: false,
-      corsair_1_turret: false,
-      corsair_1_torpedo: false,
-      corsair_2_ship_commander: false,
-      corsair_2_wing_commander: false,
-      corsair_3_fleet_commander: false,
-      raider_1_swabbie: false,
-      raider_1_linemaster: false,
-      raider_1_boarder: false,
-      raider_2_powdermonkey: false,
-      raider_2_mate: false,
-      raider_3_sailmaster: false,
-      rank: null
+client.on('guildMemberAdd', async member => {
+    try {
+        const allClasses = await getClasses(); // Fetch all classes dynamically
+        const classData = await generateClassData(allClasses); // Organize classes by category
+
+        // Check if the user already exists in the database
+        const user = await getUserById(member.user.id) || null;
+        if (user) {
+            console.log(`User ${member.user.username} is already in the UserList.`);
+            return;
+        }
+
+        // Initialize the newUser object
+        const newUser = {
+            id: member.user.id,
+            username: member.user.username,
+            nickname: null,
+            rank: null,
+        };
+
+        // Dynamically populate fields for each class category
+        for (const [category, classes] of Object.entries(classData)) {
+            for (const classObj of classes) {
+                // Add a field for each class in the category
+                newUser[classObj.name] = false; // Default to false (not completed)
+            }
+        }
+
+        // Add the new user to the database
+        const result = await createUser(newUser);
+        if (result) {
+            console.log(`User ${member.user.username} has been added to the UserList.`);
+        } else {
+            console.error(`Failed to add user ${member.user.username} to the UserList.`);
+        }
+    } catch (error) {
+        console.error('Error adding new user:', error);
     }
-  
-    const result = await createUser(newUser);
-    if (result) {
-      console.log(`User ${member.user.username} has been added to the UserList.`);
-    } else {
-      console.error(`Failed to add user ${member.user.username} to the UserList.`);
-    }
-  }
 });
 
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
-  try{
-    const oldNick = oldMember.nickname;
-    const newNick = newMember.nickname;
-    const user = await getUserById(newMember.user.id) || null;
-    if(!user){
-      console.log("Member update had no user identified, returning")
-      return;
-    }
+    try {
+        const allClasses = await getClasses(); // Fetch all classes dynamically
+        const classData = await generateClassData(allClasses); // Organize classes by category
 
-    //get the member's rank
-    const memberRoles = newMember.roles.cache.map(role => role.id);
-    const userRank = await getUserRank(memberRoles);
-    const raptorLevel = await getRaptorRankDb(oldMember.id);
-    const corsairLevel = await getCorsairRankDb(oldMember.id);
-    const raiderLevel = await getRaiderRankDb(oldMember.id);
+        // Fetch the user's existing data
+        const user = await getUserById(newMember.user.id) || null;
+        if (!user) {
+            console.log("Member update had no user identified, returning");
+            return;
+        }
 
-    const updatedUser = {
-      id: oldMember.id,
-      username: newMember.username,
-      nickname: newMember.nickname,
-      corsair_level: corsairLevel,
-      raptor_level: raptorLevel,
-      raider_level: raiderLevel,
-      raptor_1_solo: user.raptor_1_solo,
-      raptor_1_team: user.raptor_1_team,
-      raptor_2_solo: user.raptor_2_solo,
-      raptor_2_team: user.raptor_2_team,
-      raptor_3_solo: user.raptor_3_solo,
-      raptor_3_team: user.raptor_3_team,
-      corsair_1_turret: user.corsair_1_turret,
-      corsair_1_torpedo: user.corsair_1_torpedo,
-      corsair_2_ship_commander: user.corsair_2_ship_commander,
-      corsair_2_wing_commander: user.corsair_2_wing_commander,
-      corsair_3_fleet_commander: user.corsair_3_fleet_commander,
-      raider_1_swabbie: user.raider_1_swabbie,
-      raider_1_linemaster: user.raider_1_linemaster,
-      raider_1_boarder: user.raider_1_boarder,
-      raider_2_powdermonkey: user.raider_2_powdermonkey,
-      raider_2_mate: user.raider_2_mate,
-      raider_3_sailmaster: user.raider_3_sailmaster,
-      rank: userRank
+        // Get the member's rank
+        const memberRoles = newMember.roles.cache.map(role => role.id);
+        const userRank = await getUserRank(memberRoles);
+
+        // Initialize the updatedUser object
+        const updatedUser = {
+            id: user.id,
+            username: newMember.user.username,
+            nickname: newMember.nickname,
+            rank: userRank,
+        };
+
+        // Dynamically populate fields for each class category
+        for (const [category, classes] of Object.entries(classData)) {
+            for (const classObj of classes) {
+                // Add a field for each class in the category
+                updatedUser[classObj.name] = user[classObj.name] || false; // Retain the user's existing completion status
+            }
+        }
+
+        // Update the user's data in the database
+        await editUser(user.id, updatedUser);
+        console.log("User updated successfully");
+    } catch (error) {
+        console.error("Error updating user:", error);
     }
-    await editUser(user.id, updatedUser);
-    console.log("User updated successfully");
-  }catch(error){
-    console.log("Error updating user: ", error);
-  }
 });
 
 // Error handling to prevent crashes
@@ -324,3 +309,31 @@ client.on("disconnect", () => {
 
 //logs the bot in
 client.login(process.env.CLIENT_TOKEN);
+
+async function generateClassData(allClasses) {
+  const classData = {};
+  try {
+      for (const log of allClasses) {
+          if (!classData[log.prestige_category]) {
+              classData[log.prestige_category] = [];
+          }
+
+          classData[log.prestige_category].push({
+              id: log.id,
+              name: log.name,
+              alt_name: log.alt_name,
+              description: log.description,
+              ai_function_class_names: log.ai_function_class_names,
+              prerequisites: log.prerequisites,
+              thumbnail_url: log.thumbnail_url,
+              completed: false,
+              value: 0,
+              level: log.level
+          });
+      }
+      return classData;
+  }catch(error){
+      console.error('Error generating leaderboard data:', error);
+      return null;  // Return null if there's an error
+  }
+}

@@ -1,103 +1,75 @@
-const { checkForPrestigePromotionUpdateUserlist } = require('./check-for-promotion');
-const { checkForRankPromotionUpdateUserlist } = require('./check-for-promotion');
 const { getUserRank } = require("../userlist-functions/userlist-controller")
-const { getRaptorRankDb } = require("../userlist-functions/userlist-controller")
-const { getCorsairRankDb } = require("../userlist-functions/userlist-controller")
-const { getRaiderRankDb } = require("../userlist-functions/userlist-controller")
 const { getRaptorRank } = require("../userlist-functions/userlist-controller")
 const { getCorsairRank } = require("../userlist-functions/userlist-controller")
 const { getRaiderRank } = require("../userlist-functions/userlist-controller")
 const { getUserById } = require("../api/userlistApi")
 const { editUser } = require("../api/userlistApi")
 const { createUser } = require("../api/userlistApi")
+const { getClasses } = require("../api/classApi")
 
-async function refreshUserlist(client, openai){
-    console.log("Refreshing Userlist")
-    try{
+async function refreshUserlist(client, openai) {
+    console.log("Refreshing Userlist");
+    try {
         const guild = await client.guilds.cache.get(process.env.LIVE_ENVIRONMENT === "true" ? process.env.TEST_GUILD_ID : process.env.GUILD_ID);
         const memberList = await guild.members.cache;
 
+        // Fetch all classes dynamically
+        const allClasses = await getClasses();
+        const classData = await generateClassData(allClasses); // Organize classes by category
+
         memberList.forEach(async member => {
             const oldUserData = await getUserById(member.id) || null;
-            if(oldUserData !== null){//if the user is in the database
+
+            if (oldUserData !== null) { // If the user is in the database
                 const memberRoles = await member.roles.cache.map(role => role.id);
                 const userRank = await getUserRank(memberRoles);
-                const raptorLevel = await getRaptorRankDb(member.id);
-                const corsairLevel = await getCorsairRankDb(member.id);
-                const raiderLevel = await getRaiderRankDb(member.id);
-        
+
+                // Initialize the updatedUserData object
                 const updatedUserData = {
                     id: member.id,
                     username: member.user.username,
                     nickname: member.nickname,
-                    corsair_level: corsairLevel,
-                    raptor_level: raptorLevel,
-                    raider_level: raiderLevel,
-                    raptor_1_solo: oldUserData.raptor_1_solo,
-                    raptor_1_team: oldUserData.raptor_1_team,
-                    raptor_2_solo: oldUserData.raptor_2_solo,
-                    raptor_2_team: oldUserData.raptor_2_team,
-                    raptor_3_solo: oldUserData.raptor_3_solo,
-                    raptor_3_team: oldUserData.raptor_3_team,
-                    corsair_1_turret: oldUserData.corsair_1_turret,
-                    corsair_1_torpedo: oldUserData.corsair_1_torpedo,
-                    corsair_2_ship_commander: oldUserData.corsair_2_ship_commander,
-                    corsair_2_wing_commander: oldUserData.corsair_2_wing_commander,
-                    corsair_3_fleet_commander: oldUserData.corsair_3_fleet_commander,
-                    raider_1_swabbie: oldUserData.raider_1_swabbie,
-                    raider_1_linemaster: oldUserData.raider_1_linemaster,
-                    raider_1_boarder: oldUserData.raider_1_boarder,
-                    raider_2_powdermonkey: oldUserData.raider_2_powdermonkey,
-                    raider_2_mate: oldUserData.raider_2_mate,
-                    raider_3_sailmaster: oldUserData.raider_3_sailmaster,
-                    rank: userRank
+                    rank: userRank,
+                };
+
+                // Dynamically populate fields for each class category
+                for (const [category, classes] of Object.entries(classData)) {
+                    for (const classObj of classes) {
+                        updatedUserData[classObj.name] = oldUserData[classObj.name] || false; // Retain the user's existing completion status
+                    }
                 }
 
-                //check if there was a promotion missed somewhere
-                if(oldUserData.raptor_level !== raptorLevel || oldUserData.corsair_level !== corsairLevel || oldUserData.raider_level !== raiderLevel){
-                    //send a message to the player that they have been promoted
-                    checkForPrestigePromotionUpdateUserlist(oldUserData, updatedUserData, member, client, openai)
-                }
-                if(oldUserData.rank !== userRank){
-                    //send a message to the player that they have been promoted
-                    checkForRankPromotionUpdateUserlist(oldUserData, updatedUserData, member, client, openai)
-                }
-                
-            }else{//if the user isn't in the database
+                // Check for promotions
+                checkForPromotions(oldUserData, updatedUserData, member, client, openai);
+
+                // Update the user's data in the database
+                await editUser(member.id, updatedUserData);
+            } else { // If the user isn't in the database
                 const memberRoles = await member.roles.cache.map(role => role.id);
                 const userRank = await getUserRank(memberRoles);
 
+                // Initialize the newUser object
                 const newUser = {
                     id: member.id,
                     username: member.user.username,
                     nickname: member.nickname,
-                    corsair_level: 0,
-                    raptor_level: 0,
-                    raider_level: 0,
-                    raptor_1_solo: false,
-                    raptor_1_team: false,
-                    raptor_2_solo: false,
-                    raptor_2_team: false,
-                    raptor_3_solo: false,
-                    raptor_3_team: false,
-                    corsair_1_turret: false,
-                    corsair_1_torpedo: false,
-                    corsair_2_ship_commander: false,
-                    corsair_2_wing_commander: false,
-                    corsair_3_fleet_commander: false,
-                    raider_1_swabbie: false,
-                    raider_1_linemaster: false,
-                    raider_1_boarder: false,
-                    raider_2_powdermonkey: false,
-                    raider_2_mate: false,
-                    raider_3_sailmaster: false,
-                    rank: null
+                    rank: userRank,
+                };
+
+                // Dynamically populate fields for each class category
+                for (const [category, classes] of Object.entries(classData)) {
+                    for (const classObj of classes) {
+                        newUser[classObj.name] = false; // Default to false (not completed)
+                    }
                 }
-                createUser(newUser);
+
+                // Add the new user to the database
+                await createUser(newUser);
             }
-        })
-        return "Userlist updated."
-    }catch(error){
+        });
+
+        return "Userlist updated.";
+    } catch (error) {
         console.error('Error refreshing userlist: ', error);
     }
 }
@@ -146,6 +118,34 @@ async function newLoadUserList(client){
         return "New Users have been loaded - DO NOT USE THIS COMMAND AGAIN; USE THE UPDATE COMMAND"
     }catch(error){
         console.error('Error loading new userlist: ', error);
+    }
+}
+
+async function generateClassData(allClasses) {
+    const classData = {};
+    try {
+        for (const log of allClasses) {
+            if (!classData[log.prestige_category]) {
+                classData[log.prestige_category] = [];
+            }
+  
+            classData[log.prestige_category].push({
+                id: log.id,
+                name: log.name,
+                alt_name: log.alt_name,
+                description: log.description,
+                ai_function_class_names: log.ai_function_class_names,
+                prerequisites: log.prerequisites,
+                thumbnail_url: log.thumbnail_url,
+                completed: false,
+                value: 0,
+                level: log.level
+            });
+        }
+        return classData;
+    }catch(error){
+        console.error('Error generating leaderboard data:', error);
+        return null;  // Return null if there's an error
     }
 }
 
