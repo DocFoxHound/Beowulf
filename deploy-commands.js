@@ -16,9 +16,9 @@ dotenv.config({
   path: envFile,
 });
 
-const clientId = process.env.CLIENT_ID;
+const clientId = process.env.LIVE_ENVIRONMENT === "true" ? process.env.CLIENT_ID : process.env.TEST_CLIENT_ID;
 const guildId = process.env.LIVE_ENVIRONMENT === "true" ? process.env.GUILD_ID : process.env.TEST_GUILD_ID;
-const token = process.env.CLIENT_TOKEN;
+const token = process.env.LIVE_ENVIRONMENT === "true" ? process.env.CLIENT_TOKEN : process.env.TEST_CLIENT_TOKEN;
 
 const commands = [];
 // Grab all the command folders from the commands directory you created earlier

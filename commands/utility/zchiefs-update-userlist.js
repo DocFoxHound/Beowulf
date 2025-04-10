@@ -23,32 +23,40 @@ module.exports = {
         const member = interaction.member;
         const moderatorRoles = process.env.LIVE_ENVIRONMENT === "true" ? process.env.ADMIN_ROLES.split(',') : process.env.TEST_ADMIN_ROLES.split(',');
         const hasPermission = member.roles.cache.some(role => moderatorRoles.includes(role.id));
-        if(!hasPermission) {
+        if (hasPermission === false) {
             return interaction.reply({ 
                 content: `${interaction.user.username}, you do not have permission to use this command.`,
-                ephemeral: false 
+                ephemeral: true 
             });
         }
+
         try {
             const type = interaction.options.getString('type');
-            if(type === 'update'){
-                const response = await refreshUserlist(client, openai);
-                return interaction.reply({ 
-                    content: response,
-                    ephemeral: true 
-                });
+
+            // Defer the reply to allow time for the operation
+            await interaction.deferReply({ ephemeral: true });
+
+            let response = '';
+            if (type === 'update') {
+                response = await refreshUserlist(client, openai);
+            } else if (type === 'new_server_load') {
+                response = await newLoadUserList(client);
             }
-            if(type === 'new_server_load'){
-                const response = await newLoadUserList(client);
-                console.log("Response: ", response)
-                return interaction.reply({ 
-                    content: response,
-                    ephemeral: true 
-                });
-            }
+
+            // Edit the deferred reply with the response
+            await interaction.editReply({ content: response });
         } catch (error) {
             console.error('Error updating userlist:', error);
-            await interaction.reply('An error occurred while updating userlist. Please try again later.');
+
+            // Edit the deferred reply with an error message
+            if (interaction.deferred) {
+                await interaction.editReply('An error occurred while updating the userlist. Please try again later.');
+            } else {
+                await interaction.reply({
+                    content: 'An error occurred while updating the userlist. Please try again later.',
+                    ephemeral: true
+                });
+            }
         }
     }
 };
