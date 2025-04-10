@@ -19,12 +19,12 @@ const command = new SlashCommandBuilder()
             ))
     .addStringOption(option => 
         option.setName('item')
-            .setDescription('Select the item to search.')
+            .setDescription('Only use if searching by item.')
             .setRequired(false)
             .setAutocomplete(true))
     .addUserOption(option => 
         option.setName('player')
-            .setDescription('Select the player to search.')
+            .setDescription('Only use if searching by player.')
             .setRequired(false))
     ;
     
@@ -69,7 +69,6 @@ module.exports = {
             }else if (view === 'item') {
                 const allCargo = await getWarehousesByCommodity(cargoName);
                 data = await generateItemData(allCargo);
-                console.log('Data:', data);
                 author = `Search by Item`;
                 title = `${cargoName}`;
             }
