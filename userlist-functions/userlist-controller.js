@@ -132,16 +132,6 @@ async function getRaptorRank(memberRoles) {
     }
 }
 
-async function getRaptorRankDb(userId) {
-    const user = await userlistApi.getUserById(userId);
-    if (!user) return 0;
-
-    if (user.raptor_3_solo && user.raptor_3_team) return 3;
-    if (user.raptor_2_solo && user.raptor_2_team) return 2;
-    if (user.raptor_1_solo && user.raptor_1_team) return 1;
-    return 0;
-}
-
 async function getCorsairRank(memberRoles) {
     try {
         const discordPrestigeRanks = await prestigeRoles.getPrestiges();
@@ -167,16 +157,6 @@ async function getCorsairRank(memberRoles) {
         console.error("Error in getCorsairRank: ", error);
         return 0; // Return a default value in case of an error
     }
-}
-
-async function getCorsairRankDb(userId) {
-    const user = await userlistApi.getUserById(userId);
-    if (!user) return 0;
-
-    if (user.corsair_3_fleet_commander) return 3;
-    if (user.corsair_2_ship_commander && user.corsair_2_wing_commander) return 2;
-    if (user.corsair_1_turret && user.corsair_1_torpedo) return 1;
-    return 0;
 }
 
 async function getRaiderRank(memberRoles) {
@@ -206,14 +186,56 @@ async function getRaiderRank(memberRoles) {
     }
 }
 
-async function getRaiderRankDb(userId) {
-    const user = await userlistApi.getUserById(userId);
-    if (!user) return 0;
+async function getPrestigeRankDb(userId, prestigeCategory) {
+    try {
+        const user = await userlistApi.getUserById(userId);
+        if (!user) return 0;
 
-    if (user.raider_3_sailmaster) return 3;
-    if (user.raider_2_powdermonkey && user.raider_2_mate) return 2;
-    if (user.raider_1_swabbie && user.raider_1_linemaster && user.raider_1_boarder) return 1;
-    return 0;
+        // Fetch all classes dynamically
+        const allClasses = await getClasses();
+        const classData = await generateDynamicClassFields(allClasses); // Organize classes by category
+
+        // Get the classes for the specified prestige category
+        const prestigeClasses = classData[prestigeCategory];
+        if (!prestigeClasses) return 0;
+
+        // Group classes by level
+        const classesByLevel = {};
+        for (const classObj of prestigeClasses) {
+            if (!classesByLevel[classObj.level]) {
+                classesByLevel[classObj.level] = [];
+            }
+            classesByLevel[classObj.level].push(classObj);
+        }
+
+        // Check completion for each level
+        let rank = 0;
+        for (const level in classesByLevel) {
+            const levelClasses = classesByLevel[level];
+            const completed = levelClasses.every(classObj => user[classObj.name] === true);
+            if (completed) {
+                rank = Math.max(rank, parseInt(level)); // Update rank to the highest completed level
+            }
+        }
+
+        return rank;
+    } catch (error) {
+        console.error(`Error in getPrestigeRankDb for ${prestigeCategory}:`, error);
+        return 0; // Return 0 if there's an error
+    }
+}
+
+// Wrapper functions for specific prestige categories
+async function getRaptorRankDb(userId) {
+    return await getPrestigeRankDb(userId, 'raptor');
+}
+
+async function getCorsairRankDb(userId) {
+    return await getPrestigeRankDb(userId, 'corsair');
+}
+
+async function getRaiderRankDb(userId) {
+    return await getPrestigeRankDb(userId, 'raider');
 }
 
 //checks if the user is in a queue already or not
@@ -288,5 +310,6 @@ module.exports = {
     checkUserListForUserByNameOrId,
     updatedUserListData,
     generateDynamicClassFields,
-    checkUserListForUserById
+    checkUserListForUserById,
+    getPrestigeRankDb
 }

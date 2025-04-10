@@ -1,122 +1,110 @@
 const getUsers = require('../api/userlistApi').getUsers;
-const userlistController = require('../userlist-functions/userlist-controller');
+const { getClasses } = require('../api/classApi');
+const { getUserById } = require('../api/userlistApi');
+const { generateClassData, generateQueueData } = require('../commands/utility/progress-tracker');
 
+async function progressQuery(run, message) {
+    try {
+        const toolCall = run.required_action.submit_tool_outputs.tool_calls[0];
+        const parsedArgs = JSON.parse(toolCall.function.arguments);
+        const playerType = parsedArgs.user_type;
+        const optionalArea = parsedArgs.optional_area || null;
+        const otherPlayer = parsedArgs.optional_other_user || null;
 
-async function progressQuery(run, message){
-    try{
-        toolCall = run.required_action.submit_tool_outputs.tool_calls[0];
-        parsedArgs = JSON.parse(toolCall.function.arguments);
-        playerType = parsedArgs.user_type;
-        optionalArea = parsedArgs.optional_area || null;
-        otherPlayer = parsedArgs.optional_other_user || null; 
         let userData;
-        if(playerType === "self"){
+        if (playerType === "self") {
             userData = message.author;
-        }else{
+        } else {
             const allUsers = await getUsers();
-            for(const user of allUsers){
-                if(user.id === otherPlayer || user.username === otherPlayer || user.nickname === otherPlayer){
-                    userData = user;
+            userData = allUsers.find(user =>
+                user.id === otherPlayer || user.username === otherPlayer || user.nickname === otherPlayer
+            );
+        }
+
+        if (!userData) {
+            return "Issue with finding the other user mentioned.";
+        }
+
+        // Fetch all classes dynamically
+        const allClasses = await getClasses();
+        const userDbObject = await getUserById(userData.id);
+        const classData = await generateClassData(allClasses); // Organize classes by category
+        await generateQueueData(userDbObject, classData); // Populate completion data
+
+        // Helper function to format assessment status
+        const formatAssessments = (classes) => {
+            return classes
+                .map(classObj => `${classObj.completed ? '✅' : '❌'} ${classObj.alt_name || classObj.name}`)
+                .join('\n');
+        };
+
+        // Calculate completion percentages
+        const calculateCompletion = (classes) => {
+            const total = classes.length;
+            const completed = classes.filter(classObj => classObj.completed).length;
+            return Math.round((completed / total) * 100);
+        };
+
+        // Calculate overall progress
+        let crewEligibleCount = 0;
+        let marauderEligibleCount = 0;
+        let totalClasses = 0;
+        let completedClasses = 0;
+
+        for (const prestige in classData) {
+            const classes = classData[prestige];
+            totalClasses += classes.length;
+            completedClasses += classes.filter(classObj => classObj.completed).length;
+
+            // Check eligibility for crew and marauder
+            const levels = classes.reduce((acc, classObj) => {
+                acc[classObj.level] = acc[classObj.level] || [];
+                acc[classObj.level].push(classObj);
+                return acc;
+            }, {});
+
+            for (const level in levels) {
+                const levelClasses = levels[level];
+                const completed = levelClasses.filter(classObj => classObj.completed).length;
+                if (completed === levelClasses.length) {
+                    if (level === '1') crewEligibleCount++;
+                    if (level === '3') marauderEligibleCount++;
                 }
             }
         }
-            
-        if(userData !== null){
-            const raptorFields = {
-                'RAPTOR 1 Solo': userData.raptor_1_solo || false,
-                'RAPTOR 1 Team': userData.raptor_1_team || false,
-                'RAPTOR 2 Solo': userData.raptor_2_solo || false,
-                'RAPTOR 2 Team': userData.raptor_2_team || false,
-                'RAPTOR 3 Solo': userData.raptor_3_solo || false,
-                'RAPTOR 3 Team': userData.raptor_3_team || false
-            };
-            
-            const corsairFields = {
-                'CORSAIR 1 Turret': userData.corsair_1_turret || false,
-                'CORSAIR 1 Torpedo': userData.corsair_1_torpedo || false,
-                'CORSAIR 2 Ship Commander': userData.corsair_2_ship_commander || false,
-                'CORSAIR 2 Wing Commander': userData.corsair_2_wing_commander || false,
-                'CORSAIR 3 Fleet Commander': userData.corsair_3_fleet_commander || false
-            };
-            
-            const raiderFields = {
-                'RAIDER 1 Swabbie': userData.raider_1_swabbie || false,
-                'RAIDER 1 Linemaster': userData.raider_1_linemaster || false,
-                'RAIDER 1 Boarder': userData.raider_1_boarder || false,
-                'RAIDER 2 Powdermonkey': userData.raider_2_powdermonkey || false,
-                'RAIDER 2 Mate': userData.raider_2_mate || false,
-                'RAIDER 3 Sailmaster': userData.raider_3_sailmaster || false
-            };
-            
-            // Helper function to format assessment status
-            const formatAssessments = (assessments) => {
-                return Object.entries(assessments)
-                    .map(([name, completed]) => `${completed ? '✅' : '❌'} ${name}`)
-                    .join('\n');
-            };
-            
-            // Calculate completion percentages
-            const calculateCompletion = (assessments) => {
-                const total = Object.keys(assessments).length;
-                const completed = Object.values(assessments).filter(Boolean).length;
-                return Math.round((completed / total) * 100);
-            };
-            
-            const raptorLevel = await userlistController.getRaptorRankDb(userData.id);
-            const corsairLevel = await userlistController.getCorsairRankDb(userData.id);
-            const raiderLevel = await userlistController.getRaiderRankDb(userData.id);
-            const crewCompletion = Math.min(100, Math.round(((raptorLevel + corsairLevel + raiderLevel) / 3) * 100));
-            const marauderCompletion = Math.max(
-                Math.round((raptorLevel / 3) * 100),
-                Math.round((corsairLevel / 3) * 100),
-                Math.round((raiderLevel / 3) * 100)
-            );
-            const raptorCompletion = calculateCompletion(raptorFields);
-            const corsairCompletion = calculateCompletion(corsairFields);
-            const raiderCompletion = calculateCompletion(raiderFields);
-            const overallCompletion = Math.round(
-                (raptorCompletion + corsairCompletion + raiderCompletion) / 3
-            );
-            // Start with a header (or any text you always want shown)
-            let response = `${userData.username} has the following progress:\n\n`;
 
-            // If we only want RAPTOR or everything:
-            if (optionalArea === 'raptor' || optionalArea === 'overall' || optionalArea === null) {
-                response += `**RAPTOR**\n`;
-                response += `${formatAssessments(raptorFields)}\n`;
-                response += `Completion: ${raptorCompletion}%\n\n`;
-            }
+        const overallCompletion = Math.round((completedClasses / totalClasses) * 100);
+        const crewCompletion = Math.round((crewEligibleCount / 3) * 100);
+        const marauderCompletion = Math.round((marauderEligibleCount / 3) * 100);
 
-            // If we only want CORSAIR or everything:
-            if (optionalArea === 'corsair' || optionalArea === 'overall' || optionalArea === null) {
-                response += `**CORSAIR**\n`;
-                response += `${formatAssessments(corsairFields)}\n`;
-                response += `Completion: ${corsairCompletion}%\n\n`;
-            }
+        // Start building the response
+        let response = `${userData.username} has the following progress:\n\n`;
 
-            // If we only want RAIDER or everything:
-            if (optionalArea === 'raider' || optionalArea === 'overall' || optionalArea === null) {
-                response += `**RAIDER**\n`;
-                response += `${formatAssessments(raiderFields)}\n`;
-                response += `Completion: ${raiderCompletion}%\n\n`;
+        // Dynamically add progress for each prestige category
+        for (const [prestige, classes] of Object.entries(classData)) {
+            if (optionalArea === prestige.toLowerCase() || optionalArea === 'overall' || optionalArea === null) {
+                const prestigeCompletion = calculateCompletion(classes);
+                response += `**${prestige.toUpperCase()}**\n`;
+                response += `${formatAssessments(classes)}\n`;
+                response += `Completion: ${prestigeCompletion}%\n\n`;
             }
-
-            // If it’s overall, include the overall section
-            if (optionalArea === 'overall' || optionalArea === null) {
-                response += `**Overall Progress**\n`;
-                response += `Crew: ${crewCompletion}%\n`;
-                response += `Marauder: ${marauderCompletion}%\n`;
-                response += `Overall: ${overallCompletion}%\n`;
-            }
-            return response;
-        }else{
-            return "Issue with finding the other user mentioned."
         }
-    }catch(error){
-        return error;
+
+        // Add overall progress if requested
+        if (optionalArea === 'overall' || optionalArea === null) {
+            response += `**Overall Progress**\n`;
+            response += `Crew: ${crewCompletion}%\n`;
+            response += `Marauder: ${marauderCompletion}%\n`;
+            response += `Overall: ${overallCompletion}%\n`;
+        }
+
+        return response;
+    } catch (error) {
+        console.error('Error in progressQuery:', error);
+        return error.message || 'An error occurred while processing the progress query.';
     }
 }
 
 module.exports = {
     progressQuery
-}
+};
