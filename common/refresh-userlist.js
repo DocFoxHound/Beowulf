@@ -9,7 +9,7 @@ const logger = require('../logger');
 async function refreshUserlist(client, openai) {
     console.log("Refreshing Userlist");
     try {
-        const guild = await client.guilds.cache.get(process.env.LIVE_ENVIRONMENT === "true" ? process.env.TEST_GUILD_ID : process.env.GUILD_ID);
+        const guild = await client.guilds.cache.get(process.env.LIVE_ENVIRONMENT === "true" ? process.env.GUILD_ID : process.env.TEST_GUILD_ID);
         const memberList = await guild.members.cache;
 
         // Fetch all classes dynamically

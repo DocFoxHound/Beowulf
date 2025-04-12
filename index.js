@@ -116,7 +116,7 @@ client.on("ready", async () => {
     channelName: channel?.name,
     channelId: channel?.id
   })).filter(channel => channel.channelId);
-  logger.info(`Logged in as ${client.user.tag}!`);
+  console.log(`Logged in as ${client.user.tag}!`);
 
   //start off with a fresh reload of the online files
   // await vectorHandler.refreshChatLogs(channelIdAndName, openai, client)
@@ -124,6 +124,7 @@ client.on("ready", async () => {
   // processUEXData("items_by_terminal"); //do NOT await this, it takes forever
   // await trimChatLogs();
   // await loadChatlogs(client, openai)
+  // console.log(client.guilds.fetch(process.env.TEST_GUILD_ID))
   // refreshUserlist(client, openai)
   preloadedDbTables = await preloadFromDb();
 
@@ -285,7 +286,7 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 
 // Error handling to prevent crashes
 client.on("error", (e) => {
-  logger.error("Discord client error!", e);
+  console.error("Discord client error!", e);
 });
 
 // Attempt to auto-reconnect on disconnection
