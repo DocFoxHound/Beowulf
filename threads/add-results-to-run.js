@@ -1,4 +1,6 @@
 //a tool and/or Function Call
+const logger = require('../logger');
+
 async function addResultsToRun(contentText, openai, threadId, toolId, runId) {
     try {
         const run = await openai.beta.threads.runs.submitToolOutputsAndPoll(

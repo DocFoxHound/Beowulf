@@ -3,6 +3,7 @@ const { notifyPrestigePromotion } = require("../common/bot-notify");
 const { notifyRankPromotion } = require("../common/bot-notify");
 const { getPrestiges } = require("../api/prestige-roles-api");
 const { getClasses } = require('../api/classApi');
+const logger = require('../logger');
 
 async function checkForPrestigePromotionUpdateUserlist(oldUserData, updatedUserData, member, client, openai) {
     try {

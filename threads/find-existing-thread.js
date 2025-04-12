@@ -1,4 +1,5 @@
 const createNewThread = require("./create-new-thread")
+const logger = require('../logger');
 async function findExistingThread(channelId, openai){
     //check if there is a thread that exists that's already paired with the userID
     try{

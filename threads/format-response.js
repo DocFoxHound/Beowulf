@@ -1,3 +1,5 @@
+const logger = require('../logger');
+
 async function formatResponse(run, thread, openai, client) {
     try {
         const messages = await openai.beta.threads.messages.list(thread.id);

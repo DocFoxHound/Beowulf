@@ -1,7 +1,7 @@
-const fs = require('fs').promises;
 const UEX = require("../api/uexApi");
 const { getTopCommodityBuySellLocations } = require("./get-top-commodity-buy-sell-locations")
 const { getTopTerminalTransactions } = require("./get-top-terminal-transactions")
+const logger = require('../logger');
 
 
 async function preloadFromDb(){

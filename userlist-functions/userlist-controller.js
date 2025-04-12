@@ -2,9 +2,7 @@ const userlistApi = require("../api/userlistApi")
 const { getUsers } = require("../api/userlistApi")
 const rankRoles = require("../api/rank-roles-api")
 const getClasses = require("../api/classApi").getClasses;
-const editQueue = require("../api/queueApi").editQueue;
 const prestigeRoles = require("../api/prestige-roles-api")
-const lodash = require('lodash');
 
 async function createNewUser(userData, client, guildId) {
     console.log("Create New User");

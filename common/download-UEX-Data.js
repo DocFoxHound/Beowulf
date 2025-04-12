@@ -1,6 +1,7 @@
 const axios = require('axios');
 const path = require('path');
 const fs = require('fs').promises;
+const logger = require('../logger');
 
 async function downloadUEXData(){
     console.log("Updating UEX Items")

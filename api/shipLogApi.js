@@ -1,4 +1,5 @@
 const axios = require('axios');
+const logger = require('../logger');
 
 async function createShipLog(ShipLogData) {
     const apiUrl = `${process.env.SERVER_URL}/api/shiplog`;

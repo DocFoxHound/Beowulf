@@ -1,3 +1,5 @@
+const logger = require('../logger');
+
 async function runThread(thread, openai) {
     console.log("Running thread")
     try{

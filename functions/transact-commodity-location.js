@@ -1,3 +1,4 @@
+const logger = require('../logger');
 async function transact_commodity_location(run, preloadedDbTables){
     try{
       // stantonCommodityBuyList, //terminals buying this commodity from player

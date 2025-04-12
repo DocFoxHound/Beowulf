@@ -1,3 +1,5 @@
+const logger = require('../logger');
+
 async function getCachedUser(guild, userId, userCache) {
     // Check if the user is already in cache
     if (userCache.has(userId)) {

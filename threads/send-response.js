@@ -1,4 +1,5 @@
 const { createThreadDb } = require('../api/threadApi.js');
+const logger = require('../logger');
 
 async function sendResponse(message, formattedMessage, isReply, threadId) {
     console.log("Sending response")

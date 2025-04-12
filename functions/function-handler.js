@@ -8,6 +8,7 @@ const badgeQuery = require("./badge-query").badgeQuery;
 const { promoteRequest } = require("./promotion-request");
 // const queueCheck = require("../queue-functions/queue-check")
 const botNotify = require("../common/bot-notify")
+const logger = require('../logger');
 
 
 async function executeFunction(run, message, preloadedDbTables, openai, client) {

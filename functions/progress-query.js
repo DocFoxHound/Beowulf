@@ -1,3 +1,4 @@
+const logger = require('../logger');
 const getUsers = require('../api/userlistApi').getUsers;
 const { getClasses } = require('../api/classApi');
 const { getUserById } = require('../api/userlistApi');

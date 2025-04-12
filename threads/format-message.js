@@ -1,4 +1,5 @@
 const commonProcesses = require("../common/get-cached-user")
+const logger = require('../logger');
 
 function formatMessage(message, mentionRegex, userCache) {
     try{

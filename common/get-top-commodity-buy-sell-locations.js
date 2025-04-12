@@ -1,3 +1,5 @@
+const logger = require('../logger');
+
 async function getTopCommodityBuySellLocations(terminalPrices){
     reconstructedCommodityList = [];
     for (const terminal of terminalPrices) {

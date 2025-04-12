@@ -1,3 +1,5 @@
+const logger = require('../logger');
+
 async function piracy_advice_location(run, preloadedDbTables){
     try{
       const toolCall = run.required_action.submit_tool_outputs.tool_calls[0];

@@ -1,3 +1,5 @@
+const logger = require('../logger');
+
 async function getTopTerminalTransactions(terminalPrices){
     let reconstructedTerminalUsageList = [];
     for (const terminal of terminalPrices) {

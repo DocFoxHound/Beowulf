@@ -1,12 +1,10 @@
 const { getUserRank } = require("../userlist-functions/userlist-controller")
-const { getRaptorRank } = require("../userlist-functions/userlist-controller")
-const { getCorsairRank } = require("../userlist-functions/userlist-controller")
-const { getRaiderRank } = require("../userlist-functions/userlist-controller")
 const { getUserById } = require("../api/userlistApi")
 const { editUser } = require("../api/userlistApi")
 const { createUser } = require("../api/userlistApi")
 const { getClasses } = require("../api/classApi")
 const { checkForPrestigePromotionUpdateUserlist, checkForRankPromotionUpdateUserlist } = require("../common/check-for-promotion")
+const logger = require('../logger');
 
 async function refreshUserlist(client, openai) {
     console.log("Refreshing Userlist");

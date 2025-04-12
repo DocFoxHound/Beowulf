@@ -5,6 +5,7 @@ const { REST, Routes } = require('discord.js');
 const fs = require('node:fs');
 const path = require('node:path');
 const dotenv = require("dotenv");
+const logger = require('/logger.js');
 
 // Initialize dotenv config file
 const args = process.argv.slice(2);

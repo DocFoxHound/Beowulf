@@ -1,4 +1,5 @@
 const addMessageToThread = require("./add-message-to-thread")
+const logger = require('../logger');
 
 async function retryMessageAdd(thread, openai, messageAddQueue, threadPair, isBot){
     threadPair.isRetrying = true;

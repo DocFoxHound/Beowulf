@@ -1,3 +1,5 @@
+
+const logger = require('../logger');
 const { getUsersInQueue } = require('../api/queueApi')
 const { getEntriesBetweenDates } = require('../api/completed-queue-api.js')
 

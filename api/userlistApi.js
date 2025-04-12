@@ -1,4 +1,5 @@
 const axios = require('axios');
+const logger = require('../logger');
 
 async function createUser(newUser) {
     console.log("Inserting new user into UserList")

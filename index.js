@@ -3,34 +3,22 @@ const dotenv = require("dotenv");
 const { OpenAI } = require("openai");
 const fs = require('node:fs');
 const path = require('node:path');
-const vectorHandler = require("./vector-handling/vector-handler.js");
 // const threadHandler = require("./thread-handler");
 const { preloadFromDb } = require("./common/preload-from-db.js");
-const downloadUEXData = require("./common/download-UEX-Data.js")
 const queueReminderCheck = require("./queue-functions/queue-controller.js").queueReminderCheck
-const retryMessageAdd = require("./threads/retry-message-add.js")
-const sendResponse = require("./threads/send-response.js")
-const formatResponse = require("./threads/format-response.js")
-const handleRequiresAction = require("./threads/handle-requires-action.js")
-const runThread = require("./threads/run-thread.js")
-const formatMessage = require("./threads/format-message.js")
-const addMessageToThread = require("./threads/add-message-to-thread.js")
-const deployCommands = require("./deploy-commands.js")
 const { processUEXData } = require("./common/process-uex-data.js")
 const { handleMessage } = require('./threads/thread-handler.js');
 const { createUser } = require('./api/userlistApi.js');
 const { getUserById } = require('./api/userlistApi.js');
 const { editUser } = require('./api/userlistApi.js');
 const { getUserRank } = require('./userlist-functions/userlist-controller.js')
-const { getRaptorRankDb } = require('./userlist-functions/userlist-controller.js')
-const { getCorsairRankDb } = require('./userlist-functions/userlist-controller.js')
-const { getRaiderRankDb } = require('./userlist-functions/userlist-controller.js')
 const { refreshUserlist } = require("./common/refresh-userlist.js");
 const { saveMessage } = require("./common/message-saver.js");
 const { loadChatlogs } = require("./vector-handling/vector-handler.js");
 const { trimChatLogs } = require("./vector-handling/vector-handler.js");
 const { getClasses } = require('./api/classApi.js');
 // const checkQueue = require("./queue-functions/queue-check.js")
+const logger = require('./logger');
 
 // Initialize dotenv config file
 const args = process.argv.slice(2);
@@ -128,7 +116,7 @@ client.on("ready", async () => {
     channelName: channel?.name,
     channelId: channel?.id
   })).filter(channel => channel.channelId);
-  console.log(`Logged in as ${client.user.tag}!`);
+  logger.info(`Logged in as ${client.user.tag}!`);
 
   //start off with a fresh reload of the online files
   // await vectorHandler.refreshChatLogs(channelIdAndName, openai, client)
@@ -297,7 +285,7 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 
 // Error handling to prevent crashes
 client.on("error", (e) => {
-  console.error("Discord client error!", e);
+  logger.error("Discord client error!", e);
 });
 
 // Attempt to auto-reconnect on disconnection

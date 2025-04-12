@@ -1,4 +1,5 @@
 const axios = require('axios');
+const logger = require('../logger');
 
 async function createEntry(newEntry) {
     const apiUrl = `${process.env.SERVER_URL}/api/completedEntry/`; 

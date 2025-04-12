@@ -1,4 +1,5 @@
 const axios = require('axios');
+const logger = require('../logger');
 
 async function createBadge(badgeData) {
     const apiUrl = `${process.env.SERVER_URL}/api/badges`;

@@ -24,9 +24,11 @@
     "lodash": "^4.17.21",
     "openai": "^4.78.1",
     "pm2": "^6.0.5",
-    "string-progressbar": "^1.0.4"
+    "string-progressbar": "^1.0.4",
+    "winston": "^3.17.0"
   },
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "postinstall": "mkdir -p logs && mkdir -p chatlogs"
   }
 }

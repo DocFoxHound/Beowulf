@@ -1,7 +1,6 @@
 const axios = require('axios');
-const path = require('path');
-const fs = require('fs').promises;
 const UEX = require('../api/uexApi');
+const logger = require('../logger');
 
 async function processUEXData(whichTable){
     console.log(`Updating UEX ${whichTable} Items`)
