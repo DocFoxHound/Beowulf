@@ -1,8 +1,7 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const { getAllGameVersions } = require('../../api/gameVersionApi');
-const { getAllSummarizedItems, getAllSummarizedCommodities, getSummarizedItemById } = require('../../api/uexApi');
-const { createHitLog, getHitLogByEntryId, getHitLogsByUserId, getAllHitLogs, deleteHitLog } = require('../../api/hitTrackerApi');
+const { getHitLogByEntryId, getHitLogsByUserId, deleteHitLog } = require('../../api/hitTrackerApi');
 const { getUserById } = require('../../api/userlistApi');
+const logger = require('../../logger');
 
 const command = new SlashCommandBuilder()
     .setName('hit-tracker-remove')

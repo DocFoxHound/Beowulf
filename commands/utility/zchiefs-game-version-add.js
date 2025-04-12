@@ -1,6 +1,7 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { CommandInteraction } = require('discord.js');
 const { createGameVersion } = require('../../api/gameVersionApi');
+const logger = require('../../logger');
 
 module.exports = {
     data: new SlashCommandBuilder()

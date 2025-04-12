@@ -1,11 +1,10 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { updateUserClassStatus, checkUserListForUserById, userlistApi } = require('../../userlist-functions/userlist-controller');
+const { updateUserClassStatus, checkUserListForUserById } = require('../../userlist-functions/userlist-controller');
 const { getUserById } = require("../../api/userlistApi");
-const { queueController } = require('../../queue-functions/queue-controller');
 const { queueControllerForSlashCommands } = require('../../queue-functions/queue-controller');
-const { logHandler } = require('../../completed-queue-functions/completed-queue-handler');
 const { getClasses } = require('../../api/classApi');
 const queueApi = require('../../api/queueApi');
+const logger = require('../../logger');
 
 module.exports = {
     data: new SlashCommandBuilder()

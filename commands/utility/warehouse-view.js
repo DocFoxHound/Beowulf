@@ -1,9 +1,9 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js'); // Add EmbedBuilder here
 const { getAllGameVersions } = require('../../api/gameVersionApi');
-const { getAllSummarizedItems, getAllSummarizedCommodities, getSummarizedItemById } = require('../../api/uexApi');
 const { getUserById } = require('../../api/userlistApi');
-const { createWarehouse, getWarehousesByUserId, getWarehousesByUserAndCommodity, deleteWarehouse, editWarehouse, getWarehousesByCommodity, getAllWarehouses } = require('../../api/warehouseApi');
+const { getWarehousesByUserId, getWarehousesByCommodity, getAllWarehouses } = require('../../api/warehouseApi');
+const logger = require('../../logger');
 
 const command = new SlashCommandBuilder()
     .setName('warehouse-view')

@@ -1,7 +1,7 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const { CommandInteraction } = require('discord.js');
 const { getShipsById, getAllShips } = require('../../api/uexApi');
 const { createPlayerShip } = require('../../api/playerShipApi');
+const logger = require('../../logger');
 
 const command = new SlashCommandBuilder()
     .setName('create-ship')

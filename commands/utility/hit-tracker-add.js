@@ -1,8 +1,9 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('@discordjs/builders');
 const { getAllGameVersions } = require('../../api/gameVersionApi');
-const { getAllSummarizedItems, getAllSummarizedCommodities, getSummarizedItemById } = require('../../api/uexApi');
+const { getAllSummarizedItems, getAllSummarizedCommodities } = require('../../api/uexApi');
 const { createHitLog } = require('../../api/hitTrackerApi');
 const { getUserById } = require('../../api/userlistApi');
+const logger = require('../../logger');
 
 const command = new SlashCommandBuilder()
     .setName('hit-tracker-add')

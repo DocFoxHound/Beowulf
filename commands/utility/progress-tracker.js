@@ -1,10 +1,8 @@
 const { EmbedBuilder, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { checkUserListForUser } = require('../../userlist-functions/userlist-controller.js');
 const { progressBar } = require('../../common/progress-bar.js');
-const progressEmbed = require('../../common/embeds.js').progressEmbed;
 const { getClasses } = require('../../api/classApi.js');
 const { getUserById } = require('../../api/userlistApi.js');
-const userlistController = require('../../userlist-functions/userlist-controller.js');
+const logger = require('../../logger');
 
 module.exports = {
     data: new SlashCommandBuilder()

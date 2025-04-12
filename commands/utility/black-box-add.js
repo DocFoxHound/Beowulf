@@ -1,9 +1,9 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const { CommandInteraction } = require('discord.js');
 const { getAllShips } = require('../../api/uexApi');
 const { createBlackBox } = require('../../api/blackBoxApi');
 const { getAllGameVersions } = require('../../api/gameVersionApi');
 const { getPlayerShipsByUserId } = require('../../api/playerShipApi');
+const logger = require('../../logger');
 
 const command = new SlashCommandBuilder()
     .setName('black-box-add')

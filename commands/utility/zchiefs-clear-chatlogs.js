@@ -1,7 +1,6 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { CommandInteraction } = require('discord.js');
-const { refreshUserlist } = require('../../common/refresh-userlist');
-const { newLoadUserList } = require('../../common/refresh-userlist');
+const logger = require('../../logger');
 
 module.exports = {
     data: new SlashCommandBuilder()

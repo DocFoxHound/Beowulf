@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { deleteBlackBox, getAllBlackBoxes, getBlackBoxByEntryId } = require('../../api/blackBoxApi');
+const logger = require('../../logger');
 
 const command = new SlashCommandBuilder()
     .setName('xblooded-black-box-remove')

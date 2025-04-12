@@ -1,6 +1,7 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { CommandInteraction } = require('discord.js');
 const { createLessonLearned } = require('../../api/lessonsLearnedApi.js');
+const logger = require('../../logger');
 
 module.exports = {
     data: new SlashCommandBuilder()

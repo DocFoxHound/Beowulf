@@ -1,8 +1,9 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { queueControllerForSlashCommands } = require('../../queue-functions/queue-controller.js');
-const { getUsers, getUserById } = require("../../api/userlistApi.js"); 
+const { getUserById } = require("../../api/userlistApi.js"); 
 const queueApi = require('../../api/queueApi.js');
 const { getClasses } = require('../../api/classApi.js');
+const logger = require('../../logger');
 // const { getQueueUsers } = require('../../queue-functions/get-queue-users'); // Add this import
 
 module.exports = {

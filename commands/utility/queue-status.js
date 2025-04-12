@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { getClasses} = require('../../api/classApi.js');
 const { getUsersInQueue} = require('../../api/queueApi.js');
+const logger = require('../../logger');
 
 module.exports = {
     data: new SlashCommandBuilder()

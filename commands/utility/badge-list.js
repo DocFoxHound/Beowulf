@@ -1,8 +1,8 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const { CommandInteraction, MessageEmbed } = require('discord.js');
+const { CommandInteraction } = require('discord.js');
 const { getBadgesByUserId } = require('../../api/badgeApi');
-const { showBadges } = require('../../common/embeds');
+const logger = require('../../logger');
 
 module.exports = {
     data: new SlashCommandBuilder()
