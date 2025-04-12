@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { deleteShipLog, getAllShipLogs, getAssistantShipLogs, getShipLogByEntryId } = require('../../api/shipLogApi');
-const logger = require('../../logger');
+
 
 const command = new SlashCommandBuilder()
     .setName('xblooded-ship-log-remove')

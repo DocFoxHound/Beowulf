@@ -4,7 +4,7 @@ const { getAllShips } = require('../../api/uexApi');
 const { createShipLog } = require('../../api/shipLogApi');
 const { getAllGameVersions } = require('../../api/gameVersionApi');
 const { getPlayerShipsByUserId, getPlayerShipByEntryId } = require('../../api/playerShipApi');
-const logger = require('../../logger');
+
 
 const command = new SlashCommandBuilder()
     .setName('ship-log-add')

@@ -3,7 +3,7 @@ const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
 const { getAllGameVersions } = require('../../api/gameVersionApi');
 const { getUserById } = require('../../api/userlistApi');
 const { getHitLogsByPatch, getAllHitLogs } = require('../../api/hitTrackerApi');
-const logger = require('../../logger');
+
 
 
 const command = new SlashCommandBuilder()

@@ -3,7 +3,7 @@ const { getAllBlackBoxes, getBlackBoxesByPatch, getBlackBoxesByUserAndPatch, get
 const { getAllGameVersions } = require('../../api/gameVersionApi');
 const { getUserById } = require('../../api/userlistApi');
 const { getPlayerShipByEntryId } = require('../../api/playerShipApi');
-const logger = require('../../logger');
+
 
 const command = new SlashCommandBuilder()
     .setName('black-box-leaderboard')

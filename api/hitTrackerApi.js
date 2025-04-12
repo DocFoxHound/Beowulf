@@ -1,5 +1,4 @@
 const axios = require('axios');
-const logger = require('../logger');
 
 async function createHitLog(HitLogData) {
     const apiUrl = `${process.env.SERVER_URL}/api/hittracker`;

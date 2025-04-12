@@ -1,5 +1,5 @@
 //Add discord message to a thread
-const logger = require('../logger');
+
 
 async function addMessageToThread(thread, openai, formattedMessage, isBot) {
     console.log(`Adding message to thread: ${thread.id}`)

@@ -1,7 +1,7 @@
 const { AttachmentBuilder, SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { getAllGameVersions } = require('../../api/gameVersionApi');
 const { getAssistHitLogsByUserAndPatch, getAssistHitLogs, getHitLogsByUserAndPatch, getHitLogsByUserId } = require('../../api/hitTrackerApi');
-const logger = require('../../logger');
+
 
 const command = new SlashCommandBuilder()
     .setName('hit-tracker-individual-view')

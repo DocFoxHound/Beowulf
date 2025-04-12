@@ -1,5 +1,4 @@
 const axios = require('axios');
-const logger = require('../logger');
 
 async function getUserByIdTest(userId){
     const apiUrl = process.env.SERVER_URL;

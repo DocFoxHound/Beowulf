@@ -2,7 +2,7 @@ const { EmbedBuilder, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, Butt
 const { progressBar } = require('../../common/progress-bar.js');
 const { getClasses } = require('../../api/classApi.js');
 const { getUserById } = require('../../api/userlistApi.js');
-const logger = require('../../logger');
+
 
 module.exports = {
     data: new SlashCommandBuilder()

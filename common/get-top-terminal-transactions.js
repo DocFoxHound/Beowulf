@@ -1,4 +1,4 @@
-const logger = require('../logger');
+
 
 async function getTopTerminalTransactions(terminalPrices){
     let reconstructedTerminalUsageList = [];

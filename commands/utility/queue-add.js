@@ -4,7 +4,7 @@ const { getUserById} = require('../../api/queueApi.js');
 const userlistApi = require('../../api/userlistApi.js');
 const { getClasses} = require('../../api/classApi.js');
 const { queueControllerForSlashCommands } = require('../../queue-functions/queue-controller');
-const logger = require('../../logger');
+
 
 const command = new SlashCommandBuilder()
   .setName('queue-signup')

@@ -2,7 +2,7 @@ const { SlashCommandBuilder } = require('@discordjs/builders');
 const { getAllGameVersions } = require('../../api/gameVersionApi');
 const { getAllSummarizedItems, getAllSummarizedCommodities } = require('../../api/uexApi');
 const { createWarehouse, getWarehousesByUserId, getWarehousesByUserAndCommodity, deleteWarehouse, editWarehouse } = require('../../api/warehouseApi');
-const logger = require('../../logger');
+
 
 const command = new SlashCommandBuilder()
     .setName('warehouse-add-remove')

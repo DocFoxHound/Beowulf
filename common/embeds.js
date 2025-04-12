@@ -3,7 +3,7 @@ const userlistController = require('../userlist-functions/userlist-controller.js
 const { progressBar } = require('./progress-bar.js');
 const { getUsersInQueue } = require('../api/queueApi')
 const { getEntriesBetweenDates } = require('../api/completed-queue-api.js')
-const logger = require('../logger');
+
 
 async function progressEmbed(targetUser, userData){    
     try{

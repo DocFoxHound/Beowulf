@@ -1,7 +1,7 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { deleteShipLog, getCrewShipLogs, getShipLogByEntryId, getShipLogsByCommanderId } = require('../../api/shipLogApi');
 const { getUserById } = require('../../api/userlistApi');
-const logger = require('../../logger');
+
 
 const command = new SlashCommandBuilder()
     .setName('ship-log-remove')

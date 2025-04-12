@@ -17,8 +17,6 @@ const { saveMessage } = require("./common/message-saver.js");
 const { loadChatlogs } = require("./vector-handling/vector-handler.js");
 const { trimChatLogs } = require("./vector-handling/vector-handler.js");
 const { getClasses } = require('./api/classApi.js');
-// const checkQueue = require("./queue-functions/queue-check.js")
-const logger = require('./logger');
 
 // Initialize dotenv config file
 const args = process.argv.slice(2);

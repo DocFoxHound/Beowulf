@@ -1,7 +1,7 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { deleteBlackBox, getBlackBoxesByUserId, getAssistantBlackBoxes, getBlackBoxByEntryId } = require('../../api/blackBoxApi');
 const { getUserById } = require('../../api/userlistApi');
-const logger = require('../../logger');
+
 
 const command = new SlashCommandBuilder()
     .setName('black-box-remove')

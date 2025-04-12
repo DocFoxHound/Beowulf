@@ -1,5 +1,5 @@
 //a tool and/or Function Call
-const logger = require('../logger');
+
 
 async function addResultsToRun(contentText, openai, threadId, toolId, runId) {
     try {

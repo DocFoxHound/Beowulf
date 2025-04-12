@@ -3,7 +3,7 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('
 const { getAllGameVersions } = require('../../api/gameVersionApi');
 const { getUserById } = require('../../api/userlistApi');
 const { getWarehousesByUserId, getWarehousesByCommodity, getAllWarehouses } = require('../../api/warehouseApi');
-const logger = require('../../logger');
+
 
 const command = new SlashCommandBuilder()
     .setName('warehouse-view')

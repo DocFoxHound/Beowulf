@@ -1,6 +1,6 @@
 const { getUserByUsername } = require('../api/userlistApi')
 const { getBadgesByUserId } = require('../api/badgeApi')
-const logger = require('../logger');
+
 
 async function badgeQuery(run, message) {
     try{

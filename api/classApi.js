@@ -1,5 +1,4 @@
 const axios = require('axios');
-const logger = require('../logger');
 
 async function createClass(newClass) {
     console.log("Inserting new class into the 'class' table")

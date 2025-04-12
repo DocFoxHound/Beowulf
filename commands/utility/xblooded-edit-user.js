@@ -4,7 +4,7 @@ const { getUserById } = require("../../api/userlistApi");
 const { queueControllerForSlashCommands } = require('../../queue-functions/queue-controller');
 const { getClasses } = require('../../api/classApi');
 const queueApi = require('../../api/queueApi');
-const logger = require('../../logger');
+
 
 module.exports = {
     data: new SlashCommandBuilder()

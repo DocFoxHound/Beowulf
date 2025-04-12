@@ -1,4 +1,4 @@
-const logger = require('../logger');
+
 
 async function formatResponse(run, thread, openai, client) {
     try {

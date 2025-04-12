@@ -1,5 +1,4 @@
 const axios = require('axios');
-const logger = require('../logger');
 
 async function createWarehouse(WarehouseData) {
     const apiUrl = `${process.env.SERVER_URL}/api/warehouse`;

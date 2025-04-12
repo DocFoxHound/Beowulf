@@ -4,7 +4,7 @@ const { editUser } = require("../api/userlistApi")
 const { createUser } = require("../api/userlistApi")
 const { getClasses } = require("../api/classApi")
 const { checkForPrestigePromotionUpdateUserlist, checkForRankPromotionUpdateUserlist } = require("../common/check-for-promotion")
-const logger = require('../logger');
+
 
 async function refreshUserlist(client, openai) {
     console.log("Refreshing Userlist");

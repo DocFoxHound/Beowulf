@@ -1,7 +1,7 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { getAllLessonsLearned } = require('../../api/lessonsLearnedApi.js');
-const logger = require('../../logger');
+
 
 module.exports = {
     data: new SlashCommandBuilder()

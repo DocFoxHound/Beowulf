@@ -3,7 +3,7 @@ const { getAllGameVersions } = require('../../api/gameVersionApi');
 const { getAllSummarizedItems, getAllSummarizedCommodities } = require('../../api/uexApi');
 const { createHitLog } = require('../../api/hitTrackerApi');
 const { getUserById } = require('../../api/userlistApi');
-const logger = require('../../logger');
+
 
 const command = new SlashCommandBuilder()
     .setName('hit-tracker-add')

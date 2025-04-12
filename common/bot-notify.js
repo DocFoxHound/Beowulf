@@ -5,7 +5,7 @@ const createNewThread = require("../threads/create-new-thread").createNewThread
 const formatResponseForQueueCheck = require("../threads/format-response").formatResponseForQueueCheck
 const { sendMessage } = require("../threads/send-response")
 const { sendMessageNotifySubject } = require("../threads/send-response")
-const logger = require('../logger');
+
 
 
 async function notifyNewQueue(queue, requestedText, user, openai, client){

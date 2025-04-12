@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const completedQueueHandler = require("../api/completed-queue-api")
 const { updateUserClassStatus } = require("../userlist-functions/userlist-controller")
 const { getEntryByUserAndClass } = require("../api/completed-queue-api")
-const logger = require('../logger');
+
 
 function hashString(inputString) {
     const hash = crypto.createHash('sha256'); // Choose the hashing algorithm

@@ -6,7 +6,7 @@ const { runThread } = require('./run-thread.js');
 const { handleRequiresAction } = require('./handle-requires-action.js');
 const { formatResponse } = require('./format-response.js');
 const { sendResponse } = require('./send-response.js');
-const logger = require('../logger');
+
 
 
 async function handleMessage(message, openai, client, preloadedDbTables){

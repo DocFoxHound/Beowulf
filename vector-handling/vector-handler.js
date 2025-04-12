@@ -2,7 +2,7 @@ const { getMessages } = require("../api/messageApi");
 const { deleteMessagesByCount } = require("../api/messageApi");
 const fs = require("node:fs");
 const { getAllLessonsLearned } = require("../api/lessonsLearnedApi");
-const logger = require('../logger');
+
 
 async function loadChatlogs(client, openai){
   let chatLog = null;

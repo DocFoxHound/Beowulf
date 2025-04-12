@@ -1,7 +1,7 @@
 const addResultsToRun = require("./add-results-to-run")
 const functionHandler = require("../functions/function-handler");
 const sendResponse = require("../threads/send-response").sendResponse
-const logger = require('../logger');
+
 
 
 //this is called if a thread comes back with "Requires Action" instead of completed, meaning its a tool/function call from the bot

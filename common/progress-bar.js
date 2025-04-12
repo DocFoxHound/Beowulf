@@ -1,5 +1,5 @@
 // ■■□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□□
-const logger = require('../logger');
+
 
 async function progressBar(currentValue, maxValue, totalSpaces, filledChar, emptyChar) {
     const filledSpaces = Math.round((currentValue / maxValue) * totalSpaces);

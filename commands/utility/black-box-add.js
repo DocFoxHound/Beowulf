@@ -3,7 +3,6 @@ const { getAllShips } = require('../../api/uexApi');
 const { createBlackBox } = require('../../api/blackBoxApi');
 const { getAllGameVersions } = require('../../api/gameVersionApi');
 const { getPlayerShipsByUserId } = require('../../api/playerShipApi');
-const logger = require('../../logger');
 
 const command = new SlashCommandBuilder()
     .setName('black-box-add')

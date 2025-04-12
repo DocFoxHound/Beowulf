@@ -2,7 +2,7 @@ const { SlashCommandBuilder } = require('@discordjs/builders');
 const { CommandInteraction } = require('discord.js');
 const { deleteBadge } = require('../../api/badgeApi');
 const { getBadgesByUserId } = require('../../api/badgeApi');
-const logger = require('../../logger');
+
 
 module.exports = {
     data: new SlashCommandBuilder().setName('xblooded-badge-remove')

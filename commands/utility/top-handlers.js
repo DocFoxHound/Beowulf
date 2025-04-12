@@ -1,6 +1,6 @@
 const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
 const { getEntriesBetweenDates } = require('../../api/completed-queue-api')
-const logger = require('../../logger');
+
 
 module.exports = {
     data: new SlashCommandBuilder()

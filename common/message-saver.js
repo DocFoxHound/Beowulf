@@ -1,5 +1,5 @@
 const { createMessage } = require("../api/messageApi");
-const logger = require('../logger');
+
 
 async function saveMessage(message, client) {
     try {

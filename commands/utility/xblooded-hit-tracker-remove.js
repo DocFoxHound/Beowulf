@@ -1,7 +1,7 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { getHitLogByEntryId, getAllHitLogs, deleteHitLog } = require('../../api/hitTrackerApi');
 const { getUserById, getUsers } = require('../../api/userlistApi');
-const logger = require('../../logger');
+
 
 const command = new SlashCommandBuilder()
     .setName('xblooded-hit-tracker-remove')

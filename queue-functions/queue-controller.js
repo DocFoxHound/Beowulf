@@ -17,7 +17,7 @@ const { updatedUserListData } = require("../userlist-functions/userlist-controll
 const completedQueueHandler = require("../completed-queue-functions/completed-queue-handler");
 const { getClasses } = require("../api/classApi");
 const { editOrAddUserInQueue } = require("../api/queueApi");
-const logger = require('../logger');
+
 
 async function queueControllerForSlashCommands(className, targetUser, handlerUser,  openai, client, addOrRemove, classStatus, selfOrOther, interaction){
     console.log("Queue Controller for Slash Commands")

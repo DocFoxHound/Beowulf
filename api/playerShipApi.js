@@ -1,5 +1,4 @@
 const axios = require('axios');
-const logger = require('../logger');
 
 async function createPlayerShip(PlayerShipData) {
     const apiUrl = `${process.env.SERVER_URL}/api/playership`;

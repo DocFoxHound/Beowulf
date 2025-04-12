@@ -1,5 +1,4 @@
 const axios = require('axios');
-const logger = require('../logger');
 
 async function deleteUserInQueue(userId){
     const apiUrl = process.env.SERVER_URL;

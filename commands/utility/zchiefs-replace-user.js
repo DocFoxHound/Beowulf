@@ -4,7 +4,7 @@ const { getUserById } = require('../../api/userlistApi');
 const { editUser } = require('../../api/userlistApi');
 const { deleteUser } = require('../../api/userlistApi');
 const { getClasses } = require('../../api/classApi');
-const logger = require('../../logger');
+
 
 module.exports = {
     data: new SlashCommandBuilder()
