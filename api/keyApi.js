@@ -26,7 +26,7 @@ async function getAllKeys() {
     }
 }
 
-async function getKeysByUserId(user_id) {
+async function getKeyByUserId(user_id) {
     const apiUrl = `${process.env.SERVER_URL}/api/keys/user`;
     try {
         const response = await axios.get(apiUrl, {
@@ -73,10 +73,27 @@ async function deleteKey(id) {
     }
 }
 
+
+async function validateKey(key) {
+    const apiUrl = `${process.env.SERVER_URL}/api/keys/validatekey`;
+    try {
+        const response = await axios.get(apiUrl, {
+            params: {
+                key: key
+            }
+        });
+        return response.data;  // This will be the return value of the function
+    } catch (error) {
+        console.error('Error fetching user keys:', error.response ? error.response.data : error.message);
+        return null;  // Return null if there's an error
+    }
+}
+
 module.exports = {
     createKey,
     getClasses: getAllKeys,
-    getKeysByUserId,
+    getKeyByUserId,
     editKey,
-    deleteKey
+    deleteKey,
+    validateKey
 };

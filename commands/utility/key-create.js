@@ -4,7 +4,7 @@ const { createKey } = require('../../api/keyApi.js'); // Import the function to 
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('create-key')
+        .setName('key-create')
         .setDescription('Generate a new API key for the user.'),
 
     async execute(interaction) {
