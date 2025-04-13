@@ -14,6 +14,8 @@ module.exports = {
             console.log('Generated API key:', apiKey);
             // Save the API key to the database
             const parentId = new Date().getTime()
+            const now = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+            const formattedDate = now.toISOString();
             const userId = interaction.user.id;
             const username = interaction.user.username;
             const keyData = {
@@ -22,7 +24,7 @@ module.exports = {
                 user_id: interaction.user.id,
                 username: interaction.user.username,
                 created_at: new Date(),
-                expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Set expiration date to 30 days from now
+                expires_at: formattedDate, // Set expiration date to 30 days from now
                 player_name: null
             };
             const result = await createKey(keyData); // Call the function to save the key in the database
