@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 async function createWarehouse(WarehouseData) {
-    const apiUrl = `${process.env.SERVER_URL}/api/warehouse`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_STOREHOUSE}`;
     try {
         const response = await axios.post(apiUrl, WarehouseData, {
             headers: {
@@ -16,7 +16,7 @@ async function createWarehouse(WarehouseData) {
 }
 
 async function getAllWarehouses() {
-    const apiUrl = `${process.env.SERVER_URL}/api/warehouse/`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_STOREHOUSE}/`;
     try {
         const response = await axios.get(apiUrl);
         return response.data;  // This will be the return value of the function
@@ -27,7 +27,7 @@ async function getAllWarehouses() {
 }
 
 async function getWarehousesByUserId(user_id) {
-    const apiUrl = `${process.env.SERVER_URL}/api/warehouse/user`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_STOREHOUSE}/user`;
     try {
         const response = await axios.get(apiUrl, {
             params: {
@@ -42,7 +42,7 @@ async function getWarehousesByUserId(user_id) {
 }
 
 async function getWarehouseByEntryId(id) {
-    const apiUrl = `${process.env.SERVER_URL}/api/warehouse/entry`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_STOREHOUSE}/entry`;
     try {
         const response = await axios.get(apiUrl, {
             params: {
@@ -62,7 +62,7 @@ async function getWarehouseByEntryId(id) {
 }
 
 async function getWarehousesByCommodity(commodity_name) {
-    const apiUrl = `${process.env.SERVER_URL}/api/warehouse/commodity`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_STOREHOUSE}/commodity`;
     try {
         const response = await axios.get(apiUrl, {
             params: {
@@ -82,7 +82,7 @@ async function getWarehousesByCommodity(commodity_name) {
 }
 
 async function getWarehousesByPatch(patch) {
-    const apiUrl = `${process.env.SERVER_URL}/api/warehouse/patch`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_STOREHOUSE}/patch`;
     console.log("Patch: ", patch)
     try {
         const response = await axios.get(apiUrl, {
@@ -98,7 +98,7 @@ async function getWarehousesByPatch(patch) {
 }
 
 async function getWarehousesByUserAndPatch(coupling) {
-    const apiUrl = `${process.env.SERVER_URL}/api/warehouse/userandpatch`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_STOREHOUSE}/userandpatch`;
     try {
         const response = await axios.get(apiUrl, {
             params: {
@@ -114,7 +114,7 @@ async function getWarehousesByUserAndPatch(coupling) {
 }
 
 async function getWarehousesByUserAndCommodity(coupling) {
-    const apiUrl = `${process.env.SERVER_URL}/api/warehouse/userandcommodity`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_STOREHOUSE}/userandcommodity`;
     try {
         const response = await axios.get(apiUrl, {
             params: {
@@ -130,7 +130,7 @@ async function getWarehousesByUserAndCommodity(coupling) {
 }
 
 async function getWarehousesByCommodityAndPatch(coupling) {
-    const apiUrl = `${process.env.SERVER_URL}/api/warehouse/commodityandpatch`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_STOREHOUSE}/commodityandpatch`;
     try {
         const response = await axios.get(apiUrl, {
             params: {
@@ -147,7 +147,7 @@ async function getWarehousesByCommodityAndPatch(coupling) {
 
 //this isn't setup for editing yet, but is just a copy of editUser
 async function editWarehouse(WarehouseId, updatedWarehouseData) {
-    const apiUrl = `${process.env.SERVER_URL}/api/warehouse/${WarehouseId}`; // Assuming this is the correct endpoint
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_STOREHOUSE}/${WarehouseId}`; // Assuming this is the correct endpoint
     try {
         const response = await axios.put(apiUrl, updatedWarehouseData, {
             headers: {
@@ -163,7 +163,7 @@ async function editWarehouse(WarehouseId, updatedWarehouseData) {
 
 async function deleteWarehouse(id) {
     console.log("Deleting Warehouse")
-    const apiUrl = `${process.env.SERVER_URL}/api/warehouse/${id}`; 
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_STOREHOUSE}/${id}`; 
     try {
         const response = await axios.delete(apiUrl, {
             headers: {

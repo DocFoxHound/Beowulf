@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 async function createKey(keyData) {
-    const apiUrl = `${process.env.SERVER_URL}/api/keys`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_AUTH_KEY}`;
     try {
         const response = await axios.post(apiUrl, keyData, {
             headers: {
@@ -16,7 +16,7 @@ async function createKey(keyData) {
 }
 
 async function getAllKeys() {
-    const apiUrl = `${process.env.SERVER_URL}/api/keys/`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_AUTH_KEY}/`;
     try {
         const response = await axios.get(apiUrl);
         return response.data;  // This will be the return value of the function
@@ -27,7 +27,7 @@ async function getAllKeys() {
 }
 
 async function getKeyByUserId(user_id) {
-    const apiUrl = `${process.env.SERVER_URL}/api/keys/user`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_AUTH_KEY}/user`;
     try {
         const response = await axios.get(apiUrl, {
             params: {
@@ -43,7 +43,7 @@ async function getKeyByUserId(user_id) {
 
 //this isn't setup for editing yet, but is just a copy of editUser
 async function editKey(keyId, updatedKeyData) {
-    const apiUrl = `${process.env.SERVER_URL}/api/keys/${keyId}`; // Assuming this is the correct endpoint
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_AUTH_KEY}/${keyId}`; // Assuming this is the correct endpoint
     try {
         const response = await axios.put(apiUrl, updatedKeyData, {
             headers: {
@@ -59,7 +59,7 @@ async function editKey(keyId, updatedKeyData) {
 
 async function deleteKey(id) {
     console.log("Deleting key")
-    const apiUrl = `${process.env.SERVER_URL}/api/keys/${id}`; 
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_AUTH_KEY}/${id}`; 
     try {
         const response = await axios.delete(apiUrl, {
             headers: {
@@ -75,7 +75,7 @@ async function deleteKey(id) {
 
 
 async function validateKey(key) {
-    const apiUrl = `${process.env.SERVER_URL}/api/keys/validatekey`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_AUTH_KEY}/validatekey`;
     try {
         const response = await axios.get(apiUrl, {
             params: {

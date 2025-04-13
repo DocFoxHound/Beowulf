@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 async function createEntry(newEntry) {
-    const apiUrl = `${process.env.SERVER_URL}/api/completedEntry/`; 
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_COMPLETED_ENTRY}/`; 
     try {
         const response = await axios.post(apiUrl, newEntry, {
             headers: {
@@ -16,7 +16,7 @@ async function createEntry(newEntry) {
 }
 
 async function getEntries() {
-    const apiUrl = `${process.env.SERVER_URL}/api/completedEntry/`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_COMPLETED_ENTRY}/`;
     try {
         const response = await axios.get(apiUrl);
         return response.data;  // This will be the return value of the function
@@ -27,7 +27,7 @@ async function getEntries() {
 }
 
 async function getEntriesBetweenDates(startDate, endDate) {
-    const apiUrl = `${process.env.SERVER_URL}/api/completedEntry/betweendates`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_COMPLETED_ENTRY}/betweendates`;
     try {
         const response = await axios.get(apiUrl, {
             params: {
@@ -45,7 +45,7 @@ async function getEntriesBetweenDates(startDate, endDate) {
 async function getEntryById(entryId){
     const apiUrl = process.env.SERVER_URL;
     try {
-        const response = await axios.get(`${apiUrl}/api/completedEntry/${entryId}`);
+        const response = await axios.get(`${apiUrl}${process.env.API_COMPLETED_ENTRY}/${entryId}`);
         return response.data;  // This now properly returns the response data to the caller
     } catch (error) {
         return null;  // Return null or throw an error, depending on how you want to handle errors
@@ -55,7 +55,7 @@ async function getEntryById(entryId){
 async function getEntryByUserAndClass(userId, classId){
     const apiUrl = process.env.SERVER_URL;
     try {
-        const response = await axios.get(`${apiUrl}/api/completedEntry/user/${userId}/class/${classId}`);
+        const response = await axios.get(`${apiUrl}${process.env.API_COMPLETED_ENTRY}/user/${userId}/class/${classId}`);
         return response.data;  // This now properly returns the response data to the caller
     } catch (error) {
         return null;  // Return null or throw an error, depending on how you want to handle errors
@@ -64,7 +64,7 @@ async function getEntryByUserAndClass(userId, classId){
 
 
 async function editEntry(entryId, updatedEntryData) {
-    const apiUrl = `${process.env.SERVER_URL}/api/completedEntry/${entryId}`; // Assuming this is the correct endpoint
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_COMPLETED_ENTRY}/${entryId}`; // Assuming this is the correct endpoint
     try {
         const response = await axios.put(apiUrl, updatedEntryData, {
             headers: {
@@ -81,7 +81,7 @@ async function editEntry(entryId, updatedEntryData) {
 async function deleteEntry(entryId) {
     console.log("Deleting Entry from class table")
     console.log("entryId: ", entryId)
-    const apiUrl = `${process.env.SERVER_URL}/api/completedEntry/${entryId}`; 
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_COMPLETED_ENTRY}/${entryId}`; 
     try {
         const response = await axios.delete(apiUrl);
         return true;

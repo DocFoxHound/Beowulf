@@ -5,7 +5,7 @@ const axios = require('axios');
 //--------------------------------------------
 
 async function getAllCities() {
-    const apiUrl = `${process.env.SERVER_URL}/api/uex/cities/`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/cities/`;
     try {
         const response = await axios.get(apiUrl);
         return response.data;  // This will be the return value of the function
@@ -18,7 +18,7 @@ async function getAllCities() {
 async function getCityById(id){
     const apiUrl = process.env.SERVER_URL;
     try {
-        const response = await axios.get(`${apiUrl}/api/uex/cities/${id}`);
+        const response = await axios.get(`${apiUrl}${process.env.API_EXP_GER}/cities/${id}`);
         return response.data;  // This now properly returns the response data to the caller
     } catch (error) {
         return null;  // Return null or throw an error, depending on how you want to handle errors
@@ -26,7 +26,7 @@ async function getCityById(id){
 }
 
 async function createOrUpdateCity(data) {
-    const apiUrl = `${process.env.SERVER_URL}/api/uex/cities`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/cities`;
     try {
         // Check if the city exists
         await axios.get(`${apiUrl}/${data.id}`);
@@ -59,7 +59,7 @@ async function createOrUpdateCity(data) {
 //--------------------------------------------
 
 async function getAllCommodities() {
-    const apiUrl = `${process.env.SERVER_URL}/api/uex/commodities/`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/commodities/`;
     try {
         const response = await axios.get(apiUrl);
         return response.data;  // This will be the return value of the function
@@ -72,7 +72,7 @@ async function getAllCommodities() {
 async function getCommodityById(id){
     const apiUrl = process.env.SERVER_URL;
     try {
-        const response = await axios.get(`${apiUrl}/api/uex/commodities/${id}`);
+        const response = await axios.get(`${apiUrl}${process.env.API_EXP_GER}/commodities/${id}`);
         return response.data;  // This now properly returns the response data to the caller
     } catch (error) {
         return null;  // Return null or throw an error, depending on how you want to handle errors
@@ -80,7 +80,7 @@ async function getCommodityById(id){
 }
 
 async function createOrUpdateCommodity(data) {
-    const apiUrl = `${process.env.SERVER_URL}/api/uex/commodities`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/commodities`;
     try {
         // Check if the city exists
         await axios.get(`${apiUrl}/${data.id}`);
@@ -109,7 +109,7 @@ async function createOrUpdateCommodity(data) {
 //--------------------------------------------
 
 async function getAllTerminalCommodities() {
-    const apiUrl = `${process.env.SERVER_URL}/api/uex/terminalcommodities/`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/terminalcommodities/`;
     try {
         const response = await axios.get(apiUrl);
         return response.data;  // This will be the return value of the function
@@ -122,7 +122,7 @@ async function getAllTerminalCommodities() {
 async function getTerminalCommodityById(id){
     const apiUrl = process.env.SERVER_URL;
     try {
-        const response = await axios.get(`${apiUrl}/api/uex/terminalcommodities/${id}`);
+        const response = await axios.get(`${apiUrl}${process.env.API_EXP_GER}/terminalcommodities/${id}`);
         return response.data;  // This now properly returns the response data to the caller
     } catch (error) {
         return null;  // Return null or throw an error, depending on how you want to handle errors
@@ -130,7 +130,7 @@ async function getTerminalCommodityById(id){
 }
 
 async function createOrUpdateTerminalCommodity(data) {
-    const apiUrl = `${process.env.SERVER_URL}/api/uex/terminalcommodities`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/terminalcommodities`;
     try {
         // Check if the city exists
         await axios.get(`${apiUrl}/${data.id}`);
@@ -159,7 +159,7 @@ async function createOrUpdateTerminalCommodity(data) {
 //--------------------------------------------
 
 async function getAllSummarizedCommodities() {
-    const apiUrl = `${process.env.SERVER_URL}/api/uex/summarizedcommodities/`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/summarizedcommodities/`;
     try {
         const response = await axios.get(apiUrl);
         return response.data;  // This will be the return value of the function
@@ -172,7 +172,7 @@ async function getAllSummarizedCommodities() {
 async function getSummarizedCommodityById(id){
     const apiUrl = process.env.SERVER_URL;
     try {
-        const response = await axios.get(`${apiUrl}/api/uex/summarizedcommodities/${id}`);
+        const response = await axios.get(`${apiUrl}${process.env.API_EXP_GER}/summarizedcommodities/${id}`);
         return response.data;  // This now properly returns the response data to the caller
     } catch (error) {
         return null;  // Return null or throw an error, depending on how you want to handle errors
@@ -180,7 +180,7 @@ async function getSummarizedCommodityById(id){
 }
 
 async function createOrUpdateSummarizedCommodity(data) {
-    const apiUrl = `${process.env.SERVER_URL}/api/uex/summarizedcommodities`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/summarizedcommodities`;
     try {
         // Check if the city exists
         await axios.get(`${apiUrl}/${data.id}`);
@@ -209,7 +209,7 @@ async function createOrUpdateSummarizedCommodity(data) {
 //--------------------------------------------
 
 async function getAllTerminalItems() {
-    const apiUrl = `${process.env.SERVER_URL}/api/uex/terminalitems/`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/terminalitems/`;
     try {
         const response = await axios.get(apiUrl);
         return response.data;  // This will be the return value of the function
@@ -222,7 +222,7 @@ async function getAllTerminalItems() {
 async function getTerminalItemById(id){
     const apiUrl = process.env.SERVER_URL;
     try {
-        const response = await axios.get(`${apiUrl}/api/uex/terminalitems/${id}`);
+        const response = await axios.get(`${apiUrl}${process.env.API_EXP_GER}/terminalitems/${id}`);
         return response.data;  // This now properly returns the response data to the caller
     } catch (error) {
         return null;  // Return null or throw an error, depending on how you want to handle errors
@@ -230,7 +230,7 @@ async function getTerminalItemById(id){
 }
 
 async function createOrUpdateTerminalItem(data) {
-    const apiUrl = `${process.env.SERVER_URL}/api/uex/terminalitems`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/terminalitems`;
     try {
         // Check if the city exists
         await axios.get(`${apiUrl}/${data.id}`);
@@ -259,7 +259,7 @@ async function createOrUpdateTerminalItem(data) {
 //--------------------------------------------
 
 async function getAllSummarizedItems() {
-    const apiUrl = `${process.env.SERVER_URL}/api/uex/sumarizeditems/`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/sumarizeditems/`;
     try {
         const response = await axios.get(apiUrl);
         return response.data;  // This will be the return value of the function
@@ -272,7 +272,7 @@ async function getAllSummarizedItems() {
 async function getSummarizedItemById(id){
     const apiUrl = process.env.SERVER_URL;
     try {
-        const response = await axios.get(`${apiUrl}/api/uex/sumarizeditems/${id}`);
+        const response = await axios.get(`${apiUrl}${process.env.API_EXP_GER}/sumarizeditems/${id}`);
         return response.data;  // This now properly returns the response data to the caller
     } catch (error) {
         return null;  // Return null or throw an error, depending on how you want to handle errors
@@ -280,7 +280,7 @@ async function getSummarizedItemById(id){
 }
 
 async function createOrUpdateSummarizedItem(data) {
-    const apiUrl = `${process.env.SERVER_URL}/api/uex/sumarizeditems`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/sumarizeditems`;
     try {
         // Check if the city exists
         await axios.get(`${apiUrl}/${data.id}`);
@@ -309,7 +309,7 @@ async function createOrUpdateSummarizedItem(data) {
 //--------------------------------------------
 
 async function getAllOutposts() {
-    const apiUrl = `${process.env.SERVER_URL}/api/uex/outposts/`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/outposts/`;
     try {
         const response = await axios.get(apiUrl);
         return response.data;  // This will be the return value of the function
@@ -322,7 +322,7 @@ async function getAllOutposts() {
 async function getOutpostById(id){
     const apiUrl = process.env.SERVER_URL;
     try {
-        const response = await axios.get(`${apiUrl}/api/uex/outposts/${id}`);
+        const response = await axios.get(`${apiUrl}${process.env.API_EXP_GER}/outposts/${id}`);
         return response.data;  // This now properly returns the response data to the caller
     } catch (error) {
         return null;  // Return null or throw an error, depending on how you want to handle errors
@@ -330,7 +330,7 @@ async function getOutpostById(id){
 }
 
 async function createOrUpdateOutpost(data) {
-    const apiUrl = `${process.env.SERVER_URL}/api/uex/outposts`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/outposts`;
     try {
         // Check if the city exists
         await axios.get(`${apiUrl}/${data.id}`);
@@ -359,7 +359,7 @@ async function createOrUpdateOutpost(data) {
 //--------------------------------------------
 
 async function getAllPlanets() {
-    const apiUrl = `${process.env.SERVER_URL}/api/uex/planets/`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/planets/`;
     try {
         const response = await axios.get(apiUrl);
         return response.data;  // This will be the return value of the function
@@ -372,7 +372,7 @@ async function getAllPlanets() {
 async function getPlanetById(id){
     const apiUrl = process.env.SERVER_URL;
     try {
-        const response = await axios.get(`${apiUrl}/api/uex/planets/${id}`);
+        const response = await axios.get(`${apiUrl}${process.env.API_EXP_GER}/planets/${id}`);
         return response.data;  // This now properly returns the response data to the caller
     } catch (error) {
         return null;  // Return null or throw an error, depending on how you want to handle errors
@@ -380,7 +380,7 @@ async function getPlanetById(id){
 }
 
 async function createOrUpdatePlanet(data) {
-    const apiUrl = `${process.env.SERVER_URL}/api/uex/planets`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/planets`;
     try {
         // Check if the city exists
         await axios.get(`${apiUrl}/${data.id}`);
@@ -409,7 +409,7 @@ async function createOrUpdatePlanet(data) {
 //--------------------------------------------
 
 async function getAllSpaceStations() {
-    const apiUrl = `${process.env.SERVER_URL}/api/uex/spacestations/`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/spacestations/`;
     try {
         const response = await axios.get(apiUrl);
         return response.data;  // This will be the return value of the function
@@ -422,7 +422,7 @@ async function getAllSpaceStations() {
 async function getSpaceStationsById(id){
     const apiUrl = process.env.SERVER_URL;
     try {
-        const response = await axios.get(`${apiUrl}/api/uex/spacestations/${id}`);
+        const response = await axios.get(`${apiUrl}${process.env.API_EXP_GER}/spacestations/${id}`);
         return response.data;  // This now properly returns the response data to the caller
     } catch (error) {
         return null;  // Return null or throw an error, depending on how you want to handle errors
@@ -430,7 +430,7 @@ async function getSpaceStationsById(id){
 }
 
 async function createOrUpdateSpaceStation(data) {
-    const apiUrl = `${process.env.SERVER_URL}/api/uex/spacestations`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/spacestations`;
     try {
         // Check if the city exists
         await axios.get(`${apiUrl}/${data.id}`);
@@ -459,7 +459,7 @@ async function createOrUpdateSpaceStation(data) {
 //--------------------------------------------
 
 async function getAllStarSystems() {
-    const apiUrl = `${process.env.SERVER_URL}/api/uex/starsystems/`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/starsystems/`;
     try {
         const response = await axios.get(apiUrl);
         return response.data;  // This will be the return value of the function
@@ -472,7 +472,7 @@ async function getAllStarSystems() {
 async function getStarSystemById(id){
     const apiUrl = process.env.SERVER_URL;
     try {
-        const response = await axios.get(`${apiUrl}/api/uex/starsystems/${id}`);
+        const response = await axios.get(`${apiUrl}${process.env.API_EXP_GER}/starsystems/${id}`);
         return response.data;  // This now properly returns the response data to the caller
     } catch (error) {
         return null;  // Return null or throw an error, depending on how you want to handle errors
@@ -480,7 +480,7 @@ async function getStarSystemById(id){
 }
 
 async function createOrUpdateStarSystem(data) {
-    const apiUrl = `${process.env.SERVER_URL}/api/uex/starsystems`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/starsystems`;
     try {
         // Check if the city exists
         await axios.get(`${apiUrl}/${data.id}`);
@@ -509,7 +509,7 @@ async function createOrUpdateStarSystem(data) {
 //--------------------------------------------
 
 async function getAllShips() {
-    const apiUrl = `${process.env.SERVER_URL}/api/uex/ships/`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/ships/`;
     try {
         const response = await axios.get(apiUrl);
         return response.data;  // This will be the return value of the function
@@ -522,7 +522,7 @@ async function getAllShips() {
 async function getShipsById(id){
     const apiUrl = process.env.SERVER_URL;
     try {
-        const response = await axios.get(`${apiUrl}/api/uex/ships/${id}`);
+        const response = await axios.get(`${apiUrl}${process.env.API_EXP_GER}/ships/${id}`);
         return response.data;  // This now properly returns the response data to the caller
     } catch (error) {
         return null;  // Return null or throw an error, depending on how you want to handle errors
@@ -530,7 +530,7 @@ async function getShipsById(id){
 }
 
 async function createOrUpdateShips(data) {
-    const apiUrl = `${process.env.SERVER_URL}/api/uex/ships`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/ships`;
     try {
         // Check if the city exists
         await axios.get(`${apiUrl}/${data.id}`);
@@ -560,7 +560,7 @@ async function createOrUpdateShips(data) {
 //--------------------------------------------
 
 async function getAllTerminals() {
-    const apiUrl = `${process.env.SERVER_URL}/api/uex/terminals/`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/terminals/`;
     try {
         const response = await axios.get(apiUrl);
         return response.data;  // This will be the return value of the function
@@ -573,7 +573,7 @@ async function getAllTerminals() {
 async function getTerminalById(id){
     const apiUrl = process.env.SERVER_URL;
     try {
-        const response = await axios.get(`${apiUrl}/api/uex/terminals/${id}`);
+        const response = await axios.get(`${apiUrl}${process.env.API_EXP_GER}/terminals/${id}`);
         return response.data;  // This now properly returns the response data to the caller
     } catch (error) {
         return null;  // Return null or throw an error, depending on how you want to handle errors
@@ -581,7 +581,7 @@ async function getTerminalById(id){
 }
 
 async function createOrUpdateTerminal(data) {
-    const apiUrl = `${process.env.SERVER_URL}/api/uex/terminals`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/terminals`;
     try {
         // Check if the city exists
         await axios.get(`${apiUrl}/${data.id}`);
@@ -610,7 +610,7 @@ async function createOrUpdateTerminal(data) {
 //--------------------------------------------
 
 async function getAllTerminalPrices() {
-    const apiUrl = `${process.env.SERVER_URL}/api/uex/terminalprices/`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/terminalprices/`;
     try {
         const response = await axios.get(apiUrl);
         return response.data;  // This will be the return value of the function
@@ -623,7 +623,7 @@ async function getAllTerminalPrices() {
 async function getTerminalPricesById(id){
     const apiUrl = process.env.SERVER_URL;
     try {
-        const response = await axios.get(`${apiUrl}/api/uex/terminalprices/${id}`);
+        const response = await axios.get(`${apiUrl}${process.env.API_EXP_GER}/terminalprices/${id}`);
         return response.data;  // This now properly returns the response data to the caller
     } catch (error) {
         return null;  // Return null or throw an error, depending on how you want to handle errors
@@ -631,7 +631,7 @@ async function getTerminalPricesById(id){
 }
 
 async function createOrUpdateTerminalPrices(data) {
-    const apiUrl = `${process.env.SERVER_URL}/api/uex/terminalprices`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/terminalprices`;
     try {
         // Check if the city exists
         await axios.get(`${apiUrl}/${data.id}`);

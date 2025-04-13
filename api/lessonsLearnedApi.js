@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 async function createLessonLearned(lessonLearned) {
-    const apiUrl = `${process.env.SERVER_URL}/api/lessonslearned`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_LESSONS}`;
     try {
         const response = await axios.post(apiUrl, lessonLearned, {
             headers: {
@@ -16,7 +16,7 @@ async function createLessonLearned(lessonLearned) {
 }
 
 async function getAllLessonsLearned() {
-    const apiUrl = `${process.env.SERVER_URL}/api/lessonslearned/`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_LESSONS}/`;
     try {
         const response = await axios.get(apiUrl);
         return response.data;  // This will be the return value of the function
@@ -28,7 +28,7 @@ async function getAllLessonsLearned() {
 
 async function deleteLessonLearned(id) {
     console.log("Deleting LessonLearned")
-    const apiUrl = `${process.env.SERVER_URL}/api/lessonslearned/${id}`; 
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_LESSONS}/${id}`; 
     try {
         const response = await axios.delete(apiUrl, {
             headers: {

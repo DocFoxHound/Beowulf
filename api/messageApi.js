@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 async function getMessages() {
-    const apiUrl = `${process.env.SERVER_URL}/api/messages/`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_MSG}/`;
     try {
         const response = await axios.get(apiUrl);
         return response.data;  // This will be the return value of the function
@@ -12,7 +12,7 @@ async function getMessages() {
 }
 
 async function createMessage(chunk){
-    const apiUrl = `${process.env.SERVER_URL}/api/messages/`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_MSG}/`;
     try {
         const response = await axios.post(apiUrl, chunk, {
             headers: {
@@ -27,7 +27,7 @@ async function createMessage(chunk){
 }
 
 async function deleteMessagesBeforeDate() {
-    const apiUrl = `${process.env.SERVER_URL}/api/messages/older-than`; 
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_MSG}/older-than`; 
     const date = new Date();
     date.setDate(date.getDate() - 30);  // Subtract 3 days from the current date
     const formattedDate = date.toISOString();  // Format the date as an ISO string
@@ -48,7 +48,7 @@ async function deleteMessagesBeforeDate() {
 }
 
 async function deleteMessagesByCount(channel, number) {
-    const apiUrl = `${process.env.SERVER_URL}/api/messages/name/${channel}/number/${number}`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_MSG}/name/${channel}/number/${number}`;
     try {
         const response = await axios.delete(apiUrl, {
             headers: {

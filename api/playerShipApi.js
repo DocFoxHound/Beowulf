@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 async function createPlayerShip(PlayerShipData) {
-    const apiUrl = `${process.env.SERVER_URL}/api/playership`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_CUSTOM_SHIP}`;
     try {
         const response = await axios.post(apiUrl, PlayerShipData, {
             headers: {
@@ -16,7 +16,7 @@ async function createPlayerShip(PlayerShipData) {
 }
 
 // async function getAllPlayerShips() {
-//     const apiUrl = `${process.env.SERVER_URL}/api/playership/`;
+//     const apiUrl = `${process.env.SERVER_URL}${process.env.API_CUSTOM_SHIP}/`;
 //     try {
 //         const response = await axios.get(apiUrl);
 //         return response.data;  // This will be the return value of the function
@@ -27,7 +27,7 @@ async function createPlayerShip(PlayerShipData) {
 // }
 
 async function getPlayerShipsByUserId(user_id) {
-    const apiUrl = `${process.env.SERVER_URL}/api/playership/user`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_CUSTOM_SHIP}/user`;
     try {
         const response = await axios.get(apiUrl, {
             params: {
@@ -42,7 +42,7 @@ async function getPlayerShipsByUserId(user_id) {
 }
 
 async function getPlayerShipByEntryId(id) {
-    const apiUrl = `${process.env.SERVER_URL}/api/playership/entry`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_CUSTOM_SHIP}/entry`;
     try {
         const response = await axios.get(apiUrl, {
             params: {
@@ -62,7 +62,7 @@ async function getPlayerShipByEntryId(id) {
 }
 
 async function getPlayerShipsByUexShipId(uex_ship_id) {
-    const apiUrl = `${process.env.SERVER_URL}/api/playership/uexshipid`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_CUSTOM_SHIP}/uexshipid`;
     try {
         const response = await axios.get(apiUrl, {
             params: {
@@ -78,7 +78,7 @@ async function getPlayerShipsByUexShipId(uex_ship_id) {
 
 //this isn't setup for editing yet, but is just a copy of editUser
 async function editPlayerShip(playerShipId, updatedPlayerShipData) {
-    const apiUrl = `${process.env.SERVER_URL}/api/playership/${playerShipId}`; // Assuming this is the correct endpoint
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_CUSTOM_SHIP}/${playerShipId}`; // Assuming this is the correct endpoint
     try {
         const response = await axios.put(apiUrl, updatedPlayerShipData, {
             headers: {
@@ -94,7 +94,7 @@ async function editPlayerShip(playerShipId, updatedPlayerShipData) {
 
 async function deletePlayerShip(id) {
     console.log("Deleting PlayerShip")
-    const apiUrl = `${process.env.SERVER_URL}/api/playership/${id}`; 
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_CUSTOM_SHIP}/${id}`; 
     try {
         const response = await axios.delete(apiUrl, {
             headers: {

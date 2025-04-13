@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 async function createHitLog(HitLogData) {
-    const apiUrl = `${process.env.SERVER_URL}/api/hittracker`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_HIT_TRACKR}`;
     try {
         const response = await axios.post(apiUrl, HitLogData, {
             headers: {
@@ -16,7 +16,7 @@ async function createHitLog(HitLogData) {
 }
 
 async function getAllHitLogs() {
-    const apiUrl = `${process.env.SERVER_URL}/api/hittracker/`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_HIT_TRACKR}/`;
     try {
         const response = await axios.get(apiUrl);
         return response.data;  // This will be the return value of the function
@@ -27,7 +27,7 @@ async function getAllHitLogs() {
 }
 
 async function getHitLogsByUserId(user_id) {
-    const apiUrl = `${process.env.SERVER_URL}/api/hittracker/user`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_HIT_TRACKR}/user`;
     try {
         const response = await axios.get(apiUrl, {
             params: {
@@ -42,7 +42,7 @@ async function getHitLogsByUserId(user_id) {
 }
 
 async function getHitLogByEntryId(id) {
-    const apiUrl = `${process.env.SERVER_URL}/api/hittracker/entry`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_HIT_TRACKR}/entry`;
     try {
         const response = await axios.get(apiUrl, {
             params: {
@@ -62,7 +62,7 @@ async function getHitLogByEntryId(id) {
 }
 
 async function getHitLogsByPatch(patch) {
-    const apiUrl = `${process.env.SERVER_URL}/api/hittracker/patch`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_HIT_TRACKR}/patch`;
     console.log("Patch: ", patch)
     try {
         const response = await axios.get(apiUrl, {
@@ -78,7 +78,7 @@ async function getHitLogsByPatch(patch) {
 }
 
 async function getHitLogsByUserAndPatch(coupling) {
-    const apiUrl = `${process.env.SERVER_URL}/api/hittracker/userandpatch`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_HIT_TRACKR}/userandpatch`;
     try {
         const response = await axios.get(apiUrl, {
             params: {
@@ -94,7 +94,7 @@ async function getHitLogsByUserAndPatch(coupling) {
 }
 
 async function getAssistHitLogs(user_id) {
-    const apiUrl = `${process.env.SERVER_URL}/api/hittracker/assists`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_HIT_TRACKR}/assists`;
     try {
         const response = await axios.get(apiUrl, {
             params: {
@@ -109,7 +109,7 @@ async function getAssistHitLogs(user_id) {
 }
 
 async function getAssistHitLogsByUserAndPatch(coupling) {
-    const apiUrl = `${process.env.SERVER_URL}/api/hittracker/assistsuserpatch`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_HIT_TRACKR}/assistsuserpatch`;
     // console.log(coupling)
     try {
         const response = await axios.get(apiUrl, {
@@ -128,7 +128,7 @@ async function getAssistHitLogsByUserAndPatch(coupling) {
 
 //this isn't setup for editing yet, but is just a copy of editUser
 async function editHitLog(HitLogId, updatedHitLogData) {
-    const apiUrl = `${process.env.SERVER_URL}/api/hittracker/${HitLogId}`; // Assuming this is the correct endpoint
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_HIT_TRACKR}/${HitLogId}`; // Assuming this is the correct endpoint
     try {
         const response = await axios.put(apiUrl, updatedHitLogData, {
             headers: {
@@ -144,7 +144,7 @@ async function editHitLog(HitLogId, updatedHitLogData) {
 
 async function deleteHitLog(id) {
     console.log("Deleting HitLog")
-    const apiUrl = `${process.env.SERVER_URL}/api/hittracker/${id}`; 
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_HIT_TRACKR}/${id}`; 
     try {
         const response = await axios.delete(apiUrl, {
             headers: {

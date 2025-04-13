@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 async function createThreadDb(threadData) {
-    const apiUrl = `${process.env.SERVER_URL}/api/threads`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.OPENAI_CODE}`;
     try {
         const response = await axios.post(apiUrl, threadData, {
             headers: {
@@ -16,7 +16,7 @@ async function createThreadDb(threadData) {
 }
 
 async function getThreadByMessageId(message_id) {
-    const apiUrl = `${process.env.SERVER_URL}/api/threads/message`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.OPENAI_CODE}/message`;
     try {
         const response = await axios.get(apiUrl, {
             params: {
@@ -31,7 +31,7 @@ async function getThreadByMessageId(message_id) {
 }
 
 async function deleteThreadsBeforeDate() {
-    const apiUrl = `${process.env.SERVER_URL}/api/threads/older-than`; 
+    const apiUrl = `${process.env.SERVER_URL}${process.env.OPENAI_CODE}/older-than`; 
     const date = new Date();
     date.setDate(date.getDate() - 3);  // Subtract 3 days from the current date
     const formattedDate = date.toISOString();  // Format the date as an ISO string
@@ -53,7 +53,7 @@ async function deleteThreadsBeforeDate() {
 
 //this isn't setup for editing yet, but is just a copy of editUser
 async function editThread(message_id, updatedThreadData) {
-    const apiUrl = `${process.env.SERVER_URL}/api/threads/${message_id}`; // Assuming this is the correct endpoint
+    const apiUrl = `${process.env.SERVER_URL}${process.env.OPENAI_CODE}/${message_id}`; // Assuming this is the correct endpoint
     try {
         const response = await axios.put(apiUrl, updatedThreadData, {
             headers: {

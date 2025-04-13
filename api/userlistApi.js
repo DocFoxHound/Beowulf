@@ -2,7 +2,7 @@ const axios = require('axios');
 
 async function createUser(newUser) {
     console.log("Inserting new user into UserList")
-    const apiUrl = `${process.env.SERVER_URL}/api/users/`; 
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_MEMBERS}/`; 
     try {
         const response = await axios.post(apiUrl, newUser, {
             headers: {
@@ -17,7 +17,7 @@ async function createUser(newUser) {
 }
 
 async function getUsers() {
-    const apiUrl = `${process.env.SERVER_URL}/api/users/`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_MEMBERS}/`;
     try {
         const response = await axios.get(apiUrl);
         return response.data;  // This will be the return value of the function
@@ -30,7 +30,7 @@ async function getUsers() {
 async function getUserById(userId){
     const apiUrl = process.env.SERVER_URL;
     try {
-        const response = await axios.get(`${apiUrl}/api/users/${userId}`);
+        const response = await axios.get(`${apiUrl}${process.env.API_MEMBERS}/${userId}`);
         return response.data;  // This now properly returns the response data to the caller
     } catch (error) {
         return null;  // Return null or throw an error, depending on how you want to handle errors
@@ -40,7 +40,7 @@ async function getUserById(userId){
 async function getUserByUsername(username){
     const apiUrl = process.env.SERVER_URL;
     try {
-        const response = await axios.get(`${apiUrl}/api/users/${username}`);
+        const response = await axios.get(`${apiUrl}${process.env.API_MEMBERS}/${username}`);
         return response.data;  // This now properly returns the response data to the caller
     } catch (error) {
         return null;  // Return null or throw an error, depending on how you want to handle errors
@@ -49,7 +49,7 @@ async function getUserByUsername(username){
 
 
 async function editUser(userId, updatedUserData) {
-    const apiUrl = `${process.env.SERVER_URL}/api/users/${userId}`; // Assuming this is the correct endpoint
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_MEMBERS}/${userId}`; // Assuming this is the correct endpoint
     try {
         const response = await axios.put(apiUrl, updatedUserData, {
             headers: {
@@ -65,7 +65,7 @@ async function editUser(userId, updatedUserData) {
 
 async function deleteUser(userId) {
     console.log("Deleting User")
-    const apiUrl = `${process.env.SERVER_URL}/api/users/${id}`; 
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_MEMBERS}/${id}`; 
     try {
         const response = await axios.delete(apiUrl, {
             headers: {

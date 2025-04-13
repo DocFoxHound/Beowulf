@@ -3,7 +3,7 @@ const axios = require('axios');
 async function deleteUserInQueue(userId){
     const apiUrl = process.env.SERVER_URL;
     try {
-        const response = await axios.delete(`${apiUrl}/api/queue/${userId}`);
+        const response = await axios.delete(`${apiUrl}${process.env.API_CLASS_LINE}/${userId}`);
         return true;  // This now properly returns the response data to the caller
     } catch (error) {
         console.error('Error removing user from Queue: ', error.response ? error.response.data : error.message);
@@ -12,7 +12,7 @@ async function deleteUserInQueue(userId){
 }
 
 async function getUsersInQueue() {
-    const apiUrl = `${process.env.SERVER_URL}/api/queue/`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_CLASS_LINE}/`;
     try {
         const response = await axios.get(apiUrl);
         return response.data;  // This will be the return value of the function
@@ -25,7 +25,7 @@ async function getUsersInQueue() {
 async function getUserById(userId){
     const apiUrl = process.env.SERVER_URL;
     try {
-        const response = await axios.get(`${apiUrl}/api/queue/${userId}`);
+        const response = await axios.get(`${apiUrl}${process.env.API_CLASS_LINE}/${userId}`);
         return response.data;  // This now properly returns the response data to the caller
     } catch (error) {
         return null;  // Return null or throw an error, depending on how you want to handle errors
@@ -33,7 +33,7 @@ async function getUserById(userId){
 }
 
 async function editUserInQueue(userId, updatedUserData) {
-    const apiUrl = `${process.env.SERVER_URL}/api/queue/${userId}`; // Assuming this is the correct endpoint
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_CLASS_LINE}/${userId}`; // Assuming this is the correct endpoint
     try {
         const response = await axios.put(apiUrl, updatedUserData, {
             headers: {
@@ -49,7 +49,7 @@ async function editUserInQueue(userId, updatedUserData) {
 
 async function createUserInQueue(newUser) {
     console.log("Inserting new user into Queue")
-    const apiUrl = `${process.env.SERVER_URL}/api/queue/`; 
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_CLASS_LINE}/`; 
     try {
         const response = await axios.post(apiUrl, newUser, {
             headers: {

@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 async function getPrestiges() {
-    const apiUrl = `${process.env.SERVER_URL}/api/prestiges/`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_PRESTIGE_RANKS}/`;
     try {
         const response = await axios.get(apiUrl);
         return response.data;  // This will be the return value of the function
@@ -14,7 +14,7 @@ async function getPrestiges() {
 async function getPrestigeById(prestigeId){
     const apiUrl = process.env.SERVER_URL;
     try {
-        const response = await axios.get(`${apiUrl}/api/prestiges/${prestigeId}`);
+        const response = await axios.get(`${apiUrl}${process.env.API_PRESTIGE_RANKS}/${prestigeId}`);
         return response.data;  // This now properly returns the response data to the caller
     } catch (error) {
         return null;  // Return null or throw an error, depending on how you want to handle errors

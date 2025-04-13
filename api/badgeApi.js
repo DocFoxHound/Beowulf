@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 async function createBadge(badgeData) {
-    const apiUrl = `${process.env.SERVER_URL}/api/badges`;
+    const apiUrl = `${process.env.SERVER_URL}$${process.env.API_BADGES}`;
     try {
         const response = await axios.post(apiUrl, badgeData, {
             headers: {
@@ -16,7 +16,7 @@ async function createBadge(badgeData) {
 }
 
 async function getAllBadges() {
-    const apiUrl = `${process.env.SERVER_URL}/api/badges/`;
+    const apiUrl = `${process.env.SERVER_URL}$${process.env.API_BADGES}/`;
     try {
         const response = await axios.get(apiUrl);
         return response.data;  // This will be the return value of the function
@@ -27,7 +27,7 @@ async function getAllBadges() {
 }
 
 async function getBadgesByUserId(user_id) {
-    const apiUrl = `${process.env.SERVER_URL}/api/badges/user`;
+    const apiUrl = `${process.env.SERVER_URL}$${process.env.API_BADGES}/user`;
     try {
         const response = await axios.get(apiUrl, {
             params: {
@@ -43,7 +43,7 @@ async function getBadgesByUserId(user_id) {
 
 //this isn't setup for editing yet, but is just a copy of editUser
 async function editBadge(badgeId, updatedBadgeData) {
-    const apiUrl = `${process.env.SERVER_URL}/api/badges/${badgeId}`; // Assuming this is the correct endpoint
+    const apiUrl = `${process.env.SERVER_URL}$${process.env.API_BADGES}/${badgeId}`; // Assuming this is the correct endpoint
     try {
         const response = await axios.put(apiUrl, updatedBadgeData, {
             headers: {
@@ -59,7 +59,7 @@ async function editBadge(badgeId, updatedBadgeData) {
 
 async function deleteBadge(id) {
     console.log("Deleting badge")
-    const apiUrl = `${process.env.SERVER_URL}/api/badges/${id}`; 
+    const apiUrl = `${process.env.SERVER_URL}$${process.env.API_BADGES}/${id}`; 
     try {
         const response = await axios.delete(apiUrl, {
             headers: {
