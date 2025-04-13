@@ -22,6 +22,8 @@ module.exports = {
                 user_id: interaction.user.id,
                 username: interaction.user.username,
                 created_at: new Date(),
+                expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Set expiration date to 30 days from now
+                player_name: null
             };
             const result = await createKey(keyData); // Call the function to save the key in the database
 
