@@ -77,7 +77,7 @@ async function deleteKey(id) {
 async function validateKey(key) {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_AUTH_KEY}/validatekey`;
     try {
-        const response = await axios.get(apiUrl, {
+        const response = await axios.post(apiUrl, {
             params: {
                 key: key
             }
