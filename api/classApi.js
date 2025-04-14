@@ -2,7 +2,7 @@ const axios = require('axios');
 
 async function createClass(newClass) {
     console.log("Inserting new class into the 'class' table")
-    const apiUrl = `${process.env.SERVER_URL}$${process.env.API_CLASS}/`; 
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_CLASS}/`; 
     try {
         const response = await axios.post(apiUrl, newClass, {
             headers: {
@@ -17,7 +17,7 @@ async function createClass(newClass) {
 }
 
 async function getClasses() {
-    const apiUrl = `${process.env.SERVER_URL}$${process.env.API_CLASS}/`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_CLASS}/`;
     try {
         const response = await axios.get(apiUrl);
         return response.data;  // This will be the return value of the function
@@ -30,7 +30,7 @@ async function getClasses() {
 async function getClassById(classId){
     const apiUrl = process.env.SERVER_URL;
     try {
-        const response = await axios.get(`${apiUrl}$${process.env.API_CLASS}/${classId}`);
+        const response = await axios.get(`${apiUrl}${process.env.API_CLASS}/${classId}`);
         return response.data;  // This now properly returns the response data to the caller
     } catch (error) {
         return null;  // Return null or throw an error, depending on how you want to handle errors
@@ -39,7 +39,7 @@ async function getClassById(classId){
 
 //this isn't setup for editing yet, but is just a copy of editUser
 async function editClass(classId, updatedUserData) {
-    const apiUrl = `${process.env.SERVER_URL}$${process.env.API_CLASS}/${classId}`; // Assuming this is the correct endpoint
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_CLASS}/${classId}`; // Assuming this is the correct endpoint
     try {
         const response = await axios.put(apiUrl, updatedUserData, {
             headers: {
@@ -55,7 +55,7 @@ async function editClass(classId, updatedUserData) {
 
 async function deleteClass(classId) {
     console.log("Deleting class from class table")
-    const apiUrl = `${process.env.SERVER_URL}$${process.env.API_CLASS}/`; 
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_CLASS}/`; 
     try {
         const response = await axios.delete(apiUrl, classId, {
             headers: {

@@ -10,7 +10,7 @@ async function createKey(keyData) {
         });
         return response.data;  // Return the created key data
     } catch (error) {
-        console.error('Error creating key:', error.response ? error.response.data : error.message);
+        console.error('Error creating key:', error);
         return null;  // Return null if there's an error
     }
 }

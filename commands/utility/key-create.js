@@ -11,7 +11,6 @@ module.exports = {
         try {
             // Generate a random API key
             const apiKey = crypto.randomBytes(16).toString('hex'); // 32-character hexadecimal key
-            console.log('Generated API key:', apiKey);
             // Save the API key to the database
             const parentId = new Date().getTime()
             const now = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)

@@ -171,7 +171,6 @@ async function generateIndividualData(blackBoxLogs, user) {
 
         for (const log of blackBoxLogs) {
             const hitId = log.id;
-            const shipUsedObject = await getPlayerShipByEntryId(log.ship_used);
             const assistsList = [];
             if(log.assists.length > 0){
                 for(const assist of log.assists){
@@ -194,7 +193,7 @@ async function generateIndividualData(blackBoxLogs, user) {
             leaderboard[username].hits.push({
                 id: hitId,
                 kill_count: log.kill_count,
-                ship_used: shipUsedObject.custom_name,
+                ship_used: log.ship_used,
                 ship_killed: log.ship_killed,
                 value: log.value,
                 assists: assistsList || "none",

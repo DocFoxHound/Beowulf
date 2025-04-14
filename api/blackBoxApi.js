@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 async function createBlackBox(BlackBoxData) {
-    const apiUrl = `${process.env.SERVER_URL}$${process.env.API_BLACKBOX}`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_BLACKBOX}`;
     try {
         const response = await axios.post(apiUrl, BlackBoxData, {
             headers: {
@@ -16,7 +16,7 @@ async function createBlackBox(BlackBoxData) {
 }
 
 async function getAllBlackBoxes() {
-    const apiUrl = `${process.env.SERVER_URL}$${process.env.API_BLACKBOX}/`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_BLACKBOX}/`;
     try {
         const response = await axios.get(apiUrl);
         return response.data;  // This will be the return value of the function
@@ -27,7 +27,7 @@ async function getAllBlackBoxes() {
 }
 
 async function getBlackBoxesByUserId(user_id) {
-    const apiUrl = `${process.env.SERVER_URL}$${process.env.API_BLACKBOX}/user`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_BLACKBOX}/user`;
     try {
         const response = await axios.get(apiUrl, {
             params: {
@@ -42,7 +42,7 @@ async function getBlackBoxesByUserId(user_id) {
 }
 
 async function getBlackBoxByEntryId(id) {
-    const apiUrl = `${process.env.SERVER_URL}$${process.env.API_BLACKBOX}/entry`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_BLACKBOX}/entry`;
     try {
         const response = await axios.get(apiUrl, {
             params: {
@@ -62,7 +62,7 @@ async function getBlackBoxByEntryId(id) {
 }
 
 async function getBlackBoxesByPatch(patch) {
-    const apiUrl = `${process.env.SERVER_URL}$${process.env.API_BLACKBOX}/patch`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_BLACKBOX}/patch`;
     try {
         const response = await axios.get(apiUrl, {
             params: {
@@ -78,7 +78,7 @@ async function getBlackBoxesByPatch(patch) {
 ///user2/:id/patch/:patch
 
 async function getBlackBoxesByUserAndPatch(coupling) {
-    const apiUrl = `${process.env.SERVER_URL}$${process.env.API_BLACKBOX}/userandpatch`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_BLACKBOX}/userandpatch`;
     try {
         const response = await axios.get(apiUrl, {
             params: {
@@ -95,7 +95,7 @@ async function getBlackBoxesByUserAndPatch(coupling) {
 
 
 async function getAssistantBlackBoxes(user_id) {
-    const apiUrl = `${process.env.SERVER_URL}$${process.env.API_BLACKBOX}/assistantbox`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_BLACKBOX}/assistantbox`;
     try {
         const response = await axios.get(apiUrl, {
             params: {
@@ -110,7 +110,7 @@ async function getAssistantBlackBoxes(user_id) {
 }
 
 async function getAssistantBlackBoxesByUserAndPatch(coupling) {
-    const apiUrl = `${process.env.SERVER_URL}$${process.env.API_BLACKBOX}/assistantboxuserpatch`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_BLACKBOX}/assistantboxuserpatch`;
     // console.log(coupling)
     try {
         const response = await axios.get(apiUrl, {
@@ -129,7 +129,7 @@ async function getAssistantBlackBoxesByUserAndPatch(coupling) {
 
 //this isn't setup for editing yet, but is just a copy of editUser
 async function editBlackBox(BlackBoxId, updatedBlackBoxData) {
-    const apiUrl = `${process.env.SERVER_URL}$${process.env.API_BLACKBOX}/${BlackBoxId}`; // Assuming this is the correct endpoint
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_BLACKBOX}/${BlackBoxId}`; // Assuming this is the correct endpoint
     try {
         const response = await axios.put(apiUrl, updatedBlackBoxData, {
             headers: {
@@ -145,7 +145,7 @@ async function editBlackBox(BlackBoxId, updatedBlackBoxData) {
 
 async function deleteBlackBox(id) {
     console.log("Deleting BlackBox")
-    const apiUrl = `${process.env.SERVER_URL}$${process.env.API_BLACKBOX}/${id}`; 
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_BLACKBOX}/${id}`; 
     try {
         const response = await axios.delete(apiUrl, {
             headers: {
