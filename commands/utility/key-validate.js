@@ -16,7 +16,6 @@ module.exports = {
             // Generate a random API key
             const apiKey = interaction.options.getString('key');
             const result = await validateKey(apiKey); // Call the function to save the key in the database
-            console.log('API key validation result:', result);
             if (result) {
                 // Send the API key to the user as an ephemeral message
                 await interaction.reply({
@@ -24,7 +23,7 @@ module.exports = {
                     ephemeral: true
                 });
             } else {
-                throw new Error('Failed to save the API key to the database.');
+                throw new Error('Failed to validate the API key in the database.');
             }
         } catch (error) {
             console.error('Error validating API key:', error);

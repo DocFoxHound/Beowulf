@@ -77,21 +77,21 @@ async function deleteKey(id) {
 async function validateKey(key) {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_AUTH_KEY}/validatekey`;
     try {
-        const response = await axios.post(apiUrl, {
-            params: {
-                key: key
+        const response = await axios.get(apiUrl, {
+            headers: {
+                'Authorization': `${key}` // Send the key as a Bearer token in the Authorization header
             }
         });
         return response.data;  // This will be the return value of the function
     } catch (error) {
-        console.error('Error fetching user keys:', error.response ? error.response.data : error.message);
+        console.error('Error validating key:', error.response ? error.response.data : error.message);
         return null;  // Return null if there's an error
     }
 }
 
 module.exports = {
     createKey,
-    getClasses: getAllKeys,
+    getAllKeys,
     getKeyByUserId,
     editKey,
     deleteKey,
