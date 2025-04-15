@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 async function createKey(keyData) {
-    const apiUrl = `${process.env.SERVER_URL}${process.env.API_AUTH_KEY_POST}`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_AUTH_KEY}`;
     try {
         const response = await axios.post(apiUrl, keyData, {
             headers: {
@@ -16,7 +16,7 @@ async function createKey(keyData) {
 }
 
 async function getAllKeys() {
-    const apiUrl = `${process.env.SERVER_URL}${process.env.API_AUTH_KEY_GET}`;
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_AUTH_KEY}/`;
     try {
         const response = await axios.get(apiUrl);
         return response.data;  // This will be the return value of the function
