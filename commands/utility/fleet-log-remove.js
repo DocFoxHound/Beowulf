@@ -1,10 +1,10 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { deleteShipLog, getCrewShipLogs, getShipLogByEntryId, getShipLogsByCommanderId } = require('../../api/shipLogApi');
-const { getUserById } = require('../../api/userlistApi');
+const { getUserById, getUsers } = require('../../api/userlistApi');
 
 
 const command = new SlashCommandBuilder()
-    .setName('ship-log-remove')
+    .setName('fleet-log-remove')
     .setDescription('Remove a kill log for your ship to the Black Box.')
     .addStringOption(option => 
         option.setName('log')
@@ -24,8 +24,8 @@ module.exports = {
             const channelId = process.env.LIVE_ENVIRONMENT === "true" ? process.env.AUDIT_CHANNEL : process.env.TEST_AUDIT_CHANNEL; // Replace with actual channel ID
             const channel = await client.channels.fetch(channelId);
             const logRecord = await getShipLogByEntryId(killLog); // Fetch the kill log record
-            if(interaction.user.id !== logRecord.owner_id){
-                const originalCreator = await getUserById(logRecord.owner_id);
+            if(interaction.user.id !== logRecord.commander){
+                const originalCreator = await getUserById(logRecord.commander);
                 return interaction.reply({ 
                     content: `Only ${originalCreator.username} or a Marauder+ can delete this log: (${logRecord.id}).`, 
                     ephemeral: false 
@@ -44,13 +44,17 @@ module.exports = {
     },
     async autocomplete(interaction) {
         const focusedValue = interaction.options.getFocused(); // Get the focused option value
-        const allPrimaryBlackBoxLogs = await getShipLogsByCommanderId(interaction.user.id); // Fetch all black box logs
-        const allSecondaryBlackBoxLogs = await getCrewShipLogs(interaction.user.id); // Fetch all assistant black box logs
-        const allBlackBoxesCombined = [...allPrimaryBlackBoxLogs, ...allSecondaryBlackBoxLogs]; // Combine both logs
+        const allFleetLogsCombined = await getShipLogsByCommanderId(interaction.user.id); // Fetch all black box logs
+        const allUsers = await getUsers()
 
         // Combine ship_used and victims[] into a single searchable array
-        const allBlackBoxLogsListed = allBlackBoxesCombined.map(log => ({
-            name: `${log.ship_used} - Victims: ${log.victim_orgs.join(', ')}`,
+        const allBlackBoxLogsListed = allFleetLogsCombined.map(log => ({
+            name: `${log.id} - Subcommanders: ${log.subcommanders
+                .map(subId => {
+                    const user = allUsers.find(user => user.id === subId); // Find the user in allUsers
+                    return user ? user.username : 'Unknown'; // Replace with username or 'Unknown' if not found
+                })
+                .join(', ')}`,
             value: log.id // Use the log ID as the value for selection
         }));
 
@@ -65,3 +69,8 @@ module.exports = {
         );
     }
 };
+
+async function getPlayerName(allUsers, playerId) {
+    const userData = await getUserById(playerId)
+    return userData ? userData.nickname : userData.username; // Fallback to playerId if not found
+}

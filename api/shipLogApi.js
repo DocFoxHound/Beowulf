@@ -41,12 +41,12 @@ async function getShipLogsByCommanderId(commander) {
     }
 }
 
-async function getShipLogsByOwnerId(owner_id) {
+async function getShipLogsByOwnerId(commander) {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_LOGS}/owner`;
     try {
         const response = await axios.get(apiUrl, {
             params: {
-                owner_id: owner_id
+                commander: commander
             }
         });
         return response.data;  // This will be the return value of the function
@@ -87,23 +87,6 @@ async function getShipLogsByPatch(patch) {
         return response.data;  // This will be the return value of the function
     } catch (error) {
         console.error('Error fetching user ShipLogs by Patch:', error.response ? error.response.data : error.message);
-        return null;  // Return null if there's an error
-    }
-}
-///user2/:id/patch/:patch
-
-async function getShipLogsByOwnerAndPatch(coupling) {
-    const apiUrl = `${process.env.SERVER_URL}${process.env.API_LOGS}/ownerandpatch`;
-    try {
-        const response = await axios.get(apiUrl, {
-            params: {
-                owner_id: coupling.owner_id,
-                patch: coupling.patch
-            }
-        });
-        return response.data;  // This will be the return value of the function
-    } catch (error) {
-        console.error('Error fetching user ShipLogs by Owner ID and Patch:', error.response ? error.response.data : error.message);
         return null;  // Return null if there's an error
     }
 }
@@ -196,7 +179,6 @@ module.exports = {
     editShipLog,
     deleteShipLog,
     getShipLogsByPatch,
-    getShipLogsByOwnerAndPatch,
     getShipLogsByCommanderAndPatch,
     getCrewShipLogs,
     getCrewShipLogsByUserAndPatch,
