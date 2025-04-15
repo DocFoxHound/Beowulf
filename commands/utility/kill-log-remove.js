@@ -4,8 +4,8 @@ const { getUserById } = require('../../api/userlistApi');
 
 
 const command = new SlashCommandBuilder()
-    .setName('black-box-remove')
-    .setDescription('Remove a kill log for your ship to the Black Box.')
+    .setName('kill-log-remove')
+    .setDescription('Remove a kill log from the Black Box.')
     .addStringOption(option => 
         option.setName('kill')
             .setDescription('The kill log you want to remove')
@@ -43,13 +43,12 @@ module.exports = {
     },
     async autocomplete(interaction) {
         const focusedValue = interaction.options.getFocused(); // Get the focused option value
-        const allPrimaryBlackBoxLogs = await getBlackBoxesByUserId(interaction.user.id); // Fetch all black box logs
-        const allSecondaryBlackBoxLogs = await getAssistantBlackBoxes(interaction.user.id); // Fetch all assistant black box logs
-        const allBlackBoxesCombined = [...allPrimaryBlackBoxLogs, ...allSecondaryBlackBoxLogs]; // Combine both logs
+        let allPrimaryBlackBoxLogs = await getBlackBoxesByUserId(interaction.user.id); // Fetch all black box logs
+        allPrimaryBlackBoxLogs.sort((a, b) => b.id - a.id); // Sort logs by ID in descending order
 
         // Combine ship_used and victims[] into a single searchable array
-        const allBlackBoxLogsListed = allBlackBoxesCombined.map(log => ({
-            name: `${log.ship_used} - Victims: ${log.victims.join(', ')}`,
+        const allBlackBoxLogsListed = allPrimaryBlackBoxLogs.map(log => ({
+            name: `(${log.id}) ${log.ship_used} vs. ${log.ship_used} (${log.victims.join(', ')})`,
             value: log.id // Use the log ID as the value for selection
         }));
 

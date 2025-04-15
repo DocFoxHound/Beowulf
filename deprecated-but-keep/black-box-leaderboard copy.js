@@ -1,18 +1,26 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { getAllBlackBoxes, getBlackBoxesByPatch, getBlackBoxesByUserAndPatch, getBlackBoxesByUserId, getAssistantBlackBoxes, getAssistantBlackBoxesByUserAndPatch } = require('../../api/blackBoxApi');
-const { getAllGameVersions } = require('../../api/gameVersionApi');
-const { getUserById } = require('../../api/userlistApi');
-const { getPlayerShipByEntryId } = require('../../api/playerShipApi');
+const { getAllBlackBoxes, getBlackBoxesByPatch, getBlackBoxesByUserAndPatch, getBlackBoxesByUserId, getAssistantBlackBoxes, getAssistantBlackBoxesByUserAndPatch } = require('../api/blackBoxApi');
+const { getAllGameVersions } = require('../api/gameVersionApi');
+const { getUserById } = require('../api/userlistApi');
+const { getPlayerShipByEntryId } = require('../api/playerShipApi');
 
 
 const command = new SlashCommandBuilder()
-    .setName('black-box-leaderboard')
+    .setName('kill-log-leaderboard')
     .setDescription('See the BlackBox stats of either an individual or the whole organization.')
     .addStringOption(option =>
         option.setName('patch')
             .setDescription('Which patch to search')
             .setRequired(true)
             .setAutocomplete(true))
+    .addStringOption(option =>
+        option.setName('type')
+            .setDescription('This quarter or all time?')
+            .setRequired(true)
+            .addChoices(
+                { name: 'Ship Kills', value: 'ships' },
+                { name: 'FPS Kills', value: 'f[s' }
+            ))
     .addUserOption(option =>
         option.setName('user')
             .setDescription('Which user to search (leave blank for all)')
