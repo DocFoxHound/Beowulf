@@ -1,9 +1,10 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { deleteShipLog, getAllShipLogs, getAssistantShipLogs, getShipLogByEntryId } = require('../../api/shipLogApi');
+const { getUsers } = require('../../api/userlistApi');
 
 
 const command = new SlashCommandBuilder()
-    .setName('yblooded-ship-log-remove')
+    .setName('yblooded-fleet-log-remove')
     .setDescription('Remove a kill log for your ship to the Black Box.')
     .addStringOption(option => 
         option.setName('log')
@@ -47,12 +48,19 @@ module.exports = {
     async autocomplete(interaction) {
         const focusedValue = interaction.options.getFocused(); // Get the focused option value
         const allPrimaryBlackBoxLogs = await getAllShipLogs(interaction.user.id); // Fetch all black box logs
+        const allUsers = await getUsers(); // Fetch all users
 
         // Combine ship_used and victims[] into a single searchable array
-        const allBlackBoxLogsListed = allPrimaryBlackBoxLogs.map(log => ({
-            name: `${log.ship_used} - Victims: ${log.victim_orgs.join(', ')}`,
-            value: log.id // Use the log ID as the value for selection
-        }));
+        const allBlackBoxLogsListed = allPrimaryBlackBoxLogs.map(log => {
+            // Find the commander in the allUsers array
+            const commander = allUsers.find(user => user.id === log.commander);
+            const commanderName = commander ? commander.username : 'Unknown Commander';
+
+            return {
+                name: `(${log.id}) - Commander: ${commanderName}`,
+                value: log.id // Use the log ID as the value for selection
+            };
+        }).sort((a, b) => Number(b.value) - Number(a.value)); // Sort by log.id in descending order
 
         // Filter logs based on the focused value (search both ship_used and victims)
         const filtered = allBlackBoxLogsListed.filter(log =>

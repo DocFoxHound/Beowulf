@@ -3,7 +3,7 @@ const { deleteBlackBox, getAllBlackBoxes, getBlackBoxByEntryId } = require('../.
 
 
 const command = new SlashCommandBuilder()
-    .setName('yblooded-black-box-remove')
+    .setName('yblooded-kill-log-remove')
     .setDescription('Add a kill log for your ship to the Black Box.')
     .addStringOption(option => 
         option.setName('kill')
