@@ -8,7 +8,7 @@ const queueApi = require('../../api/queueApi');
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('xblooded-edit-user')
+        .setName('xmoderator-user-progression')
         .setDescription('Edit a user status for a specific class')
         .addStringOption(option => 
             option.setName('target')
@@ -42,7 +42,7 @@ module.exports = {
             const target = interaction.options.getString('target').replace(/\D/g, '');
             const targetUser = await getUserById(target);
             const member = interaction.member;
-            const moderatorRoles = process.env.LIVE_ENVIRONMENT === "true" ? process.env.MODERATOR_ROLES.split(',') : process.env.TEST_MODERATOR_ROLES.split(',');
+            const moderatorRoles = process.env.LIVE_ENVIRONMENT === "true" ? process.env.PROGRESSION_MOD_ROLES.split(',') : process.env.TEST_PROGRESSION_MOD_ROLES.split(',');
             const hasPermission = member.roles.cache.some(role => moderatorRoles.includes(role.id));
             
             if (!hasPermission) {

@@ -5,7 +5,7 @@ const { deleteLessonLearned } = require('../../api/lessonsLearnedApi.js');
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('xblooded-unlearn')
+        .setName('yblooded-unlearn')
         .setDescription('Erase a lesson learned from the bot.')
         .addStringOption(option => 
             option.setName('lesson-id')

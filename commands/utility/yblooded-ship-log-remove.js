@@ -3,7 +3,7 @@ const { deleteShipLog, getAllShipLogs, getAssistantShipLogs, getShipLogByEntryId
 
 
 const command = new SlashCommandBuilder()
-    .setName('xblooded-ship-log-remove')
+    .setName('yblooded-ship-log-remove')
     .setDescription('Remove a kill log for your ship to the Black Box.')
     .addStringOption(option => 
         option.setName('log')
