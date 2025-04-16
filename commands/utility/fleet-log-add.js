@@ -10,28 +10,40 @@ const command = new SlashCommandBuilder()
     .setName('fleet-log-add')
     .setDescription('For Commanders to add an entry to the Fleet Log.')
     .addStringOption(option => 
-        option.setName('sub-commanders')
-            .setDescription('@ the players who sub-commanded under you.')
+        option.setName('title')
+            .setDescription('The Title of the Operation')
             .setRequired(true))
     .addStringOption(option =>
         option.setName('crew')
             .setDescription('@ ironpoint members, or write names of external participants (separate by comma)')
-            .setRequired(true));
+            .setRequired(true))
+    .addStringOption(option => 
+        option.setName('air-sub-commanders')
+            .setDescription('@ the players who sub-commanded under you.')
+            .setRequired(false))
+    .addStringOption(option => 
+        option.setName('fps-sub-commanders')
+            .setDescription('@ the players who sub-commanded under you.')
+            .setRequired(false))
+    .addStringOption(option => 
+        option.setName('link')
+            .setDescription('Link to the Operation (put N/A if none)')
+            .setRequired(false));
     
 module.exports = {
     data: command,
     async execute(interaction, client, openai) {
         // Get the chosen class name from the command options
-        const subcommanders = interaction.options.getString('sub-commanders');
+        const airsubcommanders = interaction.options.getString('air-sub-commanders');
+        const fpssubcommanders = interaction.options.getString('fps-sub-commanders');
+        const title = interaction.options.getString('title');
+        const link = interaction.options.getString('link');
         const assistsRaw = interaction.options.getString('crew');
         
         const shipLogChannel = process.env.LIVE_ENVIRONMENT === "true" ? process.env.SHIP_LOG_CHANNEL : process.env.TEST_SHIP_LOG_CHANNEL;
         const patches = await getAllGameVersions();
         const latestPatchesSorted = patches.sort((a, b) => b.id - a.id);
         const latestPatch = latestPatchesSorted[0].version; // Get the latest patch
-        // const subcommanderPlayers = subcommanders
-        //     ? subcommanders.match(/<@!?(\d+)>/g)?.map(id => id.replace(/\D/g, '')) || []
-        //     : [];
         const discordUserIdsCrew = assistsRaw.match(/<@!?(\d+)>/g)?.map(id => id.replace(/\D/g, '')) || [];
         const plaintextUsernamesCrew = assistsRaw
             .replace(/<@!?(\d+)>/g, '') // Remove Discord user mentions
@@ -39,16 +51,33 @@ module.exports = {
             .split(',')
             .map(name => name.trim()) // Trim whitespace around each username
             .filter(name => name.length > 0); // Remove empty entries
-        const discordUserIdsSubcommanders = subcommanders.match(/<@!?(\d+)>/g)?.map(id => id.replace(/\D/g, '')) || [];
-        const plaintextUsernamesSubcommanders = subcommanders
-            .replace(/<@!?(\d+)>/g, '') // Remove Discord user mentions
-            .replace(/\s+/g, ',') // Replace spaces with commas
-            .split(',')
-            .map(name => name.trim()) // Trim whitespace around each username
-            .filter(name => name.length > 0); // Remove empty entries
+        let discordUserIdsFpsSubcommanders = [];
+        let plaintextUsernamesFpsSubcommanders = [];
+        if(fpssubcommanders !== null){
+            discordUserIdsFpsSubcommanders = fpssubcommanders.match(/<@!?(\d+)>/g)?.map(id => id.replace(/\D/g, '')) || [];
+            plaintextUsernamesFpsSubcommanders = fpssubcommanders
+                .replace(/<@!?(\d+)>/g, '') // Remove Discord user mentions
+                .replace(/\s+/g, ',') // Replace spaces with commas
+                .split(',')
+                .map(name => name.trim()) // Trim whitespace around each username
+                .filter(name => name.length > 0); // Remove empty entries
+        }
+        let discordUserIdsAirSubcommanders = [];
+        let plaintextUsernamesAirSubcommanders = [];
+        if(airsubcommanders !== null){
+            discordUserIdsAirSubcommanders = airsubcommanders.match(/<@!?(\d+)>/g)?.map(id => id.replace(/\D/g, '')) || [];
+            plaintextUsernamesAirSubcommanders = airsubcommanders
+                .replace(/<@!?(\d+)>/g, '') // Remove Discord user mentions
+                .replace(/\s+/g, ',') // Replace spaces with commas
+                .split(',')
+                .map(name => name.trim()) // Trim whitespace around each username
+                .filter(name => name.length > 0); // Remove empty entries
+        }
+        
 
         const assistedPlayers = [...discordUserIdsCrew, ...plaintextUsernamesCrew];
-        const subcommanderPlayers = [...discordUserIdsSubcommanders, ...plaintextUsernamesSubcommanders];
+        const airsubcommanderPlayers = [...discordUserIdsAirSubcommanders, ...plaintextUsernamesAirSubcommanders];
+        const fpssubcommanderPlayers = [...discordUserIdsFpsSubcommanders, ...plaintextUsernamesFpsSubcommanders];
 
         // Call your signup logic from the external file
         try {
@@ -89,11 +118,14 @@ module.exports = {
                 await createShipLog({
                     id: parentId,
                     commander: interaction.user.id,
-                    subcommanders: subcommanderPlayers,
+                    air_subcommanders: airsubcommanderPlayers,
+                    fps_subcommanders: fpssubcommanderPlayers,
                     patch: latestPatch,
                     crew: assistedPlayers,
                     created_at: new Date().toISOString(),
                     notes: modalDescription,
+                    title: title,
+                    link: link,
                 });
 
                 const logChannel = await client.channels.fetch(shipLogChannel).catch(err => {
@@ -102,7 +134,8 @@ module.exports = {
 
                 if (logChannel && logChannel.isTextBased()) {
                     let formattedPlayerList = [];
-                    let formattedSubcommanderList = [];
+                    let formattedAirSubcommanderList = [];
+                    let formattedFpsSubcommanderList = [];
                     for (const player of assistedPlayers) {
                         // Check if the player is a Discord user ID (numeric string)
                         if (/^\d+$/.test(player)) {
@@ -118,37 +151,53 @@ module.exports = {
                             formattedPlayerList.push(`${player}`);
                         }
                     }
-                    for(const player of subcommanderPlayers) {
+                    for(const player of airsubcommanderPlayers) {
                         // Check if the player is a Discord user ID (numeric string)
                         if (/^\d+$/.test(player)) {
                             // Retrieve the user from the database using the user ID
                             const user = await getUserById(player); // Replace with your database function
                             if (user) {
-                                formattedSubcommanderList.push(`${user.username}`);
+                                formattedAirSubcommanderList.push(`${user.username}`);
                             } else {
-                                formattedSubcommanderList.push(`${player}`); // Fallback if user not found
+                                formattedAirSubcommanderList.push(`${player}`); // Fallback if user not found
                             }
                         } else {
                             // If it's not a Discord user ID, treat it as a plaintext username
-                            formattedSubcommanderList.push(`${player}`);
+                            formattedAirSubcommanderList.push(`${player}`);
+                        }
+                    }
+                    for(const player of fpssubcommanderPlayers) {
+                        // Check if the player is a Discord user ID (numeric string)
+                        if (/^\d+$/.test(player)) {
+                            // Retrieve the user from the database using the user ID
+                            const user = await getUserById(player); // Replace with your database function
+                            if (user) {
+                                formattedFpsSubcommanderList.push(`${user.username}`);
+                            } else {
+                                formattedFpsSubcommanderList.push(`${player}`); // Fallback if user not found
+                            }
+                        } else {
+                            // If it's not a Discord user ID, treat it as a plaintext username
+                            formattedFpsSubcommanderList.push(`${player}`);
                         }
                     }
                     const embed = new EmbedBuilder()
-                        .setAuthor({ name: `New Fleet Log Entry`, iconURL: 'https://i.imgur.com/QHdkPrB.png' })
+                        .setAuthor({ name: `Fleet Log (${parentId})`, iconURL: 'https://i.imgur.com/QHdkPrB.png' })
                         .setThumbnail('https://i.imgur.com/UoZsrrM.png')
-                        .setTitle(`Fleet Log (${parentId})`)
+                        .setTitle(`${title}`)
                         .setImage('https://i.imgur.com/PUdhTOd.png')
-                        .setDescription(`A new fleet log entry has been submitted.`)
+                        .setDescription(`${parentId}`)
                         .addFields(
-                            { name: 'ID', value: `${parentId}`, inline: true },
                             { name: 'Commander', value: `<@${interaction.user.id}>`, inline: true },
-                            { name: 'Sub-Commanders', value: formattedSubcommanderList.join(', ') || 'None', inline: false },
+                            { name: 'Link', value: link || 'N/A', inline: false },
+                            { name: 'Air Sub-Commanders', value: formattedAirSubcommanderList.join(', ') || 'None', inline: false },
+                            { name: 'FPS Sub-Commanders', value: formattedFpsSubcommanderList.join(', ') || 'None', inline: false },
                             { name: 'Crew', value: formattedPlayerList.join(', ') || 'None', inline: false },
                             { name: 'Description', value: modalDescription || 'No description provided.', inline: false }
                         )
                         .setColor('#ff0000')
                         .setTimestamp()
-                        .setFooter({ text: 'Fleet Log System' });
+                        .setFooter({ text: `Fleet Log System` });
 
                     await logChannel.send({ embeds: [embed] });
                 }

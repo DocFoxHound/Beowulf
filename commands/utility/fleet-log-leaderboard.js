@@ -28,7 +28,6 @@ module.exports = {
             const patchSelectedBool = patch !== 'ALL' ? true : false;
             let embeds = null;
             let shipLogs = [];
-            let leaderBoardData = null;
             let commanderData = null;
             let crewData = null;
             if(patchSelectedBool && !user){ //patch selected
@@ -37,26 +36,29 @@ module.exports = {
                     return interaction.reply({ content: `No Fleet logs found for patch ${patch}.`, ephemeral: true });
                 }
                 commanderData = await generateCommanderData(shipLogs);
-                subcommanderData = await generateSubcommanderData(shipLogs);
+                airsubcommanderData = await generateAirSubcommanderData(shipLogs);
+                fpssubcommanderData = await generateFpsSubcommanderData(shipLogs);
                 crewData = await generateCrewData(shipLogs);
-                embeds = createLeaderboardEmbeds(null, commanderData, subcommanderData, crewData, patch, null);
+                embeds = createLeaderboardEmbeds(null, commanderData, airsubcommanderData, fpssubcommanderData, crewData, patch, null);
             }else if (patchSelectedBool && user){ //user and patch selected
                 shipLogs = await getShipLogsByPatch(patch);
                 if(!shipLogs){
                     return interaction.reply({ content: `No Fleet logs found for patch ${patch}.`, ephemeral: true });
                 }
                 individualData = await generateIndividualData(shipLogs, user);
-                embeds = createLeaderboardEmbeds(individualData, null, null, null, patch, user);
-            }else if(!patchSelectedBool && user){ //only user selected
+                embeds = createLeaderboardEmbeds(individualData, null, null, null, null, patch, user);
+            }else if(!patchSelectedBool && user){ // ALL and user selected
                 shipLogs = await getAllShipLogs(user);
                 individualData = await generateIndividualData(shipLogs, user);
-                embeds = createLeaderboardEmbeds(individualData, null, null, null, patch, user);
-            }else if (!patchSelectedBool && !user){
+                embeds = createLeaderboardEmbeds(individualData, null, null, null, null, patch, user);
+                // individualData, commanderData, airsubcommanderData, fpssubcommanderData, crewData, patch, user
+            }else if (!patchSelectedBool && !user){ //ALL and no user
                 shipLogs = await getAllShipLogs()
                 commanderData = await generateCommanderData(shipLogs);
-                subcommanderData = await generateSubcommanderData(shipLogs);
+                airsubcommanderData = await generateAirSubcommanderData(shipLogs);
+                fpssubcommanderData = await generateFpsSubcommanderData(shipLogs);
                 crewData = await generateCrewData(shipLogs);
-                embeds = createLeaderboardEmbeds(null, commanderData, subcommanderData, crewData, patch, null);
+                embeds = createLeaderboardEmbeds(null, commanderData, airsubcommanderData, fpssubcommanderData, crewData, patch, null);
             }
 
             // Create buttons for navigation
@@ -141,14 +143,19 @@ module.exports = {
 // Helper function to generate leaderboard data
 async function generateIndividualData(shipLogs, user) {
     try{
-        let userStats = { timesCommanding: 0, subcommandInstances: 0, crewedInstances: 0, totalSubcommanders: 0, totalCrewWhileCommanding: 0, totalCrewWhileSubCommanding: 0, commandEffectiveness: 0, subcommandEffectiveness: 0};
+        let userStats = { timesCommanding: 0, subcommandInstances: 0, airsubcommandInstances: 0, fpssubcommandInstances: 0, totalInstances: 0, crewedInstances: 0, totalSubcommanders: 0, totalCrewWhileCommanding: 0, totalCrewWhileSubCommanding: 0, commandEffectiveness: 0, subcommandEffectiveness: 0};
         for (const log of shipLogs) {
             if(log.commander === user.id) {
                 userStats.timesCommanding += 1;
-                if(log.subcommanders === null || log.subcommanders.length === 0){
+                userStats.totalInstances += 1;
+                if(log.air_subcommanders === null && log.fps_subcommanders === null){
                     userStats.totalSubcommanders += 0;
+                }else if(log.air_subcommanders !== null && log.fps_subcommanders === null){
+                    userStats.totalSubcommanders += log.air_subcommanders.length;
+                }else if(log.air_subcommanders === null && log.fps_subcommanders !== null){
+                    userStats.totalSubcommanders += log.fps_subcommanders.length;
                 }else{
-                    userStats.totalSubcommanders += log.subcommanders.length;
+                    userStats.totalSubcommanders += log.air_subcommanders.length + log.fps_subcommanders.length;
                 }
                 if(log.crew === null || log.crew.length === 0){
                     userStats.totalCrewWhileCommanding += 0;
@@ -156,12 +163,24 @@ async function generateIndividualData(shipLogs, user) {
                     userStats.totalCrewWhileCommanding += log.crew.length;
                 }
             }
-            if(log.subcommanders !== null && log.subcommanders.includes(user.id)){
+            const totalAirSubCommandersInLog = log.air_subcommanders !== null ? log.air_subcommanders.length : 0;
+            const totalFpsSubCommandersInLog = log.fps_subcommanders !== null ? log.fps_subcommanders.length : 0;
+            const totalSubCommandersInLog = totalAirSubCommandersInLog + totalFpsSubCommandersInLog;
+            if(log.air_subcommanders !== null && log.air_subcommanders.includes(user.id)){
                 userStats.subcommandInstances += 1;
-                userStats.totalCrewWhileSubCommanding += log.crew.length;
+                userStats.airsubcommandInstances += 1;
+                userStats.totalCrewWhileSubCommanding += (log.crew.length / totalSubCommandersInLog);
+                userStats.totalInstances += 1;
+            }
+            if(log.fps_subcommanders !== null && log.fps_subcommanders.includes(user.id)){
+                userStats.subcommandInstances += 1;
+                userStats.fpssubcommandInstances += 1;
+                userStats.totalCrewWhileSubCommanding += (log.crew.length / totalSubCommandersInLog);
+                userStats.totalInstances += 1;
             }
             if(log.crew !== null && log.crew.includes(user.id)){
                 userStats.crewedInstances += 1;
+                userStats.totalInstances += 1;
             }
         }
         commandStats = {
@@ -192,20 +211,33 @@ async function generateCommanderData(shipLogs) {
             const commanderUser = await getUserById(log.commander);
 
             if (!commanderboard[commanderUser.username]) {
-                commanderboard[commanderUser.username] = { commanderName: commanderUser.username, subcommanders: [], crew: [], totalSubcommanders: 0, totalCrew: 0, timesCommanding: 0 };
+                commanderboard[commanderUser.username] = { commanderName: commanderUser.username, air_subcommanders: [], fps_subcommanders: [], crew: [], totalSubcommanders: 0, totalCrew: 0, timesCommanding: 0 };
             }
-            let subcommanderList = [];
-            if(log.subcommanders !== null && log.subcommanders.length > 0){
-                for(const sub of log.subcommanders){
+            let airsubcommanderList = [];
+            let fpssubcommanderList = [];
+            if(log.air_subcommanders !== null && log.air_subcommanders.length > 0){
+                for(const sub of log.air_subcommanders){
                     const subUser = await getUserById(sub);
                     if(subUser === null){
-                        subcommanderList.push(subUser)
+                        airsubcommanderList.push(subUser)
                     }else{
-                        subcommanderList.push(subUser.username);
+                        airsubcommanderList.push(subUser.username);
                     }
                 }
             }else{
-                subcommanderList.push('None');
+                airsubcommanderList.push('None');
+            }
+            if(log.fps_subcommanders !== null && log.fps_subcommanders.length > 0){
+                for(const sub of log.fps_subcommanders){
+                    const subUser = await getUserById(sub);
+                    if(subUser === null){
+                        fpssubcommanderList.push(subUser)
+                    }else{
+                        fpssubcommanderList.push(subUser.username);
+                    }
+                }
+            }else{
+                fpssubcommanderList.push('None');
             }
             let crewList = [];
             if(log.crew !== null && log.crew.length > 0){
@@ -220,11 +252,19 @@ async function generateCommanderData(shipLogs) {
             }else{
                 crewList.push('None');
             }
-            commanderboard[commanderUser.username].subcommanders.push(...subcommanderList);
-            commanderboard[commanderUser.username].totalSubcommanders += subcommanderList.length;
+            commanderboard[commanderUser.username].air_subcommanders.push(...airsubcommanderList);
+            commanderboard[commanderUser.username].fps_subcommanders.push(...fpssubcommanderList);
             commanderboard[commanderUser.username].crew.push(...crewList);
-            commanderboard[commanderUser.username].totalCrew += crewList.length;
             commanderboard[commanderUser.username].timesCommanding += 1;
+            if(log.air_subcommanders !== null && log.air_subcommanders.length > 0){
+                commanderboard[commanderUser.username].totalSubcommanders += airsubcommanderList.length;
+            }
+            if(log.fps_subcommanders !== null && log.fps_subcommanders.length > 0){
+                commanderboard[commanderUser.username].totalSubcommanders += fpssubcommanderList.length;
+            }
+            if(log.crew !== null && log.crew.length > 0){
+                commanderboard[commanderUser.username].totalCrew += crewList.length;
+            }
         }
         return commanderboard;
     }catch(error){
@@ -234,17 +274,48 @@ async function generateCommanderData(shipLogs) {
 }
 
 // Helper function to generate leaderboard data
-async function generateSubcommanderData(shipLogs) {
+async function generateAirSubcommanderData(shipLogs) {
     const subcommandboard = {};
     try{
         for (const log of shipLogs) {
             // const shipUsedObject = await getPlayerShipByEntryId(log.ship_used);
             // const shipName = log.ship_used_name;
             let subcomUser = null
-            if(log.subcommanders === null || log.subcommanders.length === 0){
+            if(log.air_subcommanders === null || log.air_subcommanders.length === 0){
                 continue;
             }
-            for(const subcom of log.subcommanders){
+            for(const subcom of log.air_subcommanders){
+                subcomUser = await getUserById(subcom);
+                if(subcomUser === null){
+                    continue;
+                }
+                if (!subcommandboard[subcomUser.username]) {
+                    subcommandboard[subcomUser.username] = { subcomName: subcomUser.username, subcommandInstances: 0, totalCrew: 0 };
+                }
+                
+                subcommandboard[subcomUser.username].subcommandInstances += 1;
+                subcommandboard[subcomUser.username].totalCrew += log.crew.length;
+
+            }
+        }
+        return subcommandboard;
+    }catch(error){
+        console.error('Error generating leaderboard data:', error);
+        return null;  // Return null if there's an error
+    }
+}
+
+async function generateFpsSubcommanderData(shipLogs) {
+    const subcommandboard = {};
+    try{
+        for (const log of shipLogs) {
+            // const shipUsedObject = await getPlayerShipByEntryId(log.ship_used);
+            // const shipName = log.ship_used_name;
+            let subcomUser = null
+            if(log.fps_subcommanders === null || log.fps_subcommanders.length === 0){
+                continue;
+            }
+            for(const subcom of log.fps_subcommanders){
                 subcomUser = await getUserById(subcom);
                 if(subcomUser === null){
                     continue;
@@ -296,12 +367,14 @@ async function generateCrewData(shipLogs) {
 }
 
 // Helper function to create leaderboard embeds
-function createLeaderboardEmbeds(individualData, commanderData, subcommanderData, crewData, patch, user) {
+function createLeaderboardEmbeds(individualData, commanderData, airsubcommanderData, fpssubcommanderData, crewData, patch, user) {
     try{
         const embeds = [];
         if(individualData === null){
             const sortedByTopCommanders = structuredClone(Object.entries(commanderData).sort((a, b) => calculateCommandEffectiveness(b[1]) - calculateCommandEffectiveness(a[1])));
-            const sortedByTopSubCommanders = structuredClone(Object.entries(subcommanderData).sort((a, b) => subCommanderEffectivenessScore(b[1]) - subCommanderEffectivenessScore(a[1])));
+            const sortedByTopAirSubCommanders = structuredClone(Object.entries(airsubcommanderData).sort((a, b) => subCommanderEffectivenessScore(b[1]) - subCommanderEffectivenessScore(a[1])));
+            const sortedByTopFpsSubCommanders = structuredClone(Object.entries(fpssubcommanderData).sort((a, b) => subCommanderEffectivenessScore(b[1]) - subCommanderEffectivenessScore(a[1])));
+            const sortedByTopSubCommanders = structuredClone(Object.entries(fpssubcommanderData).sort((a, b) => subCommanderEffectivenessScore(b[1]) - subCommanderEffectivenessScore(a[1])));
             const sortedByTopCrew = structuredClone(Object.entries(crewData).sort((a, b) => b[1].crewedInstances - a[1].crewedInstances));
             // Top Commanders by value
             const topCommandersEmbed = new EmbedBuilder()
@@ -314,8 +387,8 @@ function createLeaderboardEmbeds(individualData, commanderData, subcommanderData
                 .setColor('#3e6606');
                 sortedByTopCommanders.forEach(([username, stats], index) => {
                     topCommandersEmbed.addFields({
-                        name: `${index + 1}. ${username}`,
-                        value: `**Effectiveness:** ${calculateCommandEffectiveness(stats).toFixed(2)}
+                        name: `${index + 1}. **${username}**`,
+                        value: `Effectiveness: ${calculateCommandEffectiveness(stats).toFixed(2)}
                         Times Commanding: ${stats.timesCommanding}
                         Total Sub-Commanders: ${stats.totalSubcommanders}
                         Total Crew: ${stats.totalCrew}
@@ -326,25 +399,46 @@ function createLeaderboardEmbeds(individualData, commanderData, subcommanderData
             embeds.push(topCommandersEmbed);
 
             // Top Crew by value
-            const topSubCommanders = new EmbedBuilder()
+            const topAirSubCommanders = new EmbedBuilder()
                 .setThumbnail('https://i.imgur.com/UoZsrrM.png')
-                .setAuthor({ name: `Top Sub-Commanders in the Fleet`, iconURL: 'https://i.imgur.com/QHdkPrB.png' })
+                .setAuthor({ name: `Top Air Sub-Commanders in the Fleet`, iconURL: 'https://i.imgur.com/QHdkPrB.png' })
                 .setTitle(`Patch ${patch}`)
                 .setImage('https://i.imgur.com/g8GdSLJ.png')
                 .setDescription(`\`\`\`\nThe following are the top Sub-Commanders of the IronPoint fleet. Their value is measured by the amount of times they assisted a commander, and in a smaller way how many individuals were involved in the fleet as a whole.
                     \`\`\`\n\n`)
                 .setColor('#3e6606');
-                sortedByTopSubCommanders.forEach(([username, stats], index) => {
-                    topSubCommanders.addFields({
-                        name: `${index + 1}. ${username}`,
-                        value: `**Effectiveness:** ${subCommanderEffectivenessScore(stats).toFixed(2)}
-                        Total Sub-Command Instances: ${stats.subcommandInstances}
+                sortedByTopAirSubCommanders.forEach(([username, stats], index) => {
+                    topAirSubCommanders.addFields({
+                        name: `${index + 1}. **${username}**`,
+                        value: `Effectiveness: ${subCommanderEffectivenessScore(stats).toFixed(2)}
+                        Air Sub-Commands: ${stats.subcommandInstances}
                         Total Crew: ${stats.totalCrew}`
                         ,
                         inline: false
                     });
             });
-            embeds.push(topSubCommanders);
+            embeds.push(topAirSubCommanders);
+
+            // Top Crew by value
+            const topFpsSubCommanders = new EmbedBuilder()
+                .setThumbnail('https://i.imgur.com/UoZsrrM.png')
+                .setAuthor({ name: `Top FPS Sub-Commanders in the Fleet`, iconURL: 'https://i.imgur.com/QHdkPrB.png' })
+                .setTitle(`Patch ${patch}`)
+                .setImage('https://i.imgur.com/g8GdSLJ.png')
+                .setDescription(`\`\`\`\nThe following are the top Sub-Commanders of the IronPoint fleet. Their value is measured by the amount of times they assisted a commander, and in a smaller way how many individuals were involved in the fleet as a whole.
+                    \`\`\`\n\n`)
+                .setColor('#3e6606');
+                sortedByTopFpsSubCommanders.forEach(([username, stats], index) => {
+                    topFpsSubCommanders.addFields({
+                        name: `${index + 1}. **${username}**`,
+                        value: `Effectiveness: ${subCommanderEffectivenessScore(stats).toFixed(2)}
+                        FPS Sub-Commands: ${stats.subcommandInstances}
+                        Total Crew: ${stats.totalCrew}`
+                        ,
+                        inline: false
+                    });
+            });
+            embeds.push(topFpsSubCommanders);
 
             // Top Crew by value
             const topCrewEmbed = new EmbedBuilder()
@@ -357,8 +451,8 @@ function createLeaderboardEmbeds(individualData, commanderData, subcommanderData
                 .setColor('#3e6606');
                 sortedByTopCrew.forEach(([username, stats], index) => {
                 topCrewEmbed.addFields({
-                    name: `${index + 1}. ${username}`,
-                    value: `**Total Fleets:** ${stats.crewedInstances}
+                    name: `${index + 1}. **${username}**`,
+                    value: `Total Fleets: ${stats.crewedInstances}
                     \n`,
                     inline: false
                 });
@@ -387,7 +481,9 @@ function createLeaderboardEmbeds(individualData, commanderData, subcommanderData
                 .addFields({
                     name: `**Sub-Command**`,
                     value: `Sub-Commander Effectiveness: ${individualData.subcommandEffectiveness.toFixed(2)}
-                    Total Sub-Command Instances: ${individualData.subcommandInstances}
+                    Total Sub-Commands: ${individualData.subcommandInstances}
+                    Air Sub-Commands: ${individualData.airsubcommandInstances}
+                    FPS Sub-Commands: ${individualData.fpssubcommandInstances}
                     Total Crew: ${individualData.totalCrewWhileSubCommanding}
                     \n`,
                     inline: false

@@ -38,9 +38,31 @@ module.exports = {
 
             combinedLogs = [...hitLogs, ...assistLogs];
 
-            const totalHits = combinedLogs.length;
-            const totalValue = combinedLogs.reduce((sum, log) => sum + log.total_value, 0);
-            const totalCutValue = combinedLogs.reduce((sum, log) => sum + log.total_cut_value, 0);
+            let totalAuthored = 0;
+            let totalHits = 0;
+            let totalValue = 0;
+            let totalCutValue = 0;
+            let totalAir = 0;
+            let totalGround = 0;
+            if(hitLogs !== null){
+                totalAuthored = hitLogs.length;
+            }
+            if (combinedLogs !== null) {
+                totalHits = combinedLogs.length;
+                totalValue = combinedLogs.reduce((sum, log) => sum + log.total_value, 0);
+                totalCutValue = combinedLogs.reduce((sum, log) => sum + log.total_cut_value, 0);
+                totalAir = 0;
+                totalGround = 0;
+                for(const log of combinedLogs) {
+                    if(log.air_or_ground?.toLowerCase() === 'air'){
+                        totalAir += 1;
+                    }
+                    if(log.air_or_ground?.toLowerCase() === 'ground'){
+                        totalGround += 1;
+                    }
+                }
+            }
+            
             let totalCargo = 0;
 
             // Consolidate cargo by type
@@ -81,7 +103,7 @@ module.exports = {
                     .setThumbnail('https://i.imgur.com/UoZsrrM.png')
                     .setImage('https://i.imgur.com/ejdkl5B.png')
                     .setAuthor({ name: `Hit Tracker for ${user.username}`, iconURL: user.displayAvatarURL() })
-                    .setDescription(`**Patch:** ${patch}\n**Total Hits:** ${totalHits}\n**Total Value:** ${totalValue.toLocaleString()} aUEC\n**Total Cut Value:** ${totalCutValue.toLocaleString()} aUEC\n**Total Cargo:** ${totalCargo} SCU`)
+                    .setDescription(`**Patch:** ${patch}\n**Total Hits:** ${totalHits}      **Total Authored:** ${totalAuthored}\n**Total Air:** ${totalAir}        **Total Ground:** ${totalGround}\n**Total Value:** ${totalValue.toLocaleString()} aUEC\n**Total Cut Value:** ${totalCutValue.toLocaleString()} aUEC\n**Total Cargo:** ${totalCargo} SCU`)
                     .addFields(embedFields.slice(i, i + fieldsPerPage))
                     .setColor('#ff0000')
                     .setTimestamp()

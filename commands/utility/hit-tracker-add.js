@@ -8,6 +8,14 @@ const { getUserById } = require('../../api/userlistApi');
 const command = new SlashCommandBuilder()
     .setName('hit-tracker-add')
     .setDescription('Log a Pirate Hit in the Tracker.')
+    .addStringOption(option =>
+        option.setName('air-or-ground')
+            .setDescription('Was the hit performed flying or FPS?')
+            .setRequired(true)
+            .addChoices(
+                { name: 'Air', value: 'air' },
+                { name: 'Ground', value: 'ground' }
+            ))
     .addStringOption(option => 
         option.setName('cargo-1')
             .setDescription('Select the cargo.')
@@ -112,6 +120,7 @@ module.exports = {
             const allItems = await getAllSummarizedItems(); // Fetch all ships
             const allCargo = [...allCommodities, ...allItems]; // Combine all items
             const assistsRaw = interaction.options.getString('assists');
+            const airOrGround = interaction.options.getString('air-or-ground');
             const assistedPlayers = assistsRaw
             ? assistsRaw.match(/<@!?(\d+)>/g)?.map(id => id.replace(/\D/g, '')) || []
             : [];
@@ -146,6 +155,7 @@ module.exports = {
 
             const hitLog = {
                 id: parentId,
+                air_or_ground: airOrGround,
                 user_id: interaction.user.id,
                 cargo: cargoList,
                 total_value: totalValue,
@@ -165,6 +175,7 @@ module.exports = {
                 .setImage('https://i.imgur.com/8eoJvJI.png')
                 .setDescription(`**Hit Log ID:** ${parentId}`)
                 .addFields(
+                    { name: 'Piracy Type', value: `${airOrGround}`, inline: true },
                     { name: 'Total Value', value: `${totalValue} aUEC`, inline: true },
                     { name: 'Total Split Value', value: `${totalCutValue} aUEC`, inline: true },
                     { name: 'Total SCU', value: `${cargoList.reduce((acc, item) => acc + item.scuAmount, 0)} SCU`, inline: true },
