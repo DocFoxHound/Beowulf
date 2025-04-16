@@ -145,14 +145,22 @@ async function generateIndividualData(shipLogs, user) {
         for (const log of shipLogs) {
             if(log.commander === user.id) {
                 userStats.timesCommanding += 1;
-                userStats.totalSubcommanders += log.subcommanders.length;
-                userStats.totalCrewWhileCommanding += log.crew.length;
+                if(log.subcommanders === null || log.subcommanders.length === 0){
+                    userStats.totalSubcommanders += 0;
+                }else{
+                    userStats.totalSubcommanders += log.subcommanders.length;
+                }
+                if(log.crew === null || log.crew.length === 0){
+                    userStats.totalCrewWhileCommanding += 0;
+                }else{
+                    userStats.totalCrewWhileCommanding += log.crew.length;
+                }
             }
-            if(log.subcommanders.includes(user.id)){
+            if(log.subcommanders !== null && log.subcommanders.includes(user.id)){
                 userStats.subcommandInstances += 1;
                 userStats.totalCrewWhileSubCommanding += log.crew.length;
             }
-            if(log.crew.includes(user.id)){
+            if(log.crew !== null && log.crew.includes(user.id)){
                 userStats.crewedInstances += 1;
             }
         }
@@ -187,18 +195,30 @@ async function generateCommanderData(shipLogs) {
                 commanderboard[commanderUser.username] = { commanderName: commanderUser.username, subcommanders: [], crew: [], totalSubcommanders: 0, totalCrew: 0, timesCommanding: 0 };
             }
             let subcommanderList = [];
-            if(log.subcommanders.length > 0){
+            if(log.subcommanders !== null && log.subcommanders.length > 0){
                 for(const sub of log.subcommanders){
                     const subUser = await getUserById(sub);
-                    subcommanderList.push(subUser.username);
+                    if(subUser === null){
+                        subcommanderList.push(subUser)
+                    }else{
+                        subcommanderList.push(subUser.username);
+                    }
                 }
+            }else{
+                subcommanderList.push('None');
             }
             let crewList = [];
-            if(log.crew.length > 0){
+            if(log.crew !== null && log.crew.length > 0){
                 for(const crew of log.crew){
                     const crewUser = await getUserById(crew);
-                    crewList.push(crewUser.username);
+                    if(crewUser === null){
+                        crewList.push(crew)
+                    }else{
+                        crewList.push(crewUser.username);
+                    }
                 }
+            }else{
+                crewList.push('None');
             }
             commanderboard[commanderUser.username].subcommanders.push(...subcommanderList);
             commanderboard[commanderUser.username].totalSubcommanders += subcommanderList.length;
@@ -221,8 +241,14 @@ async function generateSubcommanderData(shipLogs) {
             // const shipUsedObject = await getPlayerShipByEntryId(log.ship_used);
             // const shipName = log.ship_used_name;
             let subcomUser = null
+            if(log.subcommanders === null || log.subcommanders.length === 0){
+                continue;
+            }
             for(const subcom of log.subcommanders){
                 subcomUser = await getUserById(subcom);
+                if(subcomUser === null){
+                    continue;
+                }
                 if (!subcommandboard[subcomUser.username]) {
                     subcommandboard[subcomUser.username] = { subcomName: subcomUser.username, subcommandInstances: 0, totalCrew: 0 };
                 }
@@ -247,8 +273,14 @@ async function generateCrewData(shipLogs) {
             // const shipUsedObject = await getPlayerShipByEntryId(log.ship_used);
             // const shipName = log.ship_used_name;
             let crewUser = null
+            if(log.crew === null || log.crew.length === 0){
+                continue;
+            }
             for(const crew of log.crew){
                 crewUser = await getUserById(crew);
+                if(crewUser === null){
+                    continue;
+                }
                 if (!crewboard[crewUser.username]) {
                     crewboard[crewUser.username] = { crewName: crewUser.username, crewedInstances: 0 };
                 }

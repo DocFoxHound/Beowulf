@@ -4,7 +4,7 @@ const { getAllShips } = require('../../api/uexApi');
 const { createShipLog } = require('../../api/shipLogApi');
 const { getAllGameVersions } = require('../../api/gameVersionApi');
 const { getPlayerShipsByUserId, getPlayerShipByEntryId } = require('../../api/playerShipApi');
-
+const { getUserById } = require('../../api/userlistApi');
 
 const command = new SlashCommandBuilder()
     .setName('fleet-log-add')
@@ -15,7 +15,7 @@ const command = new SlashCommandBuilder()
             .setRequired(true))
     .addStringOption(option =>
         option.setName('crew')
-            .setDescription('@ the players who assisted in the operation. (at minimum, 3 players)')
+            .setDescription('@ ironpoint members, or write names of external participants (separate by comma)')
             .setRequired(true));
     
 module.exports = {
@@ -29,13 +29,26 @@ module.exports = {
         const patches = await getAllGameVersions();
         const latestPatchesSorted = patches.sort((a, b) => b.id - a.id);
         const latestPatch = latestPatchesSorted[0].version; // Get the latest patch
-        const subcommanderPlayers = subcommanders
-            ? subcommanders.match(/<@!?(\d+)>/g)?.map(id => id.replace(/\D/g, '')) || []
-            : [];
-        const assistedPlayers = assistsRaw
-            ? assistsRaw.match(/<@!?(\d+)>/g)?.map(id => id.replace(/\D/g, '')) || []
-            : [];
-        
+        // const subcommanderPlayers = subcommanders
+        //     ? subcommanders.match(/<@!?(\d+)>/g)?.map(id => id.replace(/\D/g, '')) || []
+        //     : [];
+        const discordUserIdsCrew = assistsRaw.match(/<@!?(\d+)>/g)?.map(id => id.replace(/\D/g, '')) || [];
+        const plaintextUsernamesCrew = assistsRaw
+            .replace(/<@!?(\d+)>/g, '') // Remove Discord user mentions
+            .replace(/\s+/g, ',') // Replace spaces with commas
+            .split(',')
+            .map(name => name.trim()) // Trim whitespace around each username
+            .filter(name => name.length > 0); // Remove empty entries
+        const discordUserIdsSubcommanders = subcommanders.match(/<@!?(\d+)>/g)?.map(id => id.replace(/\D/g, '')) || [];
+        const plaintextUsernamesSubcommanders = subcommanders
+            .replace(/<@!?(\d+)>/g, '') // Remove Discord user mentions
+            .replace(/\s+/g, ',') // Replace spaces with commas
+            .split(',')
+            .map(name => name.trim()) // Trim whitespace around each username
+            .filter(name => name.length > 0); // Remove empty entries
+
+        const assistedPlayers = [...discordUserIdsCrew, ...plaintextUsernamesCrew];
+        const subcommanderPlayers = [...discordUserIdsSubcommanders, ...plaintextUsernamesSubcommanders];
 
         // Call your signup logic from the external file
         try {
@@ -88,6 +101,38 @@ module.exports = {
                 });
 
                 if (logChannel && logChannel.isTextBased()) {
+                    let formattedPlayerList = [];
+                    let formattedSubcommanderList = [];
+                    for (const player of assistedPlayers) {
+                        // Check if the player is a Discord user ID (numeric string)
+                        if (/^\d+$/.test(player)) {
+                            // Retrieve the user from the database using the user ID
+                            const user = await getUserById(player); // Replace with your database function
+                            if (user) {
+                                formattedPlayerList.push(`${user.username}`);
+                            } else {
+                                formattedPlayerList.push(`${player}`); // Fallback if user not found
+                            }
+                        } else {
+                            // If it's not a Discord user ID, treat it as a plaintext username
+                            formattedPlayerList.push(`${player}`);
+                        }
+                    }
+                    for(const player of subcommanderPlayers) {
+                        // Check if the player is a Discord user ID (numeric string)
+                        if (/^\d+$/.test(player)) {
+                            // Retrieve the user from the database using the user ID
+                            const user = await getUserById(player); // Replace with your database function
+                            if (user) {
+                                formattedSubcommanderList.push(`${user.username}`);
+                            } else {
+                                formattedSubcommanderList.push(`${player}`); // Fallback if user not found
+                            }
+                        } else {
+                            // If it's not a Discord user ID, treat it as a plaintext username
+                            formattedSubcommanderList.push(`${player}`);
+                        }
+                    }
                     const embed = new EmbedBuilder()
                         .setAuthor({ name: `New Fleet Log Entry`, iconURL: 'https://i.imgur.com/QHdkPrB.png' })
                         .setThumbnail('https://i.imgur.com/UoZsrrM.png')
@@ -97,8 +142,8 @@ module.exports = {
                         .addFields(
                             { name: 'ID', value: `${parentId}`, inline: true },
                             { name: 'Commander', value: `<@${interaction.user.id}>`, inline: true },
-                            { name: 'Sub-Commanders', value: subcommanderPlayers.map(id => `<@${id}>`).join(', ') || 'None', inline: false },
-                            { name: 'Crew', value: assistedPlayers.map(id => `<@${id}>`).join(', ') || 'None', inline: false },
+                            { name: 'Sub-Commanders', value: formattedSubcommanderList.join(', ') || 'None', inline: false },
+                            { name: 'Crew', value: formattedPlayerList.join(', ') || 'None', inline: false },
                             { name: 'Description', value: modalDescription || 'No description provided.', inline: false }
                         )
                         .setColor('#ff0000')
