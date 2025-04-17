@@ -1,8 +1,9 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder } = require('discord.js');
 const { getAllBlackBoxes, getBlackBoxesByPatch, getBlackBoxesByUserAndPatch, getBlackBoxesByUserId, getAssistantBlackBoxes, getAssistantBlackBoxesByUserAndPatch } = require('../../api/blackBoxApi');
 const { getAllGameVersions } = require('../../api/gameVersionApi');
 const { getUserById } = require('../../api/userlistApi');
-
+const { generateLeaderboardChart } = require('../../common/chart-generator');
+const fs = require('fs');
 
 const command = new SlashCommandBuilder()
     .setName('kill-leaderboard')
@@ -114,13 +115,45 @@ module.exports = {
             }
 
             let embeds = null;
+            let attachmentMap = {};
+            let extKillPath = null;
+            let extValuePath = null;
             if(leaderBoardData !== null) {
                 if(type === "fps"){
-                    embeds = createFpsLeaderboardEmbeds(leaderBoardData, patch);
+                    const sortedByKills = Object.entries(leaderBoardData).sort((a, b) => b[1].kill_count - a[1].kill_count);
+                    const { buffer: killBuffer, filePath: killPath } = await generateLeaderboardChart(sortedByKills.slice(0, 10), 'kill_count', 'total-kills-chart.png');
+                    extKillPath = killPath
+                    attachmentMap = {
+                        0: new AttachmentBuilder(killBuffer, { name: 'total-kills-chart.png' })
+                    };
+                    embeds = createFpsLeaderboardEmbeds(sortedByKills, patch);
                 }else if(type === "ships"){
-                    embeds = createShipLeaderboardEmbeds(leaderBoardData, patch);
+                    const sortedByKills = Object.entries(leaderBoardData).sort((a, b) => b[1].kill_count - a[1].kill_count);
+                    const sortedByValue = Object.entries(leaderBoardData).sort((a, b) => b[1].value - a[1].value);
+                    const { buffer: killBuffer, filePath: killPath } = await generateLeaderboardChart(sortedByKills.slice(0, 10), 'kill_count', 'total-kills-chart.png');
+                    const { buffer: valueBuffer, filePath: valuePath } = await generateLeaderboardChart(sortedByValue.slice(0, 10), 'value', 'total-value-chart.png');
+                    extKillPath = killPath
+                    extValuePath = valuePath
+                    attachmentMap = {
+                        0: new AttachmentBuilder(killBuffer, { name: 'total-kills-chart.png' }),
+                        1: new AttachmentBuilder(valueBuffer, { name: 'total-value-chart.png' })
+                    };
+                    embeds = createShipLeaderboardEmbeds(sortedByKills, sortedByValue, patch);
                 }else{
-                    embeds = createCombinedLeaderboardEmbeds(leaderBoardData, patch);
+                    // Convert leaderboardData into an array of [username, stats] pairs and calculate total kills
+                    const combinedKills = Object.entries(leaderBoardData).map(([username, stats]) => {
+                        const totalKills = stats.hits.reduce((acc, hit) => acc + hit.kill_count, 0);
+                        return [username, { ...stats, totalKills }];
+                    });
+
+                    // Sort by total kills in descending order
+                    combinedKills.sort((a, b) => b[1].totalKills - a[1].totalKills);
+                    const { buffer: killBuffer, filePath: killPath } = await generateLeaderboardChart(combinedKills.slice(0, 10), 'kill_count', 'total-kills-chart.png');
+                    extKillPath = killPath
+                    attachmentMap = {
+                        0: new AttachmentBuilder(killBuffer, { name: 'total-kills-chart.png' })
+                    };
+                    embeds = createCombinedLeaderboardEmbeds(combinedKills, patch);
                 }
             }
             if(individualData !== null) {
@@ -136,7 +169,17 @@ module.exports = {
 
             if (embeds.length === 1) {
                 // Only one page — no need for buttons
-                return interaction.reply({ embeds: [embeds[0]], ephemeral: false });
+                // return interaction.reply({ embeds: [embeds[0]], ephemeral: false });
+                await interaction.reply({ 
+                    embeds: [embeds[0]], 
+                    files: attachmentMap[0] ? [attachmentMap[0]] : [], 
+                    fetchReply: true });
+                [extKillPath].forEach(path =>
+                    fs.unlink(path, err => {
+                        if (err) console.error(`Failed to delete ${path}:`, err);
+                    })
+                );
+                return;
             }
 
             // Create buttons for navigation
@@ -155,7 +198,19 @@ module.exports = {
 
             // Send the first embed with navigation buttons
             let currentPage = 0;
-            const message = await interaction.reply({ embeds: [embeds[currentPage]], components: [buttons], fetchReply: true });
+            const message = await interaction.reply({ 
+                embeds: [embeds[currentPage]], 
+                components: [buttons], 
+                files: attachmentMap[currentPage] ? [attachmentMap[currentPage]] : [], 
+                fetchReply: true });
+            
+
+            [extKillPath, extValuePath].forEach(path =>
+                fs.unlink(path, err => {
+                    if (err) console.error(`Failed to delete ${path}:`, err);
+                })
+            );
+            
 
             // Create a collector to handle button interactions
             const collector = message.createMessageComponentCollector({ time: 60000 });
@@ -171,7 +226,11 @@ module.exports = {
                 buttons.components[0].setDisabled(currentPage === 0);
                 buttons.components[1].setDisabled(currentPage === embeds.length - 1);
 
-                await i.update({ embeds: [embeds[currentPage]], components: [buttons] });
+                await i.update({ 
+                    embeds: [embeds[currentPage]], 
+                    components: [buttons], 
+                    files: attachmentMap[currentPage] ? [attachmentMap[currentPage]] : [] 
+                });
             });
 
             collector.on('end', async () => {
@@ -401,12 +460,8 @@ async function generateCombinedLeaderboardData(blackBoxLogs) {
 }
 
 // Helper function to create leaderboard embeds
-function createShipLeaderboardEmbeds(leaderboardData, patch) {
+function createShipLeaderboardEmbeds(sortedByKills, sortedByValue, patch) {
     try{
-        const sortedByKills = Object.entries(leaderboardData).sort((a, b) => b[1].kill_count - a[1].kill_count);
-        const sortedByValue = Object.entries(leaderboardData).sort((a, b) => b[1].value - a[1].value);
-        // const sortedByVictims = Object.entries(leaderboardData).sort((a, b) => b[1].victims - a[1].victims);
-
         const embeds = [];
 
         // Top players by kill count
@@ -414,7 +469,7 @@ function createShipLeaderboardEmbeds(leaderboardData, patch) {
             .setThumbnail('https://i.imgur.com/UoZsrrM.png')
             .setAuthor({ name: `Top Players by Total Kills`, iconURL: 'https://i.imgur.com/vRqPoqk.png' })
             .setTitle(`Patch ${patch}`)
-            .setImage('https://i.imgur.com/HhnpGnN.png')
+            .setImage('attachment://total-kills-chart.png')
             .setDescription(`\`\`\`\nIronPoint Total Kills: ${sortedByKills.reduce((acc, [_, stats]) => acc + stats.kill_count, 0)}\`\`\`\n`)
             .setColor('#7199de');
         sortedByKills.forEach(([username, stats], index) => {
@@ -431,7 +486,7 @@ function createShipLeaderboardEmbeds(leaderboardData, patch) {
             .setThumbnail('https://i.imgur.com/UoZsrrM.png')
             .setAuthor({ name: `Top Players by Damage Done`, iconURL: 'https://i.imgur.com/vRqPoqk.png' })
             .setTitle(`Patch ${patch}`)
-            .setImage('https://i.imgur.com/HhnpGnN.png')
+            .setImage('attachment://total-value-chart.png')
             .setDescription(`\`\`\`\nIronPoint Total Damage Cost: ${formatToCurrency(sortedByValue.reduce((acc, [_, stats]) => acc + stats.value, 0))}\`\`\`\n`)
             .setColor('#7199de');
         sortedByValue.forEach(([username, stats], index) => {
@@ -450,11 +505,8 @@ function createShipLeaderboardEmbeds(leaderboardData, patch) {
 }
 
 // Helper function to create FPS leaderboard embeds
-function createFpsLeaderboardEmbeds(leaderboardData, patch) {
+function createFpsLeaderboardEmbeds(sortedByKills, patch) {
     try {
-        // Sort leaderboard data by kill count in descending order
-        const sortedByKills = Object.entries(leaderboardData).sort((a, b) => b[1].kill_count - a[1].kill_count);
-
         const embeds = [];
 
         // Top players by kill count
@@ -462,7 +514,7 @@ function createFpsLeaderboardEmbeds(leaderboardData, patch) {
             .setThumbnail('https://i.imgur.com/UoZsrrM.png')
             .setAuthor({ name: `Top Players by FPS Kills`, iconURL: 'https://i.imgur.com/vRqPoqk.png' })
             .setTitle(`Patch ${patch}`)
-            .setImage('https://i.imgur.com/HhnpGnN.png')
+            .setImage('attachment://total-kills-chart.png')
             .setDescription(`\`\`\`\nIronPoint Total FPS Kills: ${sortedByKills.reduce((acc, [_, stats]) => acc + stats.kill_count, 0)}\`\`\`\n`)
             .setColor('#7199de');
 
@@ -484,17 +536,8 @@ function createFpsLeaderboardEmbeds(leaderboardData, patch) {
 }
 
 // Helper function to create Combined leaderboard embeds
-function createCombinedLeaderboardEmbeds(leaderboardData, patch) {
+function createCombinedLeaderboardEmbeds(combinedKills, patch) {
     try {
-        // Convert leaderboardData into an array of [username, stats] pairs and calculate total kills
-        const combinedKills = Object.entries(leaderboardData).map(([username, stats]) => {
-            const totalKills = stats.hits.reduce((acc, hit) => acc + hit.kill_count, 0);
-            return [username, { ...stats, totalKills }];
-        });
-
-        // Sort by total kills in descending order
-        combinedKills.sort((a, b) => b[1].totalKills - a[1].totalKills);
-
         const embeds = [];
 
         // Top players by combined kills
@@ -502,7 +545,7 @@ function createCombinedLeaderboardEmbeds(leaderboardData, patch) {
             .setThumbnail('https://i.imgur.com/UoZsrrM.png')
             .setAuthor({ name: `Top Players by Combined Kills`, iconURL: 'https://i.imgur.com/vRqPoqk.png' })
             .setTitle(`Patch ${patch}`)
-            .setImage('https://i.imgur.com/HhnpGnN.png')
+            .setImage('attachment://total-kills-chart.png')
             .setDescription(`\`\`\`\nIronPoint Total Combined Kills: ${combinedKills.reduce((acc, [_, stats]) => acc + stats.totalKills, 0)}\`\`\`\n`)
             .setColor('#7199de');
 

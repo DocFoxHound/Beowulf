@@ -1,10 +1,11 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { AttachmentBuilder, SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
 const { getAllGameVersions } = require('../../api/gameVersionApi');
 const { getUserById } = require('../../api/userlistApi');
 const { getHitLogsByPatch, getAllHitLogs } = require('../../api/hitTrackerApi');
-
-
+const { generateLeaderboardChart } = require('../../common/chart-generator');
+const fs = require('fs');
+const path = require('path');
 
 const command = new SlashCommandBuilder()
     .setName('hit-tracker-leaderboard')
@@ -32,14 +33,27 @@ module.exports = {
                 topTotalValue = await generateTotalValueLeaderboard(hitLogs);
                 topStolenCargo = await generateTopStolenLeaderboard(hitLogs);
                 topPirateActs = await generateTopPirateActs(hitLogs);
-                embeds = createLeaderboardEmbeds(topTotalValue, topStolenCargo, topPirateActs, patch);
             }else{ //'ALL' selected
                 hitLogs = await getAllHitLogs()
                 topTotalValue = await generateTotalValueLeaderboard(hitLogs);
                 topStolenCargo = await generateTopStolenLeaderboard(hitLogs);
                 topPirateActs = await generateTopPirateActs(hitLogs);
-                embeds = createLeaderboardEmbeds(topTotalValue, topStolenCargo, topPirateActs, patch);
             }
+            const sortedByTopTotalValue = structuredClone(Object.entries(topTotalValue).sort((a, b) => b[1].total_cut_value - a[1].total_cut_value));
+            const sortedByTopStolenCargo = structuredClone(Object.entries(topStolenCargo).sort((a, b) => b[1].total_scu - a[1].total_scu));
+            const sortedByTopPiracyActs = structuredClone(Object.entries(topPirateActs).sort((a, b) => b[1].total_hits - a[1].total_hits));
+
+            const { buffer: valueBuffer, filePath: valuePath } = await generateLeaderboardChart(sortedByTopTotalValue.slice(0, 10), 'total_cut_value', 'value-chart.png');
+            const { buffer: cargoBuffer, filePath: cargoPath } = await generateLeaderboardChart(sortedByTopStolenCargo.slice(0, 10), 'total_scu', 'cargo-chart.png');
+            const { buffer: actsBuffer, filePath: actsPath } = await generateLeaderboardChart(sortedByTopPiracyActs.slice(0, 10), 'total_hits', 'acts-chart.png');
+
+            const attachmentMap = {
+                0: new AttachmentBuilder(valueBuffer, { name: 'value-chart.png' }),
+                1: new AttachmentBuilder(cargoBuffer, { name: 'cargo-chart.png' }),
+                2: new AttachmentBuilder(actsBuffer, { name: 'acts-chart.png' })
+            };
+
+            embeds = createLeaderboardEmbeds(sortedByTopTotalValue, sortedByTopStolenCargo, sortedByTopPiracyActs, patch);
 
             // Create buttons for navigation
             const buttons = new ActionRowBuilder()
@@ -57,7 +71,18 @@ module.exports = {
 
             // Send the first embed with navigation buttons
             let currentPage = 0;
-            const message = await interaction.reply({ embeds: [embeds[currentPage]], components: [buttons], fetchReply: true });
+            const message = await interaction.reply({ 
+                embeds: [embeds[currentPage]], 
+                components: [buttons], 
+                files: [attachmentMap[currentPage]], 
+                fetchReply: true 
+              });
+              
+            [valuePath, cargoPath, actsPath].forEach(path =>
+                fs.unlink(path, err => {
+                  if (err) console.error(`Failed to delete ${path}:`, err);
+                })
+            );
 
             // Create a collector to handle button interactions
             const collector = message.createMessageComponentCollector({ time: 60000 });
@@ -73,7 +98,11 @@ module.exports = {
                 buttons.components[0].setDisabled(currentPage === 0);
                 buttons.components[1].setDisabled(currentPage === embeds.length - 1);
 
-                await i.update({ embeds: [embeds[currentPage]], components: [buttons] });
+                await i.update({ 
+                    embeds: [embeds[currentPage]], 
+                    components: [buttons], 
+                    files: [attachmentMap[currentPage]] 
+                  });
             });
 
             collector.on('end', async () => {
@@ -198,27 +227,16 @@ async function generateTopPirateActs(hitLogs) {
     }
 }
 
-function createLeaderboardEmbeds(topTotalValue, topStolenCargo, topPirateActs, patch) {
+function createLeaderboardEmbeds(sortedByTopTotalValue, sortedByTopStolenCargo, sortedByTopPiracyActs, patch) {
     try{
-        const sortedByTopTotalValue = structuredClone(Object.entries(topTotalValue).sort((a, b) => b[1].total_cut_value - a[1].total_cut_value));
-        const sortedByTopStolenCargo = structuredClone(Object.entries(topStolenCargo).sort((a, b) => b[1].total_scu - a[1].total_scu));
-        const sortedByTopPiracyActs = structuredClone(Object.entries(topPirateActs).sort((a, b) => b[1].total_hits - a[1].total_hits));
         const embeds = [];
-
-        // const totalValueConfig = createTotalValueChart(sortedByTopTotalValue);
-        // const width = 800;
-        // const height = 600;
-        // const chartCanvas = new ChartJSNodeCanvas({ width, height });
-        // const imageBuffer = await chartCanvas.renderToBuffer(totalValueConfig);
-        // const attachment = new AttachmentBuilder(imageBuffer, { name: 'chart.png' });
 
         // Top players by value earned
         const topStolenValueEmbed = new EmbedBuilder()
-            .setThumbnail('https://i.imgur.com/UoZsrrM.png')
+            .setThumbnail('https://i.imgur.com/UoZsrrM.png') // Use the chart as the thumbnail
             .setAuthor({ name: `Top Discerning Pirates`, iconURL: 'https://i.imgur.com/SBKHSKb.png' })
             .setTitle(`Patch ${patch}`)
-            .setImage('https://i.imgur.com/7k9oEu5.png')
-            // .setImage('attachment://chart.png')
+            .setImage(`attachment://value-chart.png`)
             .setDescription(`\`\`\`\nThe following are the top Pirates by Market Value of items stolen. These are the best at finding the best loot.\n\n\`\`\``)
             .setColor('#b519ff');
             sortedByTopTotalValue.forEach(([username, stats], index) => {
@@ -237,7 +255,7 @@ function createLeaderboardEmbeds(topTotalValue, topStolenCargo, topPirateActs, p
             .setThumbnail('https://i.imgur.com/UoZsrrM.png')
             .setAuthor({ name: `Top Kleptomaniacss`, iconURL: 'https://i.imgur.com/SBKHSKb.png' })
             .setTitle(`Patch ${patch}`)
-            .setImage('https://i.imgur.com/7k9oEu5.png')
+            .setImage('attachment://cargo-chart.png')
             .setDescription(`\`\`\`\nThe following list are the players who stole the most amount of cargo. This is measured in SCU and individual items pilfered.\n\`\`\`\n`)
             .setColor('#b519ff');
         sortedByTopStolenCargo.forEach(([username, stats], index) => {
@@ -255,7 +273,7 @@ function createLeaderboardEmbeds(topTotalValue, topStolenCargo, topPirateActs, p
             .setThumbnail('https://i.imgur.com/UoZsrrM.png')
             .setAuthor({ name: `Top Thugs`, iconURL: 'https://i.imgur.com/SBKHSKb.png' })
             .setTitle(`Patch ${patch}`)
-            .setImage('https://i.imgur.com/7k9oEu5.png')
+            .setImage('attachment://acts-chart.png')
             .setDescription(`\`\`\`\nThe following are the members that pirated the most. Not necessarily the richest or most efficient, but definitely the most active.\n\n\`\`\``)
             .setColor('#b519ff');
             sortedByTopPiracyActs.forEach(([username, stats], index) => {
@@ -272,47 +290,4 @@ function createLeaderboardEmbeds(topTotalValue, topStolenCargo, topPirateActs, p
         console.error('Error creating leaderboard embeds:', error);
         return null;  // Return null if there's an error
     }
-}
-
-async function createTotalValueChart(hitLogs){
-    const width = 800;
-    const height = 600;
-    const chartCanvas = new ChartJSNodeCanvas({ width, height });
-
-    // Example data
-    // const labels = ['Nova', 'Echo', 'Wraith'];
-    // const data = [93, 74, 85];
-    let labels = [];
-    let data = [];
-
-    for (const log of hitLogs) {
-        labels.push(log.username);
-        data.push(log.total_cut_value);
-    }
-
-    // Chart.js config
-    const config = {
-    type: 'bar',
-    data: {
-        labels: labels,
-        datasets: [{
-        label: 'Total Value Stolen',
-        data: data,
-        backgroundColor: 'rgba(54, 162, 235, 0.6)',
-        borderColor: 'rgba(54, 162, 235, 1)',
-        borderWidth: 1
-        }]
-    },
-    options: {
-        plugins: {
-        legend: { display: false }
-        },
-        scales: {
-        y: {
-            beginAtZero: true
-        }
-        }
-    }
-    };
-    return config;
 }
