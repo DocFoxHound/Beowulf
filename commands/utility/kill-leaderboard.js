@@ -102,11 +102,14 @@ module.exports = {
             let individualData = null;
             if (user) { //all patches, user identified
                 if(type === "fps"){
-                    individualData = await generateIndividualFpsData(blackBoxLogs, user);
+                    acLeaderBoardData = await generateIndividualFpsData(acBlackBoxLogs, user);
+                    puLeaderBoardData = await generateIndividualFpsData(puBlackBoxLogs, user);
                 }else if(type === "ships"){
-                    individualData = await generateIndividualShipData(blackBoxLogs, user);
+                    acLeaderBoardData = await generateIndividualShipData(acBlackBoxLogs, user);
+                    puLeaderBoardData = await generateIndividualShipData(puBlackBoxLogs, user);
                 }else{
-                    individualData = await generateIndividualCombinedData(blackBoxLogs, user);
+                    acLeaderBoardData = await generateIndividualCombinedData(acBlackBoxLogs, user);
+                    puLeaderBoardData = await generateIndividualCombinedData(puBlackBoxLogs, user);
                 }
             }else if (!user) { //patch identified, no user identified (works)
                 if(type === "fps"){
@@ -116,8 +119,8 @@ module.exports = {
                     acLeaderBoardData = await generateShipLeaderboardData(acBlackBoxLogs);
                     puLeaderBoardData = await generateShipLeaderboardData(puBlackBoxLogs);
                 }else{
-                    acLeaderBoardData = await generateCombinedLeaderboardData(blackBoxLogs);
-                    puLeaderBoardData = await generateCombinedLeaderboardData(blackBoxLogs);
+                    acLeaderBoardData = await generateCombinedLeaderboardData(acBlackBoxLogs);
+                    puLeaderBoardData = await generateCombinedLeaderboardData(puBlackBoxLogs);
                 }
             }
 
@@ -129,7 +132,7 @@ module.exports = {
             let extPathFour = null;
             let extPathFive = null;
             let extPathSix = null;
-            if(acLeaderBoardData !== null || puLeaderBoardData !== null) {
+            if(!user) {
                 if(type === "fps"){
                     const combinedLeaderboardData = { ...acLeaderBoardData, ...puLeaderBoardData };
                     const acSortedByKills = Object.entries(acLeaderBoardData).sort((a, b) => b[1].kill_count - a[1].kill_count);
@@ -180,22 +183,10 @@ module.exports = {
                 }
                 if (type === "overall") {
                     const combinedLeaderboardData = { ...acLeaderBoardData, ...puLeaderBoardData };
-                    // // Convert leaderboardData into an array of [username, stats] pairs and calculate total kills
-                    // const combinedKills = Object.entries(combinedLeaderboardData).map(([username, stats]) => {
-                    //     const totalKills = stats.hits.reduce((acc, hit) => acc + hit.kill_count, 0);
-                    //     return [username, { ...stats, totalKills }];
-                    // });
-                    // const combinedValue = Object.entries(combinedLeaderboardData).map(([username, stats]) => {
-                    //     const totalKills = stats.hits.reduce((acc, hit) => acc + hit.value, 0);
-                    //     return [username, { ...stats, totalKills }];
-                    // });
-                    // combinedKills.sort((a, b) => b[1].totalKills - a[1].totalKills);
-                    // combinedValue.sort((a, b) => b[1].value - a[1].value);
                     const sortedByKills = Object.entries(combinedLeaderboardData).sort((a, b) => b[1].kill_count - a[1].kill_count);
                     const sortedByValue = Object.entries(combinedLeaderboardData).sort((a, b) => b[1].value - a[1].value);
                     const { buffer: killBuffer, filePath: killPath } = await generateLeaderboardChart(sortedByKills.slice(0, 10), 'kill_count', 'total-kills-chart.png');
                     const { buffer: valueBuffer, filePath: valuePath } = await generateLeaderboardChart(sortedByValue.slice(0, 10), 'value', 'total-value-chart.png');
-
                     extKillPath = killPath
                     extValuePath = valuePath
                     attachmentMap = {
@@ -205,11 +196,12 @@ module.exports = {
                     embeds = createCombinedLeaderboardEmbeds(sortedByKills, sortedByValue, patch);
                 }
             }
-            if(individualData !== null) {
+            if(user) {
                 if(type === "fps"){
-                    embeds = createIndividualFpsEmbeds(individualData, patch, user);
+                    const combinedLeaderboardData = { ...acLeaderBoardData, ...puLeaderBoardData };
+                    embeds = createIndividualFpsEmbeds(acLeaderBoardData, puLeaderBoardData, combinedLeaderboardData, patch, user);
                 }else if(type === "ships"){
-                    embeds = createIndividualShipEmbeds(individualData, patch, user);
+                    embeds = createIndividualShipEmbeds(acLeaderBoardData, puLeaderBoardData, patch, user);
                 }else{
                     embeds = createIndividualCombinedEmbeds(individualData, patch, user);
                 }
@@ -220,15 +212,9 @@ module.exports = {
                 // Only one page — no need for buttons
                 // return interaction.reply({ embeds: [embeds[0]], ephemeral: false });
                 await interaction.reply({ 
-                    embeds: [embeds[0].setImage(`attachment://${attachmentMap[0].name}`)], // Link the attachment to the embed
-                    files: attachmentMap[0] ? [attachmentMap[0]] : [], 
+                    embeds: [embeds[0]], // Link the attachment to the embed
                     fetchReply: true 
                 });
-                [extKillPath].forEach(path =>
-                    fs.unlink(path, err => {
-                        if (err) console.error(`Failed to delete ${path}:`, err);
-                    })
-                );
                 return;
             }
 
@@ -248,11 +234,21 @@ module.exports = {
 
             // Send the first embed with navigation buttons
             let currentPage = 0;
-            const message = await interaction.reply({ 
-                embeds: [embeds[currentPage].setImage(`attachment://${attachmentMap[currentPage].name}`)], // Link the attachment to the embed
-                components: [buttons], 
-                files: [attachmentMap[currentPage]], 
-                fetchReply: true });
+            let message;
+            if(!user){
+                message = await interaction.reply({ 
+                    embeds: [embeds[currentPage].setImage(`attachment://${attachmentMap[currentPage].name}`)], // Link the attachment to the embed
+                    components: [buttons], 
+                    files: [attachmentMap[currentPage]], 
+                    fetchReply: true });
+            }
+            if(user){
+                message = await interaction.reply({ 
+                    embeds: [embeds[currentPage]], // Link the attachment to the embed
+                    components: [buttons], 
+                    fetchReply: true });
+            }
+            
             
             const killPaths = [extKillPath, extValuePath, extPathThree, extPathFour, extPathFive, extPathSix].filter(path => path && path.length > 0);
             killPaths.forEach(path =>
@@ -276,11 +272,20 @@ module.exports = {
                 buttons.components[0].setDisabled(currentPage === 0);
                 buttons.components[1].setDisabled(currentPage === embeds.length - 1);
 
-                await i.update({ 
-                    embeds: [embeds[currentPage].setImage(`attachment://${attachmentMap[currentPage].name}`)], // Link the attachment to the embed
-                    components: [buttons], 
-                    files: attachmentMap[currentPage] ? [attachmentMap[currentPage]] : [] 
-                });
+                if(!user){
+                    await i.update({ 
+                        embeds: [embeds[currentPage].setImage(`attachment://${attachmentMap[currentPage].name}`)], // Link the attachment to the embed
+                        components: [buttons], 
+                        files: attachmentMap[currentPage] ? [attachmentMap[currentPage]] : [] 
+                    });
+                }
+                if(user){
+                    await i.update({ 
+                        embeds: [embeds[currentPage]], // Link the attachment to the embed
+                        components: [buttons]
+                    });
+                }
+                
             });
 
             collector.on('end', async () => {
@@ -694,7 +699,6 @@ function createFpsLeaderboardEmbeds(puSortedByKills, acSortedByKills, comSortedB
 function createCombinedLeaderboardEmbeds(sortedByKills, sortedByValue, patch) {
     try {
         const embeds = [];
-        console.log(sortedByKills)
         // Top players by combined kills
         const combinedKillsEmbed = new EmbedBuilder()
             .setThumbnail('https://i.imgur.com/UoZsrrM.png')
@@ -739,18 +743,44 @@ function createCombinedLeaderboardEmbeds(sortedByKills, sortedByValue, patch) {
 }
 
 // Helper function to create individual stat sheet embeds
-function createIndividualShipEmbeds(individualData, patch, user) {
+function createIndividualShipEmbeds(acLeaderBoardData, puLeaderBoardData, patch, user) {
     try {
         const embeds = [];
         const fieldsPerPage = 25; // Discord's limit for fields per embed
+        let combinedLeaderboardData = {};
+
+        const keys = new Set([
+        ...Object.keys(acLeaderBoardData),
+        ...Object.keys(puLeaderBoardData)
+        ]);
+
+        for (const key of keys) {
+        const acData = acLeaderBoardData[key] || { kill_count: 0, value: 0, victims: [], hits: [] };
+        const puData = puLeaderBoardData[key] || { kill_count: 0, value: 0, victims: [], hits: [] };
+
+        combinedLeaderboardData[key] = {
+            kill_count: acData.kill_count + puData.kill_count,
+            value: acData.value + puData.value,
+            victims: [...acData.victims, ...puData.victims],
+            hits: [...acData.hits, ...puData.hits]
+        };
+        }
 
         // Calculate total kills and total value
-        const totalKills = individualData[user.username].kill_count || 0;
-        const totalValue = formatToCurrency(individualData[user.username].value || 0);
+        const totalAcKills = acLeaderBoardData[user.username].kill_count || 0;
+        const totalPuKills = puLeaderBoardData[user.username].kill_count || 0;
+        const totalKills = totalAcKills + totalPuKills;
+        const totalAcValue = formatToCurrency(acLeaderBoardData[user.username].value || 0);
+        const totalPuValue = formatToCurrency(puLeaderBoardData[user.username].value || 0);
+        const ac = parseFloat(totalAcValue.replace(/[$,]/g, ''));
+        const pu = parseFloat(totalPuValue.replace(/[$,]/g, ''));
+        const tempTotalValue = ac + pu;
+        const totalValue = `$${tempTotalValue.toFixed(2)}`;
+        
 
-        const individualShipTotals = {};
-        for(const hit of individualData[user.username].hits){
-            const shipName = hit.ship_used;
+        let individualShipTotals = {};
+        for(const hit of combinedLeaderboardData[user.username].hits){
+            const shipName = hit.ship_killed;
             if (!individualShipTotals[shipName]) {
                 individualShipTotals[shipName] = { kill_count: 0, value: 0 };
             }
@@ -758,7 +788,7 @@ function createIndividualShipEmbeds(individualData, patch, user) {
             individualShipTotals[shipName].value += hit.value;
         }
 
-        const individualShipEntryArray = []
+        let individualShipEntryArray = []
         for(const shipName in individualShipTotals){
             const stats = individualShipTotals[shipName];
             individualShipEntryArray.push({
@@ -779,7 +809,7 @@ function createIndividualShipEmbeds(individualData, patch, user) {
                 .setTitle(`Patch ${patch}`)
                 .setImage('https://i.imgur.com/HhnpGnN.png')
                 .setColor('#7199de')
-                .setDescription(`\`\`\`\nTotal Kills: ${totalKills}\nTotal Damage Cost: ${totalValue}\`\`\`\n`)
+                .setDescription(`\`\`\`\nTotal Kills: ${totalKills}\nTotal Damage Cost: ${totalValue}\nAC Kills: ${totalAcKills}\nPU Kills: ${totalPuKills}\nAC Damages: ${totalAcValue}\nPU Damages: ${totalPuValue}\`\`\`\n`)
                 .addFields(currentFields);
 
             embeds.push(embed);
@@ -787,7 +817,7 @@ function createIndividualShipEmbeds(individualData, patch, user) {
 
         // Prepare the fields for the hits lists
         const hitsFields = [];
-        Object.entries(individualData).forEach(([username, stats]) => {
+        Object.entries(combinedLeaderboardData).forEach(([username, stats]) => {
             stats.hits.forEach(hit => {
                 const victims = hit.victims.join(', ');
                 const killOrKills = hit.kill_count === 1 ? 'Kill' : 'Kills';
@@ -823,17 +853,19 @@ function createIndividualShipEmbeds(individualData, patch, user) {
     }
 }
 
-function createIndividualFpsEmbeds(individualData, patch, user) {
+function createIndividualFpsEmbeds(acLeaderBoardData, puLeaderBoardData, combinedLeaderboardData, patch, user) {
     try {
         const embeds = [];
         const fieldsPerPage = 25; // Discord's limit for fields per embed
 
         // Calculate total kills
-        const totalKills = individualData[user.username].kill_count || 0;
+        const totalKills = combinedLeaderboardData[user.username].kill_count || 0;
+        const totalAcKills = acLeaderBoardData[user.username].kill_count || 0;
+        const totalPuKills = puLeaderBoardData[user.username].kill_count || 0;
 
         // Prepare the fields for the hits list
         const hitsFields = [];
-        Object.entries(individualData).forEach(([username, stats]) => {
+        Object.entries(combinedLeaderboardData).forEach(([username, stats]) => {
             stats.hits.forEach(hit => {
                 const victims = hit.victims.join(', ');
                 const date = new Date(Number(hit.id)).toLocaleDateString(); ;
@@ -857,7 +889,7 @@ function createIndividualFpsEmbeds(individualData, patch, user) {
                 .setTitle(`Patch ${patch}`)
                 .setImage('https://i.imgur.com/HhnpGnN.png')
                 .setColor('#7199de')
-                .setDescription(`\`\`\`\nTotal FPS Kills: ${totalKills}\`\`\`\n`)
+                .setDescription(`\`\`\`\nTotal FPS Kills: ${totalKills}\nAC Kills: ${totalAcKills}\nPU Kills: ${totalPuKills}\`\`\`\n`)
                 .addFields(currentFields);
 
             embeds.push(embed);
