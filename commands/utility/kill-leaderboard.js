@@ -1,7 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, AttachmentBuilder } = require('discord.js');
 const { getAllBlackBoxes, getBlackBoxesByPatch, getBlackBoxesByUserAndPatch, getBlackBoxesByUserId, getAssistantBlackBoxes, getAssistantBlackBoxesByUserAndPatch } = require('../../api/blackBoxApi');
 const { getAllGameVersions } = require('../../api/gameVersionApi');
-const { getUserById } = require('../../api/userlistApi');
+const { getUserById, getUsers } = require('../../api/userlistApi');
 const { generateLeaderboardChart } = require('../../common/chart-generator');
 const fs = require('fs');
 
@@ -30,6 +30,7 @@ const command = new SlashCommandBuilder()
 module.exports = {
     data: command,
     async execute(interaction) {
+        const allUsers = await getUsers();
         const patch = interaction.options.getString('patch');
         const type = interaction.options.getString('type');
         const gamemode = interaction.options.getString('gamemode');
@@ -113,14 +114,14 @@ module.exports = {
                 }
             }else if (!user) { //patch identified, no user identified (works)
                 if(type === "fps"){
-                    acLeaderBoardData = await generateFpsLeaderboardData(acBlackBoxLogs);
-                    puLeaderBoardData = await generateFpsLeaderboardData(puBlackBoxLogs);
+                    acLeaderBoardData = await generateFpsLeaderboardData(acBlackBoxLogs, allUsers);
+                    puLeaderBoardData = await generateFpsLeaderboardData(puBlackBoxLogs, allUsers);
                 }else if(type === "ships"){
-                    acLeaderBoardData = await generateShipLeaderboardData(acBlackBoxLogs);
-                    puLeaderBoardData = await generateShipLeaderboardData(puBlackBoxLogs);
+                    acLeaderBoardData = await generateShipLeaderboardData(acBlackBoxLogs, allUsers);
+                    puLeaderBoardData = await generateShipLeaderboardData(puBlackBoxLogs, allUsers);
                 }else{
-                    acLeaderBoardData = await generateCombinedLeaderboardData(acBlackBoxLogs);
-                    puLeaderBoardData = await generateCombinedLeaderboardData(puBlackBoxLogs);
+                    acLeaderBoardData = await generateCombinedLeaderboardData(acBlackBoxLogs, allUsers);
+                    puLeaderBoardData = await generateCombinedLeaderboardData(puBlackBoxLogs, allUsers);
                 }
             }
 
@@ -438,11 +439,12 @@ async function generateIndividualCombinedData(blackBoxLogs, user) {
 }
 
 // Helper function to generate leaderboard data
-async function generateFpsLeaderboardData(blackBoxLogs) {
+async function generateFpsLeaderboardData(blackBoxLogs, allUsers) {
     const leaderboard = {};
     try{
         for (const log of blackBoxLogs) {
-            const user = await getUserById(log.user_id);
+            // const user = await getUserById(log.user_id);
+            const user = allUsers.find(user => user.id === log.user_id);
             const username = user.nickname ? user.nickname : user.username;
     
             if (!leaderboard[username]) {
@@ -459,11 +461,12 @@ async function generateFpsLeaderboardData(blackBoxLogs) {
 }
 
 // Helper function to generate leaderboard data
-async function generateShipLeaderboardData(blackBoxLogs) {
+async function generateShipLeaderboardData(blackBoxLogs, allUsers) {
     const leaderboard = {};
     try{
         for (const log of blackBoxLogs) {
-            const user = await getUserById(log.user_id);
+            // const user = await getUserById(log.user_id);
+            const user = allUsers.find(user => user.id === log.user_id);
             const username = user.nickname ? user.nickname : user.username;
     
             if (!leaderboard[username]) {
@@ -481,11 +484,12 @@ async function generateShipLeaderboardData(blackBoxLogs) {
 }
 
 // Helper function to generate leaderboard data
-async function generateCombinedLeaderboardData(blackBoxLogs) {
+async function generateCombinedLeaderboardData(blackBoxLogs, allUsers) {
     const leaderboard = {};
     try{
         for (const log of blackBoxLogs) {
-            const user = await getUserById(log.user_id);
+            // const user = await getUserById(log.user_id);
+            const user = allUsers.find(user => user.id === log.user_id);
             const username = user.nickname ? user.nickname : user.username;
     
             if (!leaderboard[username]) {

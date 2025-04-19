@@ -1,7 +1,7 @@
 const { AttachmentBuilder, SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { ChartJSNodeCanvas } = require('chartjs-node-canvas');
 const { getAllGameVersions } = require('../../api/gameVersionApi');
-const { getUserById } = require('../../api/userlistApi');
+const { getUserById, getUsers } = require('../../api/userlistApi');
 const { getHitLogsByPatch, getAllHitLogs } = require('../../api/hitTrackerApi');
 const { generateLeaderboardChart } = require('../../common/chart-generator');
 const fs = require('fs');
@@ -28,11 +28,12 @@ module.exports = {
             let topTotalValue = null;
             let topStolenCargo = null;
             let topPirateActs = null;
+            const allUsers = await getUsers();
             if(patchSelectedBool){ //patch selected
                 hitLogs = await getHitLogsByPatch(patch)
-                topTotalValue = await generateTotalValueLeaderboard(hitLogs);
-                topStolenCargo = await generateTopStolenLeaderboard(hitLogs);
-                topPirateActs = await generateTopPirateActs(hitLogs);
+                topTotalValue = await generateTotalValueLeaderboard(hitLogs, allUsers);
+                topStolenCargo = await generateTopStolenLeaderboard(hitLogs, allUsers);
+                topPirateActs = await generateTopPirateActs(hitLogs, allUsers);
             }else{ //'ALL' selected
                 hitLogs = await getAllHitLogs()
                 topTotalValue = await generateTotalValueLeaderboard(hitLogs);
@@ -140,11 +141,12 @@ module.exports = {
 };
 
 // Helper function to generate leaderboard data
-async function generateTotalValueLeaderboard(hitLogs) {
+async function generateTotalValueLeaderboard(hitLogs, allUsers) {
     const leaderboard = {};
     try{
         for (const log of hitLogs) {
-            const userObject = await getUserById(log.user_id);
+            const userObject = allUsers.find(user => user.id === log.user_id);
+            // const userObject = await getUserById(log.user_id);
             const userName = userObject.username;
             if (!leaderboard[userName]) {
                 leaderboard[userName] = { username: userName, total_cut_value: 0 };
@@ -153,7 +155,8 @@ async function generateTotalValueLeaderboard(hitLogs) {
             leaderboard[userName].total_cut_value += log.total_cut_value;
 
             for(const assist of log.assists){
-                const assistUserObject = await getUserById(assist);
+                // const assistUserObject = await getUserById(assist);
+                const assistUserObject = allUsers.find(user => user.id === assist.user_id);
                 const assistUserName = assistUserObject.username;
                 if (!leaderboard[assistUserName]) {
                     leaderboard[assistUserName] = { username: assistUserName, total_cut_value: 0 };
@@ -169,11 +172,12 @@ async function generateTotalValueLeaderboard(hitLogs) {
 }
 
 // Helper function to generate leaderboard data
-async function generateTopStolenLeaderboard(hitLogs) {
+async function generateTopStolenLeaderboard(hitLogs, allUsers) {
     const leaderboard = {};
     try{
         for (const log of hitLogs) {
-            const userObject = await getUserById(log.user_id);
+            // const userObject = await getUserById(log.user_id);
+            const userObject = allUsers.find(user => user.id === log.user_id);
             const userName = userObject.username;
             const numberAssists = log.assists.length + 1;
             if (!leaderboard[userName]) {
@@ -183,7 +187,8 @@ async function generateTopStolenLeaderboard(hitLogs) {
             leaderboard[userName].total_scu += (log.total_scu / numberAssists);
 
             for(const assist of log.assists){
-                const assistUserObject = await getUserById(assist);
+                // const assistUserObject = await getUserById(assist);
+                const assistUserObject = allUsers.find(user => user.id === assist.user_id);
                 const assistUserName = assistUserObject.username;
                 if (!leaderboard[assistUserName]) {
                     leaderboard[assistUserName] = { username: assistUserName, total_scu: 0 };
@@ -199,11 +204,12 @@ async function generateTopStolenLeaderboard(hitLogs) {
 }
 
 // Helper function to generate leaderboard data
-async function generateTopPirateActs(hitLogs) {
+async function generateTopPirateActs(hitLogs, allUsers) {
     const leaderboard = {};
     try{
         for (const log of hitLogs) {
-            const userObject = await getUserById(log.user_id);
+            // const userObject = await getUserById(log.user_id);
+            const userObject = allUsers.find(user => user.id === log.user_id);
             const userName = userObject.username;
             if (!leaderboard[userName]) {
                 leaderboard[userName] = { username: userName, total_hits: 0 };
@@ -212,7 +218,8 @@ async function generateTopPirateActs(hitLogs) {
             leaderboard[userName].total_hits += 1;
 
             for(const assist of log.assists){
-                const assistUserObject = await getUserById(assist);
+                // const assistUserObject = await getUserById(assist);
+                const assistUserObject = allUsers.find(user => user.id === assist.user_id);
                 const assistUserName = assistUserObject.username;
                 if (!leaderboard[assistUserName]) {
                     leaderboard[assistUserName] = { username: assistUserName, total_hits: 0 };
