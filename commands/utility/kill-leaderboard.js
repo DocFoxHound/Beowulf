@@ -15,7 +15,7 @@ const command = new SlashCommandBuilder()
             .setAutocomplete(true))
     .addStringOption(option =>
         option.setName('type')
-            .setDescription('This quarter or all time?')
+            .setDescription('FPS, Ships, or Both?')
             .setRequired(true)
             .addChoices(
                 { name: 'FPS Kills', value: 'fps' },
@@ -32,8 +32,8 @@ module.exports = {
     async execute(interaction) {
         const patch = interaction.options.getString('patch');
         const type = interaction.options.getString('type');
+        const gamemode = interaction.options.getString('gamemode');
         const user = interaction.options.getUser('user') || null;
-
         try {
             let blackBoxLogs = [];
             if(type === "ships") {
@@ -94,6 +94,10 @@ module.exports = {
             }
 
             // Generate leaderboard data and embeds
+            const acBlackBoxLogs = Object.values(blackBoxLogs).filter(stats => stats.game_mode === 'AC');
+            const puBlackBoxLogs = Object.values(blackBoxLogs).filter(stats => stats.game_mode === 'PU');
+            let acLeaderBoardData = null;
+            let puLeaderBoardData = null;
             let leaderBoardData = null;
             let individualData = null;
             if (user) { //all patches, user identified
@@ -106,11 +110,14 @@ module.exports = {
                 }
             }else if (!user) { //patch identified, no user identified (works)
                 if(type === "fps"){
-                    leaderBoardData = await generateFpsLeaderboardData(blackBoxLogs);
+                    acLeaderBoardData = await generateFpsLeaderboardData(acBlackBoxLogs);
+                    puLeaderBoardData = await generateFpsLeaderboardData(puBlackBoxLogs);
                 }else if(type === "ships"){
-                    leaderBoardData = await generateShipLeaderboardData(blackBoxLogs);
+                    acLeaderBoardData = await generateShipLeaderboardData(acBlackBoxLogs);
+                    puLeaderBoardData = await generateShipLeaderboardData(puBlackBoxLogs);
                 }else{
-                    leaderBoardData = await generateCombinedLeaderboardData(blackBoxLogs);
+                    acLeaderBoardData = await generateCombinedLeaderboardData(blackBoxLogs);
+                    puLeaderBoardData = await generateCombinedLeaderboardData(blackBoxLogs);
                 }
             }
 
@@ -118,42 +125,84 @@ module.exports = {
             let attachmentMap = {};
             let extKillPath = null;
             let extValuePath = null;
-            if(leaderBoardData !== null) {
+            let extPathThree = null;
+            let extPathFour = null;
+            let extPathFive = null;
+            let extPathSix = null;
+            if(acLeaderBoardData !== null || puLeaderBoardData !== null) {
                 if(type === "fps"){
-                    const sortedByKills = Object.entries(leaderBoardData).sort((a, b) => b[1].kill_count - a[1].kill_count);
-                    const { buffer: killBuffer, filePath: killPath } = await generateLeaderboardChart(sortedByKills.slice(0, 10), 'kill_count', 'total-kills-chart.png');
-                    extKillPath = killPath
+                    const combinedLeaderboardData = { ...acLeaderBoardData, ...puLeaderBoardData };
+                    const acSortedByKills = Object.entries(acLeaderBoardData).sort((a, b) => b[1].kill_count - a[1].kill_count);
+                    const puSortedByKills = Object.entries(puLeaderBoardData).sort((a, b) => b[1].kill_count - a[1].kill_count);
+                    const comSortedByKills = Object.entries(combinedLeaderboardData).sort((a, b) => b[1].kill_count - a[1].kill_count);
+                    const { buffer: acKillBuffer, filePath: acKillPath } = await generateLeaderboardChart(acSortedByKills.slice(0, 10), 'kill_count', 'total-ac-kills-chart.png');
+                    const { buffer: puKillBuffer, filePath: puKillPath } = await generateLeaderboardChart(puSortedByKills.slice(0, 10), 'kill_count', 'total-pu-kills-chart.png');
+                    const { buffer: comKillBuffer, filePath: comKillPath } = await generateLeaderboardChart(comSortedByKills.slice(0, 10), 'kill_count', 'total-comb-kills-chart.png');
+                    extKillPath = acKillPath
+                    extValuePath = puKillPath
+                    extPathThree = comKillPath
                     attachmentMap = {
-                        0: new AttachmentBuilder(killBuffer, { name: 'total-kills-chart.png' })
+                        0: new AttachmentBuilder(acKillBuffer, { name: 'total-ac-kills-chart.png' }),
+                        1: new AttachmentBuilder(puKillBuffer, { name: 'total-pu-kills-chart.png' }),
+                        2: new AttachmentBuilder(comKillBuffer, { name: 'total-comb-kills-chart.png' })
                     };
-                    embeds = createFpsLeaderboardEmbeds(sortedByKills, patch);
-                }else if(type === "ships"){
-                    const sortedByKills = Object.entries(leaderBoardData).sort((a, b) => b[1].kill_count - a[1].kill_count);
-                    const sortedByValue = Object.entries(leaderBoardData).sort((a, b) => b[1].value - a[1].value);
+                    embeds = createFpsLeaderboardEmbeds(puSortedByKills, acSortedByKills, comSortedByKills, patch);
+                }
+                if(type === "ships"){
+                    const combinedLeaderboardData = { ...acLeaderBoardData, ...puLeaderBoardData };
+                    const sortedByKills = Object.entries(combinedLeaderboardData).sort((a, b) => b[1].kill_count - a[1].kill_count);
+                    const sortedByValue = Object.entries(combinedLeaderboardData).sort((a, b) => b[1].value - a[1].value);
+                    const sortedByAcKills = Object.entries(acLeaderBoardData).sort((a, b) => b[1].kill_count - a[1].kill_count);
+                    const sortedByAcValue = Object.entries(acLeaderBoardData).sort((a, b) => b[1].value - a[1].value);
+                    const sortedByPuKills = Object.entries(puLeaderBoardData).sort((a, b) => b[1].kill_count - a[1].kill_count);
+                    const sortedByPuValue = Object.entries(puLeaderBoardData).sort((a, b) => b[1].value - a[1].value);
                     const { buffer: killBuffer, filePath: killPath } = await generateLeaderboardChart(sortedByKills.slice(0, 10), 'kill_count', 'total-kills-chart.png');
                     const { buffer: valueBuffer, filePath: valuePath } = await generateLeaderboardChart(sortedByValue.slice(0, 10), 'value', 'total-value-chart.png');
+                    const { buffer: acKillBuffer, filePath: acKillPath } = await generateLeaderboardChart(sortedByAcKills.slice(0, 10), 'kill_count', 'ac-total-kills-chart.png');
+                    const { buffer: acValueBuffer, filePath: acValuePath } = await generateLeaderboardChart(sortedByAcValue.slice(0, 10), 'value', 'ac-total-value-chart.png');
+                    const { buffer: puKillBuffer, filePath: puKillPath } = await generateLeaderboardChart(sortedByPuKills.slice(0, 10), 'kill_count', 'pu-total-kills-chart.png');
+                    const { buffer: puValueBuffer, filePath: puValuePath } = await generateLeaderboardChart(sortedByPuValue.slice(0, 10), 'value', 'pu-total-value-chart.png');
+                    extKillPath = killPath
+                    extValuePath = valuePath
+                    extPathThree = acKillPath
+                    extPathFour = acValuePath
+                    extPathFive = puKillPath
+                    extPathSix = puValuePath
+                    attachmentMap = {
+                        0: new AttachmentBuilder(killBuffer, { name: 'total-kills-chart.png' }),
+                        1: new AttachmentBuilder(valueBuffer, { name: 'total-value-chart.png' }),
+                        2: new AttachmentBuilder(acKillBuffer, { name: 'ac-total-kills-chart.png' }),
+                        3: new AttachmentBuilder(acValueBuffer, { name: 'ac-total-value-chart.png' }),
+                        4: new AttachmentBuilder(puKillBuffer, { name: 'pu-total-kills-chart.png' }),
+                        5: new AttachmentBuilder(puValueBuffer, { name: 'pu-total-value-chart.png' })
+                    };
+                    embeds = createShipLeaderboardEmbeds(sortedByKills, sortedByValue, sortedByAcKills, sortedByAcValue, sortedByPuKills, sortedByPuValue, patch);
+                }
+                if (type === "overall") {
+                    const combinedLeaderboardData = { ...acLeaderBoardData, ...puLeaderBoardData };
+                    // // Convert leaderboardData into an array of [username, stats] pairs and calculate total kills
+                    // const combinedKills = Object.entries(combinedLeaderboardData).map(([username, stats]) => {
+                    //     const totalKills = stats.hits.reduce((acc, hit) => acc + hit.kill_count, 0);
+                    //     return [username, { ...stats, totalKills }];
+                    // });
+                    // const combinedValue = Object.entries(combinedLeaderboardData).map(([username, stats]) => {
+                    //     const totalKills = stats.hits.reduce((acc, hit) => acc + hit.value, 0);
+                    //     return [username, { ...stats, totalKills }];
+                    // });
+                    // combinedKills.sort((a, b) => b[1].totalKills - a[1].totalKills);
+                    // combinedValue.sort((a, b) => b[1].value - a[1].value);
+                    const sortedByKills = Object.entries(combinedLeaderboardData).sort((a, b) => b[1].kill_count - a[1].kill_count);
+                    const sortedByValue = Object.entries(combinedLeaderboardData).sort((a, b) => b[1].value - a[1].value);
+                    const { buffer: killBuffer, filePath: killPath } = await generateLeaderboardChart(sortedByKills.slice(0, 10), 'kill_count', 'total-kills-chart.png');
+                    const { buffer: valueBuffer, filePath: valuePath } = await generateLeaderboardChart(sortedByValue.slice(0, 10), 'value', 'total-value-chart.png');
+
                     extKillPath = killPath
                     extValuePath = valuePath
                     attachmentMap = {
                         0: new AttachmentBuilder(killBuffer, { name: 'total-kills-chart.png' }),
                         1: new AttachmentBuilder(valueBuffer, { name: 'total-value-chart.png' })
                     };
-                    embeds = createShipLeaderboardEmbeds(sortedByKills, sortedByValue, patch);
-                }else{
-                    // Convert leaderboardData into an array of [username, stats] pairs and calculate total kills
-                    const combinedKills = Object.entries(leaderBoardData).map(([username, stats]) => {
-                        const totalKills = stats.hits.reduce((acc, hit) => acc + hit.kill_count, 0);
-                        return [username, { ...stats, totalKills }];
-                    });
-
-                    // Sort by total kills in descending order
-                    combinedKills.sort((a, b) => b[1].totalKills - a[1].totalKills);
-                    const { buffer: killBuffer, filePath: killPath } = await generateLeaderboardChart(combinedKills.slice(0, 10), 'kill_count', 'total-kills-chart.png');
-                    extKillPath = killPath
-                    attachmentMap = {
-                        0: new AttachmentBuilder(killBuffer, { name: 'total-kills-chart.png' })
-                    };
-                    embeds = createCombinedLeaderboardEmbeds(combinedKills, patch);
+                    embeds = createCombinedLeaderboardEmbeds(sortedByKills, sortedByValue, patch);
                 }
             }
             if(individualData !== null) {
@@ -171,9 +220,10 @@ module.exports = {
                 // Only one page — no need for buttons
                 // return interaction.reply({ embeds: [embeds[0]], ephemeral: false });
                 await interaction.reply({ 
-                    embeds: [embeds[0]], 
+                    embeds: [embeds[0].setImage(`attachment://${attachmentMap[0].name}`)], // Link the attachment to the embed
                     files: attachmentMap[0] ? [attachmentMap[0]] : [], 
-                    fetchReply: true });
+                    fetchReply: true 
+                });
                 [extKillPath].forEach(path =>
                     fs.unlink(path, err => {
                         if (err) console.error(`Failed to delete ${path}:`, err);
@@ -199,13 +249,13 @@ module.exports = {
             // Send the first embed with navigation buttons
             let currentPage = 0;
             const message = await interaction.reply({ 
-                embeds: [embeds[currentPage]], 
+                embeds: [embeds[currentPage].setImage(`attachment://${attachmentMap[currentPage].name}`)], // Link the attachment to the embed
                 components: [buttons], 
-                files: attachmentMap[currentPage] ? [attachmentMap[currentPage]] : [], 
+                files: [attachmentMap[currentPage]], 
                 fetchReply: true });
             
-
-            [extKillPath, extValuePath].forEach(path =>
+            const killPaths = [extKillPath, extValuePath, extPathThree, extPathFour, extPathFive, extPathSix].filter(path => path && path.length > 0);
+            killPaths.forEach(path =>
                 fs.unlink(path, err => {
                     if (err) console.error(`Failed to delete ${path}:`, err);
                 })
@@ -227,7 +277,7 @@ module.exports = {
                 buttons.components[1].setDisabled(currentPage === embeds.length - 1);
 
                 await i.update({ 
-                    embeds: [embeds[currentPage]], 
+                    embeds: [embeds[currentPage].setImage(`attachment://${attachmentMap[currentPage].name}`)], // Link the attachment to the embed
                     components: [buttons], 
                     files: attachmentMap[currentPage] ? [attachmentMap[currentPage]] : [] 
                 });
@@ -460,17 +510,16 @@ async function generateCombinedLeaderboardData(blackBoxLogs) {
 }
 
 // Helper function to create leaderboard embeds
-function createShipLeaderboardEmbeds(sortedByKills, sortedByValue, patch) {
+function createShipLeaderboardEmbeds(sortedByKills, sortedByValue, sortedByAcKills, sortedByAcValue, sortedByPuKills, sortedByPuValue, patch) {
     try{
         const embeds = [];
-
         // Top players by kill count
         const killsEmbed = new EmbedBuilder()
             .setThumbnail('https://i.imgur.com/UoZsrrM.png')
-            .setAuthor({ name: `Top Players by Total Kills`, iconURL: 'https://i.imgur.com/vRqPoqk.png' })
+            .setAuthor({ name: `Total Ship Kills`, iconURL: 'https://i.imgur.com/vRqPoqk.png' })
             .setTitle(`Patch ${patch}`)
             .setImage('attachment://total-kills-chart.png')
-            .setDescription(`\`\`\`\nIronPoint Total Kills: ${sortedByKills.reduce((acc, [_, stats]) => acc + stats.kill_count, 0)}\`\`\`\n`)
+            .setDescription(`\`\`\`\nIronPoint Ship Kills: ${sortedByKills.reduce((acc, [_, stats]) => acc + stats.kill_count, 0)}\`\`\`\n`)
             .setColor('#7199de');
         sortedByKills.forEach(([username, stats], index) => {
             killsEmbed.addFields({
@@ -484,10 +533,10 @@ function createShipLeaderboardEmbeds(sortedByKills, sortedByValue, patch) {
         // Top players by value
         const valueEmbed = new EmbedBuilder()
             .setThumbnail('https://i.imgur.com/UoZsrrM.png')
-            .setAuthor({ name: `Top Players by Damage Done`, iconURL: 'https://i.imgur.com/vRqPoqk.png' })
+            .setAuthor({ name: `Total Ship Damage Done`, iconURL: 'https://i.imgur.com/vRqPoqk.png' })
             .setTitle(`Patch ${patch}`)
             .setImage('attachment://total-value-chart.png')
-            .setDescription(`\`\`\`\nIronPoint Total Damage Cost: ${formatToCurrency(sortedByValue.reduce((acc, [_, stats]) => acc + stats.value, 0))}\`\`\`\n`)
+            .setDescription(`\`\`\`\nIronPoint Ship Damage: ${formatToCurrency(sortedByValue.reduce((acc, [_, stats]) => acc + stats.value, 0))}\`\`\`\n`)
             .setColor('#7199de');
         sortedByValue.forEach(([username, stats], index) => {
             valueEmbed.addFields({
@@ -497,6 +546,74 @@ function createShipLeaderboardEmbeds(sortedByKills, sortedByValue, patch) {
             });
         });
         embeds.push(valueEmbed);
+
+        // Top AC kills
+        const acKillsEmbed = new EmbedBuilder()
+            .setThumbnail('https://i.imgur.com/UoZsrrM.png')
+            .setAuthor({ name: `AC Ship Kills`, iconURL: 'https://i.imgur.com/vRqPoqk.png' })
+            .setTitle(`Patch ${patch}`)
+            .setImage('attachment://ac-total-kills-chart.png')
+            .setDescription(`\`\`\`\nAC Ship Kills: ${sortedByAcKills.reduce((acc, [_, stats]) => acc + stats.kill_count, 0)}\`\`\`\n`)
+            .setColor('#7199de');
+        sortedByAcKills.forEach(([username, stats], index) => {
+            acKillsEmbed.addFields({
+                name: `${index + 1}. ${username}`,
+                value: `**Kill Count:** ${stats.kill_count}`,
+                inline: false
+            });
+        });
+        embeds.push(acKillsEmbed);
+
+        // Top AC value
+        const acValueEmbed = new EmbedBuilder()
+            .setThumbnail('https://i.imgur.com/UoZsrrM.png')
+            .setAuthor({ name: `AC Ship Damage Done`, iconURL: 'https://i.imgur.com/vRqPoqk.png' })
+            .setTitle(`Patch ${patch}`)
+            .setImage('attachment://ac-total-value-chart.png')
+            .setDescription(`\`\`\`\nAC Ship Damage: ${formatToCurrency(sortedByAcValue.reduce((acc, [_, stats]) => acc + stats.value, 0))}\`\`\`\n`)
+            .setColor('#7199de');
+        sortedByAcValue.forEach(([username, stats], index) => {
+            acValueEmbed.addFields({
+                name: `${index + 1}. ${username}`,
+                value: `**Damages Cost:** ${formatToCurrency(stats.value)}`,
+                inline: false
+            });
+        });
+        embeds.push(acValueEmbed);
+
+        // Top PU kills
+        const puKillsEmbed = new EmbedBuilder()
+            .setThumbnail('https://i.imgur.com/UoZsrrM.png')
+            .setAuthor({ name: `PU Ship Kills`, iconURL: 'https://i.imgur.com/vRqPoqk.png' })
+            .setTitle(`Patch ${patch}`)
+            .setImage('attachment://pu-total-kills-chart.png')
+            .setDescription(`\`\`\`\nPU Ship Kills: ${sortedByPuKills.reduce((acc, [_, stats]) => acc + stats.kill_count, 0)}\`\`\`\n`)
+            .setColor('#7199de');
+        sortedByPuKills.forEach(([username, stats], index) => {
+            puKillsEmbed.addFields({
+                name: `${index + 1}. ${username}`,
+                value: `**Kill Count:** ${stats.kill_count}`,
+                inline: false
+            });
+        });
+        embeds.push(puKillsEmbed);
+
+        // Top PU value
+        const puValueEmbed = new EmbedBuilder()
+            .setThumbnail('https://i.imgur.com/UoZsrrM.png')
+            .setAuthor({ name: `PU Ship Damage Done`, iconURL: 'https://i.imgur.com/vRqPoqk.png' })
+            .setTitle(`Patch ${patch}`)
+            .setImage('attachment://pu-total-value-chart.png')
+            .setDescription(`\`\`\`\nPU Ship Damage: ${formatToCurrency(sortedByPuValue.reduce((acc, [_, stats]) => acc + stats.value, 0))}\`\`\`\n`)
+            .setColor('#7199de');
+        sortedByPuValue.forEach(([username, stats], index) => {
+            puValueEmbed.addFields({
+                name: `${index + 1}. ${username}`,
+                value: `**Damages Cost:** ${formatToCurrency(stats.value)}`,
+                inline: false
+            });
+        });
+        embeds.push(puValueEmbed);
         return embeds;
     }catch(error){
         console.error('Error creating leaderboard embeds:', error);
@@ -505,28 +622,66 @@ function createShipLeaderboardEmbeds(sortedByKills, sortedByValue, patch) {
 }
 
 // Helper function to create FPS leaderboard embeds
-function createFpsLeaderboardEmbeds(sortedByKills, patch) {
+function createFpsLeaderboardEmbeds(puSortedByKills, acSortedByKills, comSortedByKills, patch) {
     try {
         const embeds = [];
 
         // Top players by kill count
-        const killsEmbed = new EmbedBuilder()
+        const combKillsEmbed = new EmbedBuilder()
             .setThumbnail('https://i.imgur.com/UoZsrrM.png')
-            .setAuthor({ name: `Top Players by FPS Kills`, iconURL: 'https://i.imgur.com/vRqPoqk.png' })
+            .setAuthor({ name: `Total FPS Kills`, iconURL: 'https://i.imgur.com/vRqPoqk.png' })
             .setTitle(`Patch ${patch}`)
-            .setImage('attachment://total-kills-chart.png')
-            .setDescription(`\`\`\`\nIronPoint Total FPS Kills: ${sortedByKills.reduce((acc, [_, stats]) => acc + stats.kill_count, 0)}\`\`\`\n`)
+            .setImage('attachment://total-comb-kills-chart.png')
+            .setDescription(`\`\`\`\nTotal FPS Kills: ${comSortedByKills.reduce((acc, [_, stats]) => acc + stats.kill_count, 0)}\`\`\`\n`)
+            .setColor('#7199de');
+    
+        comSortedByKills.forEach(([username, stats], index) => {
+            combKillsEmbed.addFields({
+                name: `${index + 1}. ${username}`,
+                value: `**Kill Count:** ${stats.kill_count}`,
+                inline: false
+            });
+        });
+    
+        embeds.push(combKillsEmbed);
+
+        // Top players by kill count
+        const puKillsEmbed = new EmbedBuilder()
+            .setThumbnail('https://i.imgur.com/UoZsrrM.png')
+            .setAuthor({ name: `PU FPS Kills`, iconURL: 'https://i.imgur.com/vRqPoqk.png' })
+            .setTitle(`Patch ${patch}`)
+            .setImage('attachment://total-pu-kills-chart.png')
+            .setDescription(`\`\`\`\nIronPoint PU FPS Kills: ${puSortedByKills.reduce((acc, [_, stats]) => acc + stats.kill_count, 0)}\`\`\`\n`)
             .setColor('#7199de');
 
-        sortedByKills.forEach(([username, stats], index) => {
-            killsEmbed.addFields({
+        puSortedByKills.forEach(([username, stats], index) => {
+            puKillsEmbed.addFields({
                 name: `${index + 1}. ${username}`,
                 value: `**Kill Count:** ${stats.kill_count}`,
                 inline: false
             });
         });
 
-        embeds.push(killsEmbed);
+        embeds.push(puKillsEmbed);
+
+        // Top players by kill count
+        const acKillsEmbed = new EmbedBuilder()
+            .setThumbnail('https://i.imgur.com/UoZsrrM.png')
+            .setAuthor({ name: `AC FPS Kills`, iconURL: 'https://i.imgur.com/vRqPoqk.png' })
+            .setTitle(`Patch ${patch}`)
+            .setImage('attachment://total-ac-kills-chart.png')
+            .setDescription(`\`\`\`\nIronPoint AC FPS Kills: ${acSortedByKills.reduce((acc, [_, stats]) => acc + stats.kill_count, 0)}\`\`\`\n`)
+            .setColor('#7199de');
+
+        acSortedByKills.forEach(([username, stats], index) => {
+            acKillsEmbed.addFields({
+                name: `${index + 1}. ${username}`,
+                value: `**Kill Count:** ${stats.kill_count}`,
+                inline: false
+            });
+        });
+
+        embeds.push(acKillsEmbed);
 
         return embeds;
     } catch (error) {
@@ -536,20 +691,20 @@ function createFpsLeaderboardEmbeds(sortedByKills, patch) {
 }
 
 // Helper function to create Combined leaderboard embeds
-function createCombinedLeaderboardEmbeds(combinedKills, patch) {
+function createCombinedLeaderboardEmbeds(sortedByKills, sortedByValue, patch) {
     try {
         const embeds = [];
-
+        console.log(sortedByKills)
         // Top players by combined kills
         const combinedKillsEmbed = new EmbedBuilder()
             .setThumbnail('https://i.imgur.com/UoZsrrM.png')
             .setAuthor({ name: `Top Players by Combined Kills`, iconURL: 'https://i.imgur.com/vRqPoqk.png' })
             .setTitle(`Patch ${patch}`)
             .setImage('attachment://total-kills-chart.png')
-            .setDescription(`\`\`\`\nIronPoint Total Combined Kills: ${combinedKills.reduce((acc, [_, stats]) => acc + stats.totalKills, 0)}\`\`\`\n`)
+            .setDescription(`\`\`\`\nIronPoint Total Combined Kills: ${sortedByKills.reduce((acc, [_, stats]) => acc + stats.kill_count, 0)}\`\`\`\n`)
             .setColor('#7199de');
 
-        combinedKills.forEach(([username, stats], index) => {
+        sortedByKills.forEach(([username, stats], index) => {
             combinedKillsEmbed.addFields({
                 name: `${index + 1}. ${username}: ${stats.totalKills} kills.`,
                 value: `**FPS Kills:** ${stats.hits.filter(hit => hit.type === 'FPS').reduce((acc, hit) => acc + hit.kill_count, 0)} // **Ship Kills:** ${stats.hits.filter(hit => hit.type === 'Ship').reduce((acc, hit) => acc + hit.kill_count, 0)}`,
@@ -558,6 +713,23 @@ function createCombinedLeaderboardEmbeds(combinedKills, patch) {
         });
 
         embeds.push(combinedKillsEmbed);
+
+         // Top players by value
+        const valueEmbed = new EmbedBuilder()
+            .setThumbnail('https://i.imgur.com/UoZsrrM.png')
+            .setAuthor({ name: `Total Ship Damage Done`, iconURL: 'https://i.imgur.com/vRqPoqk.png' })
+            .setTitle(`Patch ${patch}`)
+            .setImage('attachment://total-value-chart.png')
+            .setDescription(`\`\`\`\nIronPoint Ship Damage: ${formatToCurrency(sortedByValue.reduce((acc, [_, stats]) => acc + stats.value, 0))}\`\`\`\n`)
+            .setColor('#7199de');
+        sortedByValue.forEach(([username, stats], index) => {
+            valueEmbed.addFields({
+                name: `${index + 1}. ${username}`,
+                value: `**Damages Cost:** ${formatToCurrency(stats.value)}`,
+                inline: false
+            });
+        });
+        embeds.push(valueEmbed);
 
         return embeds;
     } catch (error) {
