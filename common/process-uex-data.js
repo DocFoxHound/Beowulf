@@ -144,17 +144,31 @@ async function sendToDb(title, data) {
                                 price_sell_avg: d.price_sell,
                             };
                             if (d.price_buy === 0 && d.price_sell === 0) {
-                                console.log("Price buy and sell are 0");
                                 let sumItems = 0;
                                 let sumPrice = 0;
+                                let averageSoFar = 0;
+                                let averageLow = 0;
+                                let averageHigh = 0;
                                 marketplaceArray.forEach((item) => {
                                     if (item.title.toLowerCase().includes(d.name.toLowerCase()) || item.description.toLowerCase().includes(d.name.toLowerCase())) {
                                         console.log("Match:", item.title, d.name);
                                         console.log("Price:", item.price);
-                                        sumItems++;
-                                        sumPrice += item.price;
+                                        averageSoFar = sumPrice / sumItems;
+                                        averageLow = 0.1 * averageSoFar;
+                                        averageHigh = 5 * averageSoFar;
+                                        if(sumItems === 0){
+                                            sumItems++;
+                                            sumPrice += item.price;
+                                        }
+                                        if (item.price > averageLow && item.price < averageHigh) {
+                                            sumItems++;
+                                            sumPrice += item.price;
+                                        }
                                     }
                                 });
+                                console.log("Sum Items:", sumItems);
+                                console.log("Sum Price:", sumPrice);
+
                                 const avgPrice = sumPrice / sumItems;
                                 summaryCommodity.price_buy_avg = avgPrice;
                                 summaryCommodity.price_sell_avg = avgPrice;
