@@ -200,11 +200,20 @@ module.exports = {
             if(user) {
                 if(type === "fps"){
                     const combinedLeaderboardData = { ...acLeaderBoardData, ...puLeaderBoardData };
+
                     embeds = createIndividualFpsEmbeds(acLeaderBoardData, puLeaderBoardData, combinedLeaderboardData, patch, user);
                 }else if(type === "ships"){
                     embeds = createIndividualShipEmbeds(acLeaderBoardData, puLeaderBoardData, patch, user);
                 }else{
-                    embeds = createIndividualCombinedEmbeds(individualData, patch, user);
+                    const combinedLeaderboardData = { ...acLeaderBoardData, ...puLeaderBoardData };
+                    // console.log(combinedLeaderboardData[user.username].hits);
+                    // const { buffer: killBuffer, filePath: killPath } = await generateLeaderboardChart(combinedLeaderboardData, 'kill_count', 'total-kills-chart.png');
+                    // extKillPath = killPath
+                    // attachmentMap = {
+                    //     0: new AttachmentBuilder(killBuffer, { name: 'total-kills-chart.png' }),
+                    //     1: new AttachmentBuilder(valueBuffer, { name: 'total-value-chart.png' })
+                    // };
+                    embeds = createIndividualCombinedEmbeds(combinedLeaderboardData, patch, user);
                 }
                 
             }
@@ -920,6 +929,10 @@ function createIndividualCombinedEmbeds(individualData, patch, user) {
             .filter(hit => hit.type === 'Ship')
             .reduce((acc, hit) => acc + hit.kill_count, 0);
 
+        const totalShipValue = individualData[user.username].hits
+            .filter(hit => hit.type === 'Ship')
+            .reduce((acc, hit) => acc + hit.value, 0);
+
         // Prepare the fields for the hits list, sorted by log.id in descending order
         const hitsFields = [];
         individualData[user.username].hits
@@ -929,8 +942,8 @@ function createIndividualCombinedEmbeds(individualData, patch, user) {
                 const killOrKills = hit.kill_count === 1 ? 'Kill' : 'Kills';
 
                 hitsFields.push({
-                    name: `Log ID: ${hit.id || 'Unknown'}`.slice(0, 256),
-                    value: `**Type:** ${hit.type}\n**Victims:** ${victims}\n**${killOrKills}:** ${hit.kill_count}\n**Patch:** ${hit.patch || 'Unknown'}`.slice(0, 1024),
+                    name: `**${victims}**`.slice(0, 256),
+                    value: `Log ID: ${hit.id || 'Unknown'}\n**Type:** ${hit.type}\n`.slice(0, 1024),
                     inline: false
                 });
             });
@@ -942,7 +955,7 @@ function createIndividualCombinedEmbeds(individualData, patch, user) {
             .setTitle(`Patch ${patch}`)
             .setImage('https://i.imgur.com/HhnpGnN.png')
             .setColor('#7199de')
-            .setDescription(`\`\`\`\nTotal FPS Kills: ${totalFpsKills}\nTotal Ship Kills: ${totalShipKills}\`\`\`\n`);
+            .setDescription(`\`\`\`\nTotal FPS Kills: ${totalFpsKills}\nTotal Ship Kills: ${totalShipKills}\nTotal Ship Damages: ${formatToCurrency(totalShipValue)}\`\`\`\n`);
 
         embeds.push(totalsEmbed);
 

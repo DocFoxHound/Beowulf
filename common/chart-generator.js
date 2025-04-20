@@ -71,4 +71,36 @@ async function generateLeaderboardChart(data, valuesKey, filename) {
     return { buffer: imageBuffer, filePath };
 }
 
+async function generateIndividualChart(data, valuesKey, filename) {
+    const labels = data.map(([username]) => username);
+    const values = data.map(([_, stats]) => stats[valuesKey] || 0);
+
+    const config = {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                label: filename,
+                data: values,
+                backgroundColor: '#ffffff'
+            }]
+        },
+        options: {
+            responsive: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                x: { ticks: { color: 'white' } },
+                y: { ticks: { color: 'white' } }
+            }
+        }
+    };
+
+    const imageBuffer = await chartJSNodeCanvas.renderToBuffer(config);
+    const filePath = path.join(__dirname, filename);
+    fs.writeFileSync(filePath, imageBuffer);
+    return { buffer: imageBuffer, filePath };
+}
+
 module.exports = { generateSingleLeaderboardChart, generateLeaderboardChart };
