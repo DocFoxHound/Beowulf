@@ -4,6 +4,7 @@ const { getAllGameVersions } = require('../../api/gameVersionApi');
 const { getUserById, getUsers } = require('../../api/userlistApi');
 const { generateLeaderboardChart } = require('../../common/chart-generator');
 const fs = require('fs');
+const { combine } = require('openai/internal/qs/utils.mjs');
 
 const command = new SlashCommandBuilder()
     .setName('kill-leaderboard')
@@ -136,6 +137,9 @@ module.exports = {
             if(!user) {
                 if(type === "fps"){
                     const combinedLeaderboardData = { ...acLeaderBoardData, ...puLeaderBoardData };
+                    if(!combinedLeaderboardData){
+                        return interaction.reply({ content: 'No Kill logs found for the given criteria.', ephemeral: true });
+                    }
                     const acSortedByKills = Object.entries(acLeaderBoardData).sort((a, b) => b[1].kill_count - a[1].kill_count).slice(0, 10);
                     const puSortedByKills = Object.entries(puLeaderBoardData).sort((a, b) => b[1].kill_count - a[1].kill_count).slice(0, 10);
                     const comSortedByKills = Object.entries(combinedLeaderboardData).sort((a, b) => b[1].kill_count - a[1].kill_count).slice(0, 10);
@@ -154,6 +158,9 @@ module.exports = {
                 }
                 if(type === "ships"){
                     const combinedLeaderboardData = { ...acLeaderBoardData, ...puLeaderBoardData };
+                    if(!combinedLeaderboardData){
+                        return interaction.reply({ content: 'No Kill logs found for the given criteria.', ephemeral: true });
+                    }
                     const sortedByKills = Object.entries(combinedLeaderboardData).sort((a, b) => b[1].kill_count - a[1].kill_count).slice(0, 10);
                     const sortedByValue = Object.entries(combinedLeaderboardData).sort((a, b) => b[1].value - a[1].value).slice(0, 10);
                     const sortedByAcKills = Object.entries(acLeaderBoardData).sort((a, b) => b[1].kill_count - a[1].kill_count).slice(0, 10);
@@ -183,7 +190,10 @@ module.exports = {
                     embeds = createShipLeaderboardEmbeds(sortedByKills, sortedByValue, sortedByAcKills, sortedByAcValue, sortedByPuKills, sortedByPuValue, patch);
                 }
                 if (type === "overall") {
-                    const combinedLeaderboardData = { ...acLeaderBoardData, ...puLeaderBoardData };
+                    const combinedLeaderboardData = {...acLeaderBoardData, ...puLeaderBoardData};
+                    if(!combinedLeaderboardData){
+                        return interaction.reply({ content: 'No Kill logs found for the given criteria.', ephemeral: true });
+                    }
                     const sortedByKills = Object.entries(combinedLeaderboardData).sort((a, b) => b[1].kill_count - a[1].kill_count).slice(0, 10);
                     const sortedByValue = Object.entries(combinedLeaderboardData).sort((a, b) => b[1].value - a[1].value).slice(0, 10);
                     const { buffer: killBuffer, filePath: killPath } = await generateLeaderboardChart(sortedByKills.slice(0, 10), 'kill_count', 'total-kills-chart.png');
@@ -199,20 +209,22 @@ module.exports = {
             }
             if(user) {
                 if(type === "fps"){
-                    const combinedLeaderboardData = { ...acLeaderBoardData, ...puLeaderBoardData };
-
-                    embeds = createIndividualFpsEmbeds(acLeaderBoardData, puLeaderBoardData, combinedLeaderboardData, patch, user);
+                    const combinedLeaderboardData = mergeTwoDataArrays(acLeaderBoardData, puLeaderBoardData);
+                    if(!combinedLeaderboardData){
+                        return interaction.reply({ content: 'No Kill logs found for the given criteria.', ephemeral: true });
+                    }
+                    embeds = createIndividualFpsEmbeds(combinedLeaderboardData, patch, user);
                 }else if(type === "ships"){
-                    embeds = createIndividualShipEmbeds(acLeaderBoardData, puLeaderBoardData, patch, user);
+                    const combinedLeaderboardData = mergeTwoDataArrays(acLeaderBoardData, puLeaderBoardData);
+                    if(!combinedLeaderboardData){
+                        return interaction.reply({ content: 'No Kill logs found for the given criteria.', ephemeral: true });
+                    }
+                    embeds = createIndividualShipEmbeds(acLeaderBoardData, puLeaderBoardData, combinedLeaderboardData, patch, user);
                 }else{
-                    const combinedLeaderboardData = { ...acLeaderBoardData, ...puLeaderBoardData };
-                    // console.log(combinedLeaderboardData[user.username].hits);
-                    // const { buffer: killBuffer, filePath: killPath } = await generateLeaderboardChart(combinedLeaderboardData, 'kill_count', 'total-kills-chart.png');
-                    // extKillPath = killPath
-                    // attachmentMap = {
-                    //     0: new AttachmentBuilder(killBuffer, { name: 'total-kills-chart.png' }),
-                    //     1: new AttachmentBuilder(valueBuffer, { name: 'total-value-chart.png' })
-                    // };
+                    const combinedLeaderboardData = mergeTwoDataArrays(acLeaderBoardData, puLeaderBoardData);
+                    if(!combinedLeaderboardData){
+                        return interaction.reply({ content: 'No Kill logs found for the given criteria.', ephemeral: true });
+                    }
                     embeds = createIndividualCombinedEmbeds(combinedLeaderboardData, patch, user);
                 }
                 
@@ -363,6 +375,7 @@ async function generateIndividualFpsData(blackBoxLogs, user) {
                 ship_killed: log.ship_killed,
                 victims: log.victims,
                 patch: log.patch,
+                game_mode: log.game_mode
             });
         }
         return leaderboard;
@@ -400,6 +413,7 @@ async function generateIndividualShipData(blackBoxLogs, user) {
                 value: log.value,
                 victims: log.victims,
                 patch: log.patch,
+                game_mode: log.game_mode
             });
         }
         return leaderboard;
@@ -437,7 +451,8 @@ async function generateIndividualCombinedData(blackBoxLogs, user) {
                 value: log.value,
                 victims: log.victims,
                 patch: log.patch,
-                type: killType
+                type: killType,
+                game_mode: log.game_mode
             });
         }
         return leaderboard;
@@ -517,7 +532,8 @@ async function generateCombinedLeaderboardData(blackBoxLogs, allUsers) {
                 value: log.value,
                 victims: log.victims,
                 patch: log.patch,
-                type: killType
+                type: killType,
+                game_mode: log.game_mode
             });
         }
         return leaderboard;
@@ -756,35 +772,21 @@ function createCombinedLeaderboardEmbeds(sortedByKills, sortedByValue, patch) {
 }
 
 // Helper function to create individual stat sheet embeds
-function createIndividualShipEmbeds(acLeaderBoardData, puLeaderBoardData, patch, user) {
+function createIndividualShipEmbeds(acLeaderBoardData, puLeaderBoardData, combinedLeaderboardData, patch, user) {
     try {
         const embeds = [];
         const fieldsPerPage = 25; // Discord's limit for fields per embed
-        let combinedLeaderboardData = {};
-
-        const keys = new Set([
-        ...Object.keys(acLeaderBoardData),
-        ...Object.keys(puLeaderBoardData)
-        ]);
-
-        for (const key of keys) {
-        const acData = acLeaderBoardData[key] || { kill_count: 0, value: 0, victims: [], hits: [] };
-        const puData = puLeaderBoardData[key] || { kill_count: 0, value: 0, victims: [], hits: [] };
-
-        combinedLeaderboardData[key] = {
-            kill_count: acData.kill_count + puData.kill_count,
-            value: acData.value + puData.value,
-            victims: [...acData.victims, ...puData.victims],
-            hits: [...acData.hits, ...puData.hits]
-        };
-        }
 
         // Calculate total kills and total value
-        const totalAcKills = acLeaderBoardData[user.username].kill_count || 0;
-        const totalPuKills = puLeaderBoardData[user.username].kill_count || 0;
+        const totalAcKills = combinedLeaderboardData[user.username].hits.filter(hit => hit.game_mode === 'AC').reduce((acc, hit) => acc + hit.kill_count, 0);
+        const totalPuKills = combinedLeaderboardData[user.username].hits.filter(hit => hit.game_mode === 'PU').reduce((acc, hit) => acc + hit.kill_count, 0);
+        // const totalAcKills = acLeaderBoardData[user.username].kill_count || 0;
+        // const totalPuKills = puLeaderBoardData[user.username].kill_count || 0;
         const totalKills = totalAcKills + totalPuKills;
-        const totalAcValue = formatToCurrency(acLeaderBoardData[user.username].value || 0);
-        const totalPuValue = formatToCurrency(puLeaderBoardData[user.username].value || 0);
+        const totalAcValue = formatToCurrency(combinedLeaderboardData[user.username].hits.filter(hit => hit.game_mode === 'AC').reduce((acc, hit) => acc + hit.value, 0));
+        const totalPuValue = formatToCurrency(combinedLeaderboardData[user.username].hits.filter(hit => hit.game_mode === 'PU').reduce((acc, hit) => acc + hit.value, 0));
+        // const totalAcValue = formatToCurrency(acLeaderBoardData[user.username].value || 0);
+        // const totalPuValue = formatToCurrency(puLeaderBoardData[user.username].value || 0);
         const ac = parseFloat(totalAcValue.replace(/[$,]/g, ''));
         const pu = parseFloat(totalPuValue.replace(/[$,]/g, ''));
         const tempTotalValue = ac + pu;
@@ -866,15 +868,15 @@ function createIndividualShipEmbeds(acLeaderBoardData, puLeaderBoardData, patch,
     }
 }
 
-function createIndividualFpsEmbeds(acLeaderBoardData, puLeaderBoardData, combinedLeaderboardData, patch, user) {
+function createIndividualFpsEmbeds(combinedLeaderboardData, patch, user) {
     try {
         const embeds = [];
         const fieldsPerPage = 25; // Discord's limit for fields per embed
 
         // Calculate total kills
         const totalKills = combinedLeaderboardData[user.username].kill_count || 0;
-        const totalAcKills = acLeaderBoardData[user.username].kill_count || 0;
-        const totalPuKills = puLeaderBoardData[user.username].kill_count || 0;
+        const totalAcKills = combinedLeaderboardData[user.username].hits.filter(hit => hit.game_mode === 'AC').reduce((acc, hit) => acc + hit.kill_count, 0);
+        const totalPuKills = combinedLeaderboardData[user.username].hits.filter(hit => hit.game_mode === 'PU').reduce((acc, hit) => acc + hit.kill_count, 0);
 
         // Prepare the fields for the hits list
         const hitsFields = [];
@@ -980,6 +982,27 @@ function createIndividualCombinedEmbeds(individualData, patch, user) {
         console.error('Error creating individual combined embeds:', error);
         return null; // Return null if there's an error
     }
+}
+
+function mergeTwoDataArrays(array1, array2){
+    let combinedArray = {};
+    // Merge the keys from both objects
+    const keys = new Set([
+        ...Object.keys(array1),
+        ...Object.keys(array2)
+    ]);
+
+    for (const key of keys) {
+        const datasetOne = array1[key] || { kill_count: 0, victims: [], hits: [] };
+        const datasetTwo = array2[key] || { kill_count: 0, victims: [], hits: [] };
+
+        combinedArray[key] = {
+            kill_count: datasetOne.kill_count + datasetTwo.kill_count, // Combine kill counts
+            victims: [...datasetOne.victims, ...datasetTwo.victims], // Merge victims arrays
+            hits: [...datasetOne.hits, ...datasetTwo.hits] // Merge hits arrays
+        };
+    }
+    return combinedArray;
 }
 
 function formatToCurrency(value){
