@@ -136,9 +136,9 @@ module.exports = {
             if(!user) {
                 if(type === "fps"){
                     const combinedLeaderboardData = { ...acLeaderBoardData, ...puLeaderBoardData };
-                    const acSortedByKills = Object.entries(acLeaderBoardData).sort((a, b) => b[1].kill_count - a[1].kill_count);
-                    const puSortedByKills = Object.entries(puLeaderBoardData).sort((a, b) => b[1].kill_count - a[1].kill_count);
-                    const comSortedByKills = Object.entries(combinedLeaderboardData).sort((a, b) => b[1].kill_count - a[1].kill_count);
+                    const acSortedByKills = Object.entries(acLeaderBoardData).sort((a, b) => b[1].kill_count - a[1].kill_count).slice(0, 10);
+                    const puSortedByKills = Object.entries(puLeaderBoardData).sort((a, b) => b[1].kill_count - a[1].kill_count).slice(0, 10);
+                    const comSortedByKills = Object.entries(combinedLeaderboardData).sort((a, b) => b[1].kill_count - a[1].kill_count).slice(0, 10);
                     const { buffer: acKillBuffer, filePath: acKillPath } = await generateLeaderboardChart(acSortedByKills.slice(0, 10), 'kill_count', 'total-ac-kills-chart.png');
                     const { buffer: puKillBuffer, filePath: puKillPath } = await generateLeaderboardChart(puSortedByKills.slice(0, 10), 'kill_count', 'total-pu-kills-chart.png');
                     const { buffer: comKillBuffer, filePath: comKillPath } = await generateLeaderboardChart(comSortedByKills.slice(0, 10), 'kill_count', 'total-comb-kills-chart.png');
@@ -154,12 +154,12 @@ module.exports = {
                 }
                 if(type === "ships"){
                     const combinedLeaderboardData = { ...acLeaderBoardData, ...puLeaderBoardData };
-                    const sortedByKills = Object.entries(combinedLeaderboardData).sort((a, b) => b[1].kill_count - a[1].kill_count);
-                    const sortedByValue = Object.entries(combinedLeaderboardData).sort((a, b) => b[1].value - a[1].value);
-                    const sortedByAcKills = Object.entries(acLeaderBoardData).sort((a, b) => b[1].kill_count - a[1].kill_count);
-                    const sortedByAcValue = Object.entries(acLeaderBoardData).sort((a, b) => b[1].value - a[1].value);
-                    const sortedByPuKills = Object.entries(puLeaderBoardData).sort((a, b) => b[1].kill_count - a[1].kill_count);
-                    const sortedByPuValue = Object.entries(puLeaderBoardData).sort((a, b) => b[1].value - a[1].value);
+                    const sortedByKills = Object.entries(combinedLeaderboardData).sort((a, b) => b[1].kill_count - a[1].kill_count).slice(0, 10);
+                    const sortedByValue = Object.entries(combinedLeaderboardData).sort((a, b) => b[1].value - a[1].value).slice(0, 10);
+                    const sortedByAcKills = Object.entries(acLeaderBoardData).sort((a, b) => b[1].kill_count - a[1].kill_count).slice(0, 10);
+                    const sortedByAcValue = Object.entries(acLeaderBoardData).sort((a, b) => b[1].value - a[1].value).slice(0, 10);
+                    const sortedByPuKills = Object.entries(puLeaderBoardData).sort((a, b) => b[1].kill_count - a[1].kill_count).slice(0, 10);
+                    const sortedByPuValue = Object.entries(puLeaderBoardData).sort((a, b) => b[1].value - a[1].value).slice(0, 10);
                     const { buffer: killBuffer, filePath: killPath } = await generateLeaderboardChart(sortedByKills.slice(0, 10), 'kill_count', 'total-kills-chart.png');
                     const { buffer: valueBuffer, filePath: valuePath } = await generateLeaderboardChart(sortedByValue.slice(0, 10), 'value', 'total-value-chart.png');
                     const { buffer: acKillBuffer, filePath: acKillPath } = await generateLeaderboardChart(sortedByAcKills.slice(0, 10), 'kill_count', 'ac-total-kills-chart.png');
@@ -184,8 +184,8 @@ module.exports = {
                 }
                 if (type === "overall") {
                     const combinedLeaderboardData = { ...acLeaderBoardData, ...puLeaderBoardData };
-                    const sortedByKills = Object.entries(combinedLeaderboardData).sort((a, b) => b[1].kill_count - a[1].kill_count);
-                    const sortedByValue = Object.entries(combinedLeaderboardData).sort((a, b) => b[1].value - a[1].value);
+                    const sortedByKills = Object.entries(combinedLeaderboardData).sort((a, b) => b[1].kill_count - a[1].kill_count).slice(0, 10);
+                    const sortedByValue = Object.entries(combinedLeaderboardData).sort((a, b) => b[1].value - a[1].value).slice(0, 10);
                     const { buffer: killBuffer, filePath: killPath } = await generateLeaderboardChart(sortedByKills.slice(0, 10), 'kill_count', 'total-kills-chart.png');
                     const { buffer: valueBuffer, filePath: valuePath } = await generateLeaderboardChart(sortedByValue.slice(0, 10), 'value', 'total-value-chart.png');
                     extKillPath = killPath

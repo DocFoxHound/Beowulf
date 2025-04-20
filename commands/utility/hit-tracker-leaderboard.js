@@ -36,13 +36,13 @@ module.exports = {
                 topPirateActs = await generateTopPirateActs(hitLogs, allUsers);
             }else{ //'ALL' selected
                 hitLogs = await getAllHitLogs()
-                topTotalValue = await generateTotalValueLeaderboard(hitLogs);
-                topStolenCargo = await generateTopStolenLeaderboard(hitLogs);
-                topPirateActs = await generateTopPirateActs(hitLogs);
+                topTotalValue = await generateTotalValueLeaderboard(hitLogs, allUsers);
+                topStolenCargo = await generateTopStolenLeaderboard(hitLogs, allUsers);
+                topPirateActs = await generateTopPirateActs(hitLogs, allUsers);
             }
-            const sortedByTopTotalValue = structuredClone(Object.entries(topTotalValue).sort((a, b) => b[1].total_cut_value - a[1].total_cut_value));
-            const sortedByTopStolenCargo = structuredClone(Object.entries(topStolenCargo).sort((a, b) => b[1].total_scu - a[1].total_scu));
-            const sortedByTopPiracyActs = structuredClone(Object.entries(topPirateActs).sort((a, b) => b[1].total_hits - a[1].total_hits));
+            const sortedByTopTotalValue = structuredClone(Object.entries(topTotalValue).sort((a, b) => b[1].total_cut_value - a[1].total_cut_value)).slice(0, 10);
+            const sortedByTopStolenCargo = structuredClone(Object.entries(topStolenCargo).sort((a, b) => b[1].total_scu - a[1].total_scu)).slice(0, 10);
+            const sortedByTopPiracyActs = structuredClone(Object.entries(topPirateActs).sort((a, b) => b[1].total_hits - a[1].total_hits)).slice(0, 10);
 
             const { buffer: valueBuffer, filePath: valuePath } = await generateLeaderboardChart(sortedByTopTotalValue.slice(0, 10), 'total_cut_value', 'value-chart.png');
             const { buffer: cargoBuffer, filePath: cargoPath } = await generateLeaderboardChart(sortedByTopStolenCargo.slice(0, 10), 'total_scu', 'cargo-chart.png');
@@ -156,7 +156,12 @@ async function generateTotalValueLeaderboard(hitLogs, allUsers) {
 
             for(const assist of log.assists){
                 // const assistUserObject = await getUserById(assist);
+                console.log(log)
                 const assistUserObject = allUsers.find(user => user.id === assist.user_id);
+                if(assistUserObject === undefined){
+                    continue; // Skip this iteration if the assist user object is undefined
+                }
+                console.log(assistUserObject)
                 const assistUserName = assistUserObject.username;
                 if (!leaderboard[assistUserName]) {
                     leaderboard[assistUserName] = { username: assistUserName, total_cut_value: 0 };
@@ -189,6 +194,9 @@ async function generateTopStolenLeaderboard(hitLogs, allUsers) {
             for(const assist of log.assists){
                 // const assistUserObject = await getUserById(assist);
                 const assistUserObject = allUsers.find(user => user.id === assist.user_id);
+                if(assistUserObject === undefined){
+                    continue; // Skip this iteration if the assist user object is undefined
+                }
                 const assistUserName = assistUserObject.username;
                 if (!leaderboard[assistUserName]) {
                     leaderboard[assistUserName] = { username: assistUserName, total_scu: 0 };
@@ -220,6 +228,9 @@ async function generateTopPirateActs(hitLogs, allUsers) {
             for(const assist of log.assists){
                 // const assistUserObject = await getUserById(assist);
                 const assistUserObject = allUsers.find(user => user.id === assist.user_id);
+                if(assistUserObject === undefined){
+                    continue; // Skip this iteration if the assist user object is undefined
+                }
                 const assistUserName = assistUserObject.username;
                 if (!leaderboard[assistUserName]) {
                     leaderboard[assistUserName] = { username: assistUserName, total_hits: 0 };
