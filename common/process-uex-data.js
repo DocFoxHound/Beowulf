@@ -151,6 +151,13 @@ async function sendToDb(title, data){
                         case "commodities":
                             console.log("Processing commodities")
                             for(const d of item.data){
+                                const summaryCommodity = {
+                                    id: d.id,
+                                    commodity_name: d.name,
+                                    price_buy_avg: d.price_buy,
+                                    price_sell_avg: d.price_sell
+                                }
+                                await UEX.createOrUpdateSummarizedCommodity(summaryCommodity);
                                 await UEX.createOrUpdateCommodity(d);
                             }
                             break;

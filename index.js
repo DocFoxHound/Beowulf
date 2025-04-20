@@ -119,7 +119,7 @@ client.on("ready", async () => {
   //start off with a fresh reload of the online files
   // await vectorHandler.refreshChatLogs(channelIdAndName, openai, client)
   // await vectorHandler.refreshUserList(openai, client)
-  processUEXData("all"); //do NOT await this, it takes forever
+  processUEXData("terminal_prices"); //do NOT await this, it takes forever
   // await trimChatLogs();
   // await loadChatlogs(client, openai)
   // console.log(client.guilds.fetch(process.env.TEST_GUILD_ID))
