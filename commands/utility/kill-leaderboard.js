@@ -158,10 +158,6 @@ module.exports = {
                 }
                 if(type === "ships"){
                     const combinedLeaderboardData = mergeTwoDataArraysEveryoneShips(acLeaderBoardData, puLeaderBoardData);
-                    // const combinedLeaderboardData = { ...acLeaderBoardData, ...puLeaderBoardData };
-                    console.log("AC Leaderboard Data: ", acLeaderBoardData);
-                    console.log("PU Leaderboard Data: ", puLeaderBoardData);
-                    console.log("Combined Leaderboard Data: ", combinedLeaderboardData);
                     if(!combinedLeaderboardData){
                         return interaction.reply({ content: 'No Kill logs found for the given criteria.', ephemeral: true });
                     }
