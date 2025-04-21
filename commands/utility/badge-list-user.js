@@ -5,7 +5,7 @@ const { getBadgesByUserId } = require('../../api/badgeApi');
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('badge-list')
+        .setName('badge-list-user')
         .setDescription('List all badges of a user')
         .addUserOption(option => 
             option.setName('target')
@@ -50,7 +50,7 @@ module.exports = {
                     chunk.forEach(badge => {
                         embed.addFields(
                             { 
-                                name: `${badge.badge_name} (Weight: ${badge.badge_weight})`, 
+                                name: `${badge.badge_name} (Points: ${badge.badge_weight})`, 
                                 value: badge.badge_description || 'No description', 
                                 inline: false 
                             }

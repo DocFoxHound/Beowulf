@@ -41,6 +41,22 @@ async function getBadgesByUserId(user_id) {
     }
 }
 
+async function getBadgesByPatch(patch) {
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_BADGES}/patch`;
+    console.log("Patch: ", patch)
+    try {
+        const response = await axios.get(apiUrl, {
+            params: {
+                patch: patch
+            }
+        });
+        return response.data;  // This will be the return value of the function
+    } catch (error) {
+        console.error('Error fetching user HitLogs by Patch:', error.response ? error.response.data : error.message);
+        return null;  // Return null if there's an error
+    }
+}
+
 //this isn't setup for editing yet, but is just a copy of editUser
 async function editBadge(badgeId, updatedBadgeData) {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_BADGES}/${badgeId}`; // Assuming this is the correct endpoint
@@ -75,8 +91,9 @@ async function deleteBadge(id) {
 
 module.exports = {
     createBadge,
-    getClasses: getAllBadges,
+    getAllBadges,
     getBadgesByUserId,
     editBadge,
-    deleteBadge
+    deleteBadge,
+    getBadgesByPatch
 };

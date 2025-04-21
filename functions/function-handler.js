@@ -35,7 +35,7 @@ async function executeFunction(run, message, preloadedDbTables, openai, client) 
     case "notify_queue_entry":
       return botNotify.notifyNewQueueThreadResponse(run);
     case "get_users_in_queue":
-      return await queueReminderCheck(openai, client, run);
+      return await queueReminderCheck(openai, client, run); //we need to change this to the embed function instead
     // case "remove_player_from_queue":
     //   return queueController(run, message, openai, client, false, "function-remove"); //false = remove user
     case "progress":

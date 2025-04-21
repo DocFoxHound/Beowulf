@@ -8,7 +8,7 @@ const queueApi = require('../../api/queueApi');
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('xmoderator-user-progression')
+        .setName('xmoderator-edit-user')
         .setDescription('Edit a user status for a specific class')
         .addStringOption(option => 
             option.setName('target')

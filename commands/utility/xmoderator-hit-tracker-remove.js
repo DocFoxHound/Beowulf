@@ -4,7 +4,7 @@ const { getUserById, getUsers } = require('../../api/userlistApi');
 
 
 const command = new SlashCommandBuilder()
-    .setName('yblooded-hit-tracker-remove')
+    .setName('xmoderator-hit-tracker-remove')
     .setDescription('Remove a hit tracker log.')
     .addStringOption(option => 
         option.setName('hit')

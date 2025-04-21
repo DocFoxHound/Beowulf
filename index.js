@@ -17,6 +17,7 @@ const { saveMessage } = require("./common/message-saver.js");
 const { loadChatlogs } = require("./vector-handling/vector-handler.js");
 const { trimChatLogs } = require("./vector-handling/vector-handler.js");
 const { getClasses } = require('./api/classApi.js');
+const { queueChannelPoster } = require("./queue-functions/queue-controller.js")
 
 // Initialize dotenv config file
 const args = process.argv.slice(2);
@@ -142,6 +143,9 @@ client.on("ready", async () => {
     21600000 //every 6 hours
   );
   setInterval(() => queueReminderCheck(openai, client, null),
+    43200000 //every 12 hours
+  );
+  setInterval(() => queueChannelPoster(client),
     43200000 //every 12 hours
   );
   setInterval(() => refreshUserlist(client, openai),

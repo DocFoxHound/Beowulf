@@ -745,8 +745,6 @@ function createCombinedLeaderboardEmbeds(combinedLeaderboardData, patch) {
             .setColor('#7199de');
 
         combinedKillsSortedData.forEach(([username, stats], index) => {
-            console.log(username)
-            console.log(stats)
             combinedKillsEmbed.addFields({
                 name: `${index + 1}. ${username}: ${stats.kill_count} kills.`,
                 value: `FPS Kills: **${stats.ac_fps_kill_count + stats.pu_fps_kill_count}** // Ship Kills: **${stats.ac_ship_kill_count + stats.pu_ship_kill_count}**\nPU Kills: **${stats.pu_fps_kill_count + stats.pu_ship_kill_count}** // AC Kills: **${stats.ac_fps_kill_count + stats.ac_ship_kill_count}**`,

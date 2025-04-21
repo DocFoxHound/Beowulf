@@ -5,7 +5,7 @@ const { getWarehousesByUserId, getWarehousesByUserAndCommodity, deleteWarehouse,
 
 
 const command = new SlashCommandBuilder()
-    .setName('yblooded-warehouse-remove')
+    .setName('xmoderator-warehouse-remove')
     .setDescription('Add items to the Org warehouse.')
     .addStringOption(option => 
         option.setName('owner')

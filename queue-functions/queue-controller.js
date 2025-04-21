@@ -1,3 +1,4 @@
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { notifyNewQueue } = require("../common/bot-notify");
 const { notifyOldQueue } = require("../common/bot-notify");
 const { notifyRemovalFromQueue } = require("../common/bot-notify");
@@ -16,7 +17,7 @@ const { editUser } = require("../api/userlistApi");
 const { updatedUserListData } = require("../userlist-functions/userlist-controller");
 const completedQueueHandler = require("../completed-queue-functions/completed-queue-handler");
 const { getClasses } = require("../api/classApi");
-const { editOrAddUserInQueue } = require("../api/queueApi");
+const { editOrAddUserInQueue, getUsersInQueue } = require("../api/queueApi");
 
 
 async function queueControllerForSlashCommands(className, targetUser, handlerUser,  openai, client, addOrRemove, classStatus, selfOrOther, interaction){
@@ -101,17 +102,17 @@ async function queueReminderCheck(openai, client, run) {
         const diffInMilliseconds = currentTime.getTime() - queueEntryTime.getTime();
         const diffInMinutes = Math.floor(diffInMilliseconds / 60000);
 
-        if (diffInMinutes > 720 || run) { // Reminder after 12 hours or if manually triggered
+        if (diffInMinutes > 7200 || run) { // Reminder after 5 days (in minutes) or if manually triggered
             usersInQueue.push(user);
 
-            if (run === null) { // Only reset their times if this is a scheduled queue check
-                const editQueueTimeSuccess = await editQueueTime(user); // Reset the timer
-                if (editQueueTimeSuccess) {
-                    console.log(`${user.username}'s timestamp updated after reminder published.`);
-                } else {
-                    console.log(`Error updating ${user.username}'s timestamp after reminder.`);
-                }
-            }
+            // if (run === null) { // Only reset their times if this is a scheduled queue check
+            //     const editQueueTimeSuccess = await editQueueTime(user); // Reset the timer
+            //     if (editQueueTimeSuccess) {
+            //         console.log(`${user.username}'s timestamp updated after reminder published.`);
+            //     } else {
+            //         console.log(`Error updating ${user.username}'s timestamp after reminder.`);
+            //     }
+            // }
         }
     }
 
@@ -129,7 +130,7 @@ async function queueReminderCheck(openai, client, run) {
                 .map(classObj => classObj.alt_name || classObj.name);
 
             if (userClasses.length > 0) {
-                queueByCategory[category].push(`${user.nickname || user.username} is in queue for: ${userClasses.join(', ')}`);
+                queueByCategory[category].push(`${user.nickname || user.username} has been in queue for over 5 days. They are queue'd for...\n${userClasses.join('\n ')}`);
             }
         }
     }
@@ -154,6 +155,93 @@ async function queueReminderCheck(openai, client, run) {
         } else if (queueByCategory[queueType.toLowerCase()]) {
             return queueByCategory[queueType.toLowerCase()].join("\n") || `There are no users in the ${queueType} queue.`;
         }
+    }
+}
+
+async function queueChannelPoster(client) {
+    const targetChannelId = process.env.LIVE_ENVIRONMENT === "true" ? process.env.QUEUE_CHANNEL : process.env.TEST_QUEUE_CHANNEL; // Replace with your actual channel ID
+    try {
+        const allClasses = await getClasses();
+        const allUsers = await getUsersInQueue();
+        const classData = await generateClassData(allClasses);
+        await generateQueueData(allUsers, classData);
+        const embeds = generatedEmbed(classData);
+
+        const channel = await client.channels.fetch(targetChannelId);
+        if (!channel || !channel.isTextBased()) throw new Error("Channel not found or not text-based.");
+
+        // Post each embed separately
+        for (const embed of embeds) {
+            await channel.send({ embeds: [embed] });
+        }
+    } catch (error) {
+        console.error('Error in Queue-Status command:', error);
+    }
+}
+
+async function generateQueueData(allUsers, classData) {
+    try{
+        for(const prestige in classData){
+            const classes = classData[prestige];
+            for(const classObj of classes){
+                for(const user of allUsers){
+                    if(user[classObj.name] === true){
+                        classObj.students.push({
+                            id: user.id,
+                            username: user.username,
+                            nickname: user.nickname,
+                            createdAt: user.createdAt
+                        });
+                    }
+                }
+            }
+        }
+    }catch(error){
+        console.error('Error generating queue data:', error);
+        return null;  // Return null if there's an error
+    }
+}
+
+function generatedEmbed(classData){
+    try{    
+        const embeds = {};
+        for(const prestige in classData){
+            const classes = classData[prestige];
+            classes.sort((a, b) => a.name.localeCompare(b.name));
+            // console.log(classes[0])
+
+            if (!embeds[prestige]) {
+                embeds[prestige] = [];
+            }
+            const classEmbed = new EmbedBuilder()
+                .setThumbnail(`${classes[0].thumbnail_url}`)
+                // .setThumbnail('https://i.imgur.com/UoZsrrM.png')
+                .setAuthor({ name: `Players in Queue`, iconURL: 'https://i.imgur.com/adzj39a.png' })
+                .setTitle(`${prestige.toString().toUpperCase()}`)
+                // .setImage('https://i.imgur.com/1t53Jsc.png')
+                .setDescription(`\`\`\`\nThe below are individuals presently waiting in Queue for either a class or an assessment.\`\`\`\n`)
+                .setColor('#ff0000');
+            for(const classObj of classes){
+                let studentsList = classObj.students.map(s =>
+                    `• ${s.nickname || s.username}`
+                ).join('\n');
+                
+                if (!studentsList) {
+                    studentsList = 'No one is currently in queue for this class.';
+                }
+                
+                classEmbed.addFields({
+                    name: `__${classObj.alt_name || classObj.name}__`,
+                    value: studentsList,
+                    inline: false
+                });
+            }
+            embeds[prestige].push(classEmbed);
+        }
+        return Object.values(embeds).flat();
+    }catch(error){
+        console.error('Error creating leaderboard embeds:', error);
+        return null;  // Return null if there's an error
     }
 }
 
@@ -400,6 +488,7 @@ module.exports = {
     queueReminderCheck,
     checkQueueForUser,
     queueControllerForChat,
-    queueControllerForSlashCommands
+    queueControllerForSlashCommands,
+    queueChannelPoster
     // getQueue,
 };

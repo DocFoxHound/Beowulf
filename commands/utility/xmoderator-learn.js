@@ -5,7 +5,7 @@ const { createLessonLearned } = require('../../api/lessonsLearnedApi.js');
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('yblooded-learn')
+        .setName('xmoderator-learn')
         .setDescription('Teaches the bot something that it should remember. Be sure to remove previous contradictory lessons.')
         .addStringOption(option => 
             option.setName('lesson')

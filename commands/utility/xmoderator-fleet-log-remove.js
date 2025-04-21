@@ -4,7 +4,7 @@ const { getUsers } = require('../../api/userlistApi');
 
 
 const command = new SlashCommandBuilder()
-    .setName('yblooded-fleet-log-remove')
+    .setName('xmoderator-fleet-log-remove')
     .setDescription('Remove a kill log for your ship to the Black Box.')
     .addStringOption(option => 
         option.setName('log')
