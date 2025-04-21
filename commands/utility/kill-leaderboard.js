@@ -190,10 +190,12 @@ module.exports = {
                     embeds = createShipLeaderboardEmbeds(sortedByKills, sortedByValue, sortedByAcKills, sortedByAcValue, sortedByPuKills, sortedByPuValue, patch);
                 }
                 if (type === "overall") {
-                    const combinedLeaderboardData = {...acLeaderBoardData, ...puLeaderBoardData};
+                    // const combinedLeaderboardData = {...acLeaderBoardData, ...puLeaderBoardData};
+                    const combinedLeaderboardData = mergeTwoDataArraysEveryoneCombined(acLeaderBoardData, puLeaderBoardData);
                     if(!combinedLeaderboardData){
                         return interaction.reply({ content: 'No Kill logs found for the given criteria.', ephemeral: true });
                     }
+                    // console.log(combinedLeaderboardData)
                     const sortedByKills = Object.entries(combinedLeaderboardData).sort((a, b) => b[1].kill_count - a[1].kill_count).slice(0, 10);
                     const sortedByValue = Object.entries(combinedLeaderboardData).sort((a, b) => b[1].value - a[1].value).slice(0, 10);
                     const { buffer: killBuffer, filePath: killPath } = await generateLeaderboardChart(sortedByKills.slice(0, 10), 'kill_count', 'total-kills-chart.png');
@@ -204,7 +206,7 @@ module.exports = {
                         0: new AttachmentBuilder(killBuffer, { name: 'total-kills-chart.png' }),
                         1: new AttachmentBuilder(valueBuffer, { name: 'total-value-chart.png' })
                     };
-                    embeds = createCombinedLeaderboardEmbeds(sortedByKills, sortedByValue, patch);
+                    embeds = createCombinedLeaderboardEmbeds(combinedLeaderboardData, patch);
                 }
             }
             if(user) {
@@ -725,22 +727,29 @@ function createFpsLeaderboardEmbeds(puSortedByKills, acSortedByKills, comSortedB
 }
 
 // Helper function to create Combined leaderboard embeds
-function createCombinedLeaderboardEmbeds(sortedByKills, sortedByValue, patch) {
+function createCombinedLeaderboardEmbeds(combinedLeaderboardData, patch) {
+    // console.log(combinedLeaderboardData)
     try {
         const embeds = [];
+
+        const combinedKillsSortedData = Object.entries(combinedLeaderboardData).sort((a, b) => b[1].kill_count - a[1].kill_count).slice(0, 10);
+        const combinedValueSortedData = Object.entries(combinedLeaderboardData).sort((a, b) => b[1].value - a[1].value).slice(0, 10);
+
         // Top players by combined kills
         const combinedKillsEmbed = new EmbedBuilder()
             .setThumbnail('https://i.imgur.com/UoZsrrM.png')
             .setAuthor({ name: `Top Players by Combined Kills`, iconURL: 'https://i.imgur.com/vRqPoqk.png' })
             .setTitle(`Patch ${patch}`)
             .setImage('attachment://total-kills-chart.png')
-            .setDescription(`\`\`\`\nIronPoint Total Combined Kills: ${sortedByKills.reduce((acc, [_, stats]) => acc + stats.kill_count, 0)}\`\`\`\n`)
+            .setDescription(`\`\`\`\nIronPoint Total Combined Kills: ${Object.entries(combinedLeaderboardData).reduce((acc, [_, stats]) => acc + stats.kill_count, 0)}\`\`\`\n`)
             .setColor('#7199de');
 
-        sortedByKills.forEach(([username, stats], index) => {
+        combinedKillsSortedData.forEach(([username, stats], index) => {
+            console.log(username)
+            console.log(stats)
             combinedKillsEmbed.addFields({
-                name: `${index + 1}. ${username}: ${stats.totalKills} kills.`,
-                value: `**FPS Kills:** ${stats.hits.filter(hit => hit.type === 'FPS').reduce((acc, hit) => acc + hit.kill_count, 0)} // **Ship Kills:** ${stats.hits.filter(hit => hit.type === 'Ship').reduce((acc, hit) => acc + hit.kill_count, 0)}`,
+                name: `${index + 1}. ${username}: ${stats.kill_count} kills.`,
+                value: `FPS Kills: **${stats.ac_fps_kill_count + stats.pu_fps_kill_count}** // Ship Kills: **${stats.ac_ship_kill_count + stats.pu_ship_kill_count}**\nPU Kills: **${stats.pu_fps_kill_count + stats.pu_ship_kill_count}** // AC Kills: **${stats.ac_fps_kill_count + stats.ac_ship_kill_count}**`,
                 inline: false
             });
         });
@@ -753,12 +762,12 @@ function createCombinedLeaderboardEmbeds(sortedByKills, sortedByValue, patch) {
             .setAuthor({ name: `Total Ship Damage Done`, iconURL: 'https://i.imgur.com/vRqPoqk.png' })
             .setTitle(`Patch ${patch}`)
             .setImage('attachment://total-value-chart.png')
-            .setDescription(`\`\`\`\nIronPoint Ship Damage: ${formatToCurrency(sortedByValue.reduce((acc, [_, stats]) => acc + stats.value, 0))}\`\`\`\n`)
+            .setDescription(`\`\`\`\nIronPoint Ship Damage: ${formatToCurrency(Object.entries(combinedLeaderboardData).reduce((acc, [_, stats]) => acc + stats.value, 0))}\`\`\`\n`)
             .setColor('#7199de');
-        sortedByValue.forEach(([username, stats], index) => {
+        combinedValueSortedData.forEach(([username, stats], index) => {
             valueEmbed.addFields({
                 name: `${index + 1}. ${username}`,
-                value: `**Damages Cost:** ${formatToCurrency(stats.value)}`,
+                value: `**Total Damages: **${formatToCurrency(stats.value)}**\nAC Damages: **${formatToCurrency(stats.ac_value)}** // PU Damages: **${formatToCurrency(stats.pu_value)}**`,
                 inline: false
             });
         });
@@ -1021,6 +1030,53 @@ function mergeTwoDataArraysEveryoneShips(array1, array2){
         combinedArray[key] = {
             kill_count: acData.kill_count + puData.kill_count, // Combine kill counts
             value: acData.value + puData.value // Combine values
+        };
+    }
+    return combinedArray;
+}
+
+function mergeTwoDataArraysEveryoneCombined(array1, array2){
+    const combinedArray = {};
+
+    // Merge the keys from both objects
+    const keys = new Set([
+        ...Object.keys(array1),
+        ...Object.keys(array2)
+    ]);
+
+    for (const key of keys) {
+        const acData = array1[key] || { kill_count: 0, value: 0, hits: [] };
+        const puData = array2[key] || { kill_count: 0, value: 0, hits: [] };
+
+        // console.log(puData.hits)
+
+        const acShipKillCount = Object.values(acData.hits)
+            .filter(hit => hit.type === 'Ship')
+            .reduce((acc, hit) => acc + hit.kill_count, 0);
+
+        const acFpsKillCount = Object.values(acData.hits)
+            .filter(hit => hit.type === 'FPS')
+            .reduce((acc, hit) => acc + hit.kill_count, 0);
+
+        const puShipKillCount = Object.values(puData.hits)
+            .filter(hit => hit.type === 'Ship')
+            .reduce((acc, hit) => acc + hit.kill_count, 0);
+
+        const puFpsKillCount = Object.values(puData.hits)
+            .filter(hit => hit.type === 'FPS')
+            .reduce((acc, hit) => acc + hit.kill_count, 0);
+
+        combinedArray[key] = {
+            kill_count: acData.kill_count + puData.kill_count, 
+            ac_kill_count: acData.kill_count,
+            ac_ship_kill_count: acShipKillCount,
+            ac_fps_kill_count: acFpsKillCount,
+            pu_kill_count: puData.kill_count,
+            pu_ship_kill_count: puShipKillCount,
+            pu_fps_kill_count: puFpsKillCount,
+            value: acData.value + puData.value, 
+            ac_value: acData.value,
+            pu_value: puData.value,
         };
     }
     return combinedArray;
