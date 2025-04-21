@@ -157,7 +157,11 @@ module.exports = {
                     embeds = createFpsLeaderboardEmbeds(puSortedByKills, acSortedByKills, comSortedByKills, patch);
                 }
                 if(type === "ships"){
-                    const combinedLeaderboardData = { ...acLeaderBoardData, ...puLeaderBoardData };
+                    const combinedLeaderboardData = mergeTwoDataArraysEveryoneShips(acLeaderBoardData, puLeaderBoardData);
+                    // const combinedLeaderboardData = { ...acLeaderBoardData, ...puLeaderBoardData };
+                    console.log("AC Leaderboard Data: ", acLeaderBoardData);
+                    console.log("PU Leaderboard Data: ", puLeaderBoardData);
+                    console.log("Combined Leaderboard Data: ", combinedLeaderboardData);
                     if(!combinedLeaderboardData){
                         return interaction.reply({ content: 'No Kill logs found for the given criteria.', ephemeral: true });
                     }
@@ -1000,6 +1004,27 @@ function mergeTwoDataArrays(array1, array2){
             kill_count: datasetOne.kill_count + datasetTwo.kill_count, // Combine kill counts
             victims: [...datasetOne.victims, ...datasetTwo.victims], // Merge victims arrays
             hits: [...datasetOne.hits, ...datasetTwo.hits] // Merge hits arrays
+        };
+    }
+    return combinedArray;
+}
+
+function mergeTwoDataArraysEveryoneShips(array1, array2){
+    const combinedArray = {};
+
+    // Merge the keys from both objects
+    const keys = new Set([
+        ...Object.keys(array1),
+        ...Object.keys(array2)
+    ]);
+
+    for (const key of keys) {
+        const acData = array1[key] || { kill_count: 0, value: 0 };
+        const puData = array2[key] || { kill_count: 0, value: 0 };
+
+        combinedArray[key] = {
+            kill_count: acData.kill_count + puData.kill_count, // Combine kill counts
+            value: acData.value + puData.value // Combine values
         };
     }
     return combinedArray;
