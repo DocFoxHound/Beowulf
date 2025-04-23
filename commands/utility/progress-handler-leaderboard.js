@@ -22,7 +22,7 @@ module.exports = {
             const timeframe = interaction.options.getString('timeframe');
             return interaction.reply({ embeds: [await topHandlers(client, interaction, timeframe)]});
         } catch (error) {
-            console.error('Error in progress-tracker command:', error);
+            console.error('Error in progress-person-view command:', error);
             return interaction.reply({
                 content: 'An error occurred while retrieving the progress data. Please try again later or contact an administrator.',
                 ephemeral: true

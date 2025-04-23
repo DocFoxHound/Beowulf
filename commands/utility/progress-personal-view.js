@@ -195,7 +195,7 @@ module.exports = {
                 await i.update({ embeds: [embeds[currentPage]], components: [buttons] });
             });   
         } catch (error) {
-            console.error('Error in progress-tracker2 command:', error);
+            console.error('Error in progress-personal-view command:', error);
             return interaction.reply({
                 content: 'An error occurred while retrieving the progress data. Please try again later or contact an administrator.',
                 ephemeral: true

@@ -2,7 +2,7 @@
 const getUsers = require('../api/userlistApi').getUsers;
 const { getClasses } = require('../api/classApi');
 const { getUserById } = require('../api/userlistApi');
-const { generateClassData, generateQueueData } = require('../commands/utility/progress-tracker');
+const { generateClassData, generateQueueData } = require('../commands/utility/progress-personal-view');
 
 async function progressQuery(run, message) {
     try {
