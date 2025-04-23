@@ -44,6 +44,7 @@ module.exports = {
             //get crew and marauder eligibility
             for(const prestige in eligibilityByPrestige) {
                 const classes = eligibilityByPrestige[prestige].levelClasses;
+                console.log(classes)
                 if(classes['1'].eligible === true){
                     marauderEligibleCount = 1;
                     crewEligibleCount++;
@@ -263,7 +264,6 @@ async function getEligibility(classData) {
                 };
             }
         }
-
         return prestigeEligibility;
     } catch (error) {
         console.error('Error getting completed classes:', error);

@@ -47,7 +47,6 @@ async function refreshUserlist(client, openai) {
                 //now update the updatedUserData object with the new completion status
                 for (const [category, classes] of Object.entries(classData)) {
                     for (const classObj of classes) {
-                        console.log(classObj)
                         //if the user's corsair_level, raider_level, or raptor_level has a number, mark all classes that or below as completed
                         if (classObj.prestige_category === 'CORSAIR' && classObj.level <= updatedUserData.corsair_level) {
                             updatedUserData[classObj.name] = true; // Mark as completed
