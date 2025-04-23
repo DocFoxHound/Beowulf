@@ -8,7 +8,7 @@ const { getClasses } = require('../../api/classApi.js');
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('queue-remove')
+        .setName('progress-dropout')
         .setDescription('Edit your queue entry')
         .addStringOption(option =>
             option.setName('class')

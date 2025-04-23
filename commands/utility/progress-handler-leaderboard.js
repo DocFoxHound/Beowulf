@@ -4,7 +4,7 @@ const { getEntriesBetweenDates } = require('../../api/completed-queue-api')
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('queue-leaderboard')
+        .setName('progress-handler-leaderboard')
         .setDescription('See who has handled the most queue tickets in the server.')
         .addStringOption(option =>
             option.setName('timeframe')

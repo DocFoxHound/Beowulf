@@ -6,7 +6,7 @@ const { getUserById } = require('../../api/userlistApi.js');
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('progress-tracker')
+        .setName('progress-personal-view')
         .setDescription('View your promotion progress across RAPTOR, CORSAIR, and RAIDER assessments')
         .addUserOption(option =>
             option.setName('target')
@@ -46,7 +46,6 @@ module.exports = {
                 interimCrewEligibility = 0;
                 interimMarauderEligibility = 0;
                 const classes = eligibilityByPrestige[prestige].levelClasses;
-                console.log(classes)
                 if(classes['1'].eligible === true){
                     interimMarauderEligibility = 1;
                     crewEligibleCount++;

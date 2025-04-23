@@ -6,7 +6,7 @@ const { getUsersInQueue} = require('../../api/queueApi.js');
 module.exports = {
     data: new SlashCommandBuilder()
     
-        .setName('queue-status')
+        .setName('progress-queue-view')
         .setDescription('View who is waiting in queue for a class or an assessment.'),
                     
     async execute(interaction) {

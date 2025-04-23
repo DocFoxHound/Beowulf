@@ -3,11 +3,11 @@ const { SlashCommandBuilder } = require('discord.js');
 const { getUserById} = require('../../api/queueApi.js');
 const userlistApi = require('../../api/userlistApi.js');
 const { getClasses} = require('../../api/classApi.js');
-const { queueControllerForSlashCommands } = require('../../queue-functions/queue-controller');
+const { queueControllerForSlashCommands } = require('../../queue-functions/queue-controller.js');
 
 
 const command = new SlashCommandBuilder()
-  .setName('queue-signup')
+  .setName('progress-signup')
   .setDescription('Sign up for a class or assessment.')
   .addStringOption(option =>
     option.setName('class')
