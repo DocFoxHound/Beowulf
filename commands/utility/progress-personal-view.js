@@ -176,7 +176,7 @@ module.exports = {
             const message = await interaction.reply({ embeds: [embed1], components: [buttons], fetchReply: true });
 
             // Create a collector to handle button interactions
-            const collector = message.createMessageComponentCollector({ time: 60000 });
+            const collector = message.createMessageComponentCollector({ time: 300000 });
 
             let currentPage = 0;
             const embeds = [embed1, embed2, ...categoryEmbeds];

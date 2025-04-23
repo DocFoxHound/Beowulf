@@ -283,7 +283,7 @@ module.exports = {
             
 
             // Create a collector to handle button interactions
-            const collector = message.createMessageComponentCollector({ time: 60000 });
+            const collector = message.createMessageComponentCollector({ time: 300000 });
 
             collector.on('collect', async i => {
                 if (i.customId === 'previous') {

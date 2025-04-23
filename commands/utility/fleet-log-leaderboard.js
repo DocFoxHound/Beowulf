@@ -91,7 +91,7 @@ module.exports = {
             // Only create a collector if there are multiple embeds
             if (embeds.length > 1) {
                 // Create a collector to handle button interactions
-                const collector = message.createMessageComponentCollector({ time: 60000 });
+                const collector = message.createMessageComponentCollector({ time: 300000 });
 
                 collector.on('collect', async i => {
                     if (i.customId === 'previous') {

@@ -79,7 +79,7 @@ module.exports = {
                 const message = await interaction.reply({ embeds: [embeds[0]], components: [buttons] });
             
                 // Create a collector to handle button interactions
-                const collector = message.createMessageComponentCollector({ time: 60000 });
+                const collector = message.createMessageComponentCollector({ time: 300000 });
             
                 let currentPage = 0;
                 collector.on('collect', async interaction => {
