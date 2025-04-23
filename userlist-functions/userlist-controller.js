@@ -103,12 +103,10 @@ async function getUserRank(memberRoles) {
     }
 }
 
-async function getRaptorRank(memberRoles) {
+async function getRaptorRank(memberRoles, prestigeRoles) {
     try {
-        const discordPrestigeRanks = await prestigeRoles.getPrestiges();
-
         // Filter roles that contain "RAPTOR" (case-insensitive) in their name
-        const raptorRoles = discordPrestigeRanks.filter(role =>
+        const raptorRoles = prestigeRoles.filter(role =>
             role.name.toLowerCase().includes("raptor")
         );
 
@@ -130,17 +128,15 @@ async function getRaptorRank(memberRoles) {
     }
 }
 
-async function getCorsairRank(memberRoles) {
+async function getCorsairRank(memberRoles, prestigeRoles) {
     try {
-        const discordPrestigeRanks = await prestigeRoles.getPrestiges();
-
         // Filter roles that contain "RAPTOR" (case-insensitive) in their name
-        const raptorRoles = discordPrestigeRanks.filter(role =>
+        const raptorRoles = prestigeRoles.filter(role =>
             role.name.toLowerCase().includes("corsair")
         );
 
         // Create a map of role IDs to their corresponding rank levels for quick lookup
-        const rankMap = new Map(discordPrestigeRanks.map(role => [role.id, role.rank_level]));
+        const rankMap = new Map(raptorRoles.map(role => [role.id, role.rank_level]));
 
         // Iterate through the memberRoles array and check for a match in the rankMap
         for (const roleId of memberRoles) {
@@ -157,17 +153,17 @@ async function getCorsairRank(memberRoles) {
     }
 }
 
-async function getRaiderRank(memberRoles) {
+async function getRaiderRank(memberRoles, prestigeRoles) {
     try {
-        const discordPrestigeRanks = await prestigeRoles.getPrestiges();
+        // const prestigeRoles = await prestigeRoles.getPrestiges();
 
         // Filter roles that contain "RAPTOR" (case-insensitive) in their name
-        const raptorRoles = discordPrestigeRanks.filter(role =>
+        const raiderRoles = prestigeRoles.filter(role =>
             role.name.toLowerCase().includes("raider")
         );
 
         // Create a map of role IDs to their corresponding rank levels for quick lookup
-        const rankMap = new Map(discordPrestigeRanks.map(role => [role.id, role.rank_level]));
+        const rankMap = new Map(raiderRoles.map(role => [role.id, role.rank_level]));
 
         // Iterate through the memberRoles array and check for a match in the rankMap
         for (const roleId of memberRoles) {
