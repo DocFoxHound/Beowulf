@@ -4,16 +4,16 @@ const { getEntriesBetweenDates } = require('../../api/completed-queue-api')
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('queue-top-handlers')
-        .setDescription('See who has handled the most queue entries in the server.')
+        .setName('queue-leaderboard')
+        .setDescription('See who has handled the most queue tickets in the server.')
         .addStringOption(option =>
             option.setName('timeframe')
                 .setDescription('This quarter or all time?')
                 .setRequired(true)
                 .addChoices(
+                    { name: 'All time', value: 'all' },
                     { name: 'This Quarter', value: 'this-quarter' },
-                    { name: 'Last Quarter', value: 'last-quarter' },
-                    { name: 'All time', value: 'all' }
+                    { name: 'Last Quarter', value: 'last-quarter' }
                 )),
     
     async execute(interaction, client) {

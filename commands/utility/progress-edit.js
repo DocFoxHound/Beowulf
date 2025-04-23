@@ -8,8 +8,8 @@ const queueApi = require('../../api/queueApi');
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('xmoderator-edit-user')
-        .setDescription('Edit a user status for a specific class')
+        .setName('progress-edit')
+        .setDescription('Moderator Only, edit a user status for a specific class')
         .addStringOption(option => 
             option.setName('target')
                 .setDescription('@ the user to edit')
@@ -83,12 +83,15 @@ module.exports = {
                         ephemeral: true 
                     });
                 }
+                try{
+                    await queueControllerForSlashCommands(className, targetUser, handler, openai, client, false, "completed", "other", interaction)
+                }catch{}
                 // Set the class status to completed (true)
                 try{
                     await updateUserClassStatus(userData, className, true);
                     await interaction.reply({ 
                         content: "User was marked as completed",
-                        ephemeral: true 
+                        ephemeral: false 
                     });
                 }catch(error){
                     console.log(`Error in edit-user command: ${error.message}`);
@@ -104,7 +107,7 @@ module.exports = {
                     await updateUserClassStatus(userData, className, false);
                     return interaction.reply({ 
                         content: "User was marked as incomplete.",
-                        ephemeral: true 
+                        ephemeral: false 
                     });
                 }catch(error){
                     response = `Error in edit-user command: ${error.message}`;
@@ -134,7 +137,10 @@ module.exports = {
             const focusedOption = interaction.options.getFocused(true);
             const target = interaction.options.getString('target').replace(/\D/g, '');
             const targetUser = await getUserById(target);
-            const queueUserData = await queueApi.getUserById(target);
+            let queueUserData = await queueApi.getUserById(target);
+            if(!queueUserData){
+                queueUserData = getUserById(target);
+            }
 
             let choices = [];
 
