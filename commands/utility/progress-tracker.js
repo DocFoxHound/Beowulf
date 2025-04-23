@@ -43,23 +43,34 @@ module.exports = {
             
             //get crew and marauder eligibility
             for(const prestige in eligibilityByPrestige) {
+                interimCrewEligibility = 0;
+                interimMarauderEligibility = 0;
                 const classes = eligibilityByPrestige[prestige].levelClasses;
                 console.log(classes)
                 if(classes['1'].eligible === true){
-                    marauderEligibleCount = 1;
+                    interimMarauderEligibility = 1;
                     crewEligibleCount++;
                     if(crewEligibleCount === 3){
                         crewEligible = true;
                     }
+                    if(interimMarauderEligibility > marauderEligibleCount){
+                        marauderEligibleCount = interimMarauderEligibility;
+                    }
                 }
                 if(classes['2'].eligible === true){
                     if(crewEligibleCount < 3){
-                        marauderEligibleCount = 2;
+                        interimMarauderEligibility = 2;
+                    }
+                    if(interimMarauderEligibility > marauderEligibleCount){
+                        marauderEligibleCount = interimMarauderEligibility;
                     }
                 }
                 if(classes['3'].eligible === true){
-                    marauderEligibleCount = 3;
+                    interimMarauderEligibility = 3;
                     marauderEligible = true;
+                    if(interimMarauderEligibility > marauderEligibleCount){
+                        marauderEligibleCount = interimMarauderEligibility;
+                    }
                 }
             }
             //how many classes are there in total
