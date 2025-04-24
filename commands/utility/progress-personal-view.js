@@ -173,7 +173,7 @@ module.exports = {
                 );
 
             // Send the first embed with navigation buttons
-            const message = await interaction.reply({ embeds: [embed1], components: [buttons], fetchReply: true });
+            const message = await interaction.reply({ embeds: [embed1], components: [buttons], fetchReply: true, ephemeral: true });
 
             // Create a collector to handle button interactions
             const collector = message.createMessageComponentCollector({ time: 300000 });
@@ -192,7 +192,7 @@ module.exports = {
                 buttons.components[0].setDisabled(currentPage === 0);
                 buttons.components[1].setDisabled(currentPage === embeds.length - 1);
 
-                await i.update({ embeds: [embeds[currentPage]], components: [buttons] });
+                await i.update({ embeds: [embeds[currentPage]], components: [buttons], ephemeral: true });
             });   
         } catch (error) {
             console.error('Error in progress-personal-view command:', error);
