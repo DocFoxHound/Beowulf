@@ -2,7 +2,7 @@ const piracyAdviceLocation = require("./piracy-advice-location");
 const transactCommodityLocation = require("./transact-commodity-location");
 const queueReminderCheck = require("../queue-functions/queue-controller").queueReminderCheck;
 const { queueControllerForChat } = require("../queue-functions/queue-controller");
-const progressQuery = require("./progress-query").progressQuery;
+const progressQuery = require("../deprecated-but-keep/progress-query").progressQuery;
 const handlerQuery = require("./handler-query").handlerQuery;
 const badgeQuery = require("./badge-query").badgeQuery;
 const { promoteRequest } = require("./promotion-request");
@@ -30,18 +30,18 @@ async function executeFunction(run, message, preloadedDbTables, openai, client) 
       return transactCommodityLocation.transact_commodity_location(run, preloadedDbTables);
     case "where_to_buy":
       return transactCommodityLocation.transact_commodity_location(run, preloadedDbTables);
-    case "add_or_remove_queue_entry":
-      return await queueControllerForChat(run, message, openai, client);
-    case "notify_queue_entry":
-      return botNotify.notifyNewQueueThreadResponse(run);
-    case "get_users_in_queue":
-      return await queueReminderCheck(openai, client, run); //we need to change this to the embed function instead
+    // case "add_or_remove_queue_entry":
+    //   return await queueControllerForChat(run, message, openai, client);
+    // case "notify_queue_entry":
+    //   return botNotify.notifyNewQueueThreadResponse(run);
+    // case "get_users_in_queue":
+    //   return await queueReminderCheck(openai, client, run); //we need to change this to the embed function instead
     // case "remove_player_from_queue":
     //   return queueController(run, message, openai, client, false, "function-remove"); //false = remove user
-    case "progress":
-      return await progressQuery(run, message);
-    case "top_ticket_handlers":
-      return await handlerQuery(run, client);
+    // case "progress":
+    //   return await progressQuery(run, message);
+    // case "top_ticket_handlers":
+    //   return await handlerQuery(run, client);
     case "recognize_badges_request":
       return await badgeQuery(run, message);
     case "recognize_promotion_request":

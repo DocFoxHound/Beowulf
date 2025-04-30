@@ -158,26 +158,26 @@ async function queueReminderCheck(openai, client, run) {
     }
 }
 
-async function queueChannelPoster(client) {
-    const targetChannelId = process.env.LIVE_ENVIRONMENT === "true" ? process.env.QUEUE_CHANNEL : process.env.TEST_QUEUE_CHANNEL; // Replace with your actual channel ID
-    try {
-        const allClasses = await getClasses();
-        const allUsers = await getUsersInQueue();
-        const classData = await generateClassData(allClasses);
-        await generateQueueData(allUsers, classData);
-        const embeds = generatedEmbed(classData);
+// async function queueChannelPoster(client) {
+//     const targetChannelId = process.env.LIVE_ENVIRONMENT === "true" ? process.env.QUEUE_CHANNEL : process.env.TEST_QUEUE_CHANNEL; // Replace with your actual channel ID
+//     try {
+//         const allClasses = await getClasses();
+//         const allUsers = await getUsersInQueue();
+//         const classData = await generateClassData(allClasses);
+//         await generateQueueData(allUsers, classData);
+//         const embeds = generatedEmbed(classData);
 
-        const channel = await client.channels.fetch(targetChannelId);
-        if (!channel || !channel.isTextBased()) throw new Error("Channel not found or not text-based.");
+//         const channel = await client.channels.fetch(targetChannelId);
+//         if (!channel || !channel.isTextBased()) throw new Error("Channel not found or not text-based.");
 
-        // Post each embed separately
-        for (const embed of embeds) {
-            await channel.send({ embeds: [embed] });
-        }
-    } catch (error) {
-        console.error('Error in Queue-Status command:', error);
-    }
-}
+//         // Post each embed separately
+//         for (const embed of embeds) {
+//             await channel.send({ embeds: [embed] });
+//         }
+//     } catch (error) {
+//         console.error('Error in Queue-Status command:', error);
+//     }
+// }
 
 async function generateQueueData(allUsers, classData) {
     try{
@@ -489,6 +489,6 @@ module.exports = {
     checkQueueForUser,
     queueControllerForChat,
     queueControllerForSlashCommands,
-    queueChannelPoster
+    // queueChannelPoster
     // getQueue,
 };

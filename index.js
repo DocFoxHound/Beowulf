@@ -17,7 +17,8 @@ const { saveMessage } = require("./common/message-saver.js");
 const { loadChatlogs } = require("./vector-handling/vector-handler.js");
 const { trimChatLogs } = require("./vector-handling/vector-handler.js");
 const { getClasses } = require('./api/classApi.js');
-const { queueChannelPoster } = require("./queue-functions/queue-controller.js")
+// const { queueChannelPoster } = require("./queue-functions/queue-controller.js")
+// const { seshEventCheck } = require("./deprecated-but-keep/seshEventCheck.js");
 
 // Initialize dotenv config file
 const args = process.argv.slice(2);
@@ -145,9 +146,9 @@ client.on("ready", async () => {
   setInterval(() => queueReminderCheck(openai, client, null),
     43200000 //every 12 hours
   );
-  setInterval(() => queueChannelPoster(client),
-    43200000 //every 12 hours
-  );
+  // setInterval(() => queueChannelPoster(client),
+  //   43200000 //every 12 hours
+  // );
   setInterval(() => refreshUserlist(client, openai),
     43201000 //every 12 hours and 1 second
   );
@@ -161,6 +162,12 @@ client.on("ready", async () => {
 }),
 
 client.on("messageCreate", async (message) => {
+  // Check if the message is posted in the specific channel
+  if (message.channelId === process.env.LIVE_ENVIRONMENT === "true" ? process.env.AUDIT_CHANNEL : process.env.TEST_AUDIT_CHANNEL) {
+    seshEventCheck(message, client);
+    // Perform actions specific to the audit channel
+    return;
+  }
   if (!channelIds.includes(message.channelId) || !message.guild || message.system) {
     return;
   }
