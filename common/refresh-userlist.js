@@ -22,41 +22,38 @@ async function refreshUserlist(client, openai) {
             if (oldUserData !== null) { // If the user is in the database
                 const memberRoles = await member.roles.cache.map(role => role.id);
                 const userRank = await getUserRank(memberRoles);
-                const raptorRank = await getRaptorRank(memberRoles, prestigeRoles);
-                const corsairRank = await getCorsairRank(memberRoles, prestigeRoles);
-                const raiderRank = await getRaiderRank(memberRoles, prestigeRoles);
+                // const raptorRank = await getRaptorRank(memberRoles, prestigeRoles);
+                // const corsairRank = await getCorsairRank(memberRoles, prestigeRoles);
+                // const raiderRank = await getRaiderRank(memberRoles, prestigeRoles);
 
                 // Initialize the updatedUserData object
                 let updatedUserData = {
                     id: member.id,
                     username: member.user.username,
                     nickname: member.nickname || null,
-                    rank: userRank,
-                    corsair_level: corsairRank,
-                    raider_level: raiderRank,
-                    raptor_level: raptorRank,
+                    rank: userRank
                 };
 
-                //Populate the updatedUserData object with the existing data
-                for (const [category, classes] of Object.entries(classData)) {
-                    for (const classObj of classes) {
-                        updatedUserData[classObj.name] = oldUserData[classObj.name] || false; // Retain the user's existing completion status
-                    }
-                }
+                // //Populate the updatedUserData object with the existing data
+                // for (const [category, classes] of Object.entries(classData)) {
+                //     for (const classObj of classes) {
+                //         updatedUserData[classObj.name] = oldUserData[classObj.name] || false; // Retain the user's existing completion status
+                //     }
+                // }
 
-                //now update the updatedUserData object with the new completion status
-                for (const [category, classes] of Object.entries(classData)) {
-                    for (const classObj of classes) {
-                        //if the user's corsair_level, raider_level, or raptor_level has a number, mark all classes that or below as completed
-                        if (classObj.prestige_category === 'CORSAIR' && classObj.level <= updatedUserData.corsair_level) {
-                            updatedUserData[classObj.name] = true; // Mark as completed
-                        } else if (classObj.prestige_category === 'RAIDER' && classObj.level <= updatedUserData.raider_level) {
-                            updatedUserData[classObj.name] = true; // Mark as completed
-                        } else if (classObj.prestige_category === 'RAPTOR' && classObj.level <= updatedUserData.raptor_level) {
-                            updatedUserData[classObj.name] = true; // Mark as completed
-                        }
-                    }
-                }
+                // //now update the updatedUserData object with the new completion status
+                // for (const [category, classes] of Object.entries(classData)) {
+                //     for (const classObj of classes) {
+                //         //if the user's corsair_level, raider_level, or raptor_level has a number, mark all classes that or below as completed
+                //         if (classObj.prestige_category === 'CORSAIR' && classObj.level <= updatedUserData.corsair_level) {
+                //             updatedUserData[classObj.name] = true; // Mark as completed
+                //         } else if (classObj.prestige_category === 'RAIDER' && classObj.level <= updatedUserData.raider_level) {
+                //             updatedUserData[classObj.name] = true; // Mark as completed
+                //         } else if (classObj.prestige_category === 'RAPTOR' && classObj.level <= updatedUserData.raptor_level) {
+                //             updatedUserData[classObj.name] = true; // Mark as completed
+                //         }
+                //     }
+                // }
 
                 
 
@@ -80,12 +77,12 @@ async function refreshUserlist(client, openai) {
                     rank: userRank,
                 };
 
-                // Dynamically populate fields for each class category
-                for (const [category, classes] of Object.entries(classData)) {
-                    for (const classObj of classes) {
-                        newUser[classObj.name] = false; // Default to false (not completed)
-                    }
-                }
+                // // Dynamically populate fields for each class category
+                // for (const [category, classes] of Object.entries(classData)) {
+                //     for (const classObj of classes) {
+                //         newUser[classObj.name] = false; // Default to false (not completed)
+                //     }
+                // }
 
                 // Add the new user to the database
                 await createUser(newUser);
@@ -106,7 +103,7 @@ async function newLoadUserList(client) {
 
         // Fetch all classes dynamically
         const allClasses = await getClasses();
-        const classData = await generateClassData(allClasses); // Organize classes by category
+        // const classData = await generateClassData(allClasses); // Organize classes by category
 
         memberList.forEach(async member => {
             const memberRoles = await member.roles.cache.map(role => role.id);
@@ -120,12 +117,12 @@ async function newLoadUserList(client) {
                 rank: userRank,
             };
 
-            // Dynamically populate fields for each class category
-            for (const [category, classes] of Object.entries(classData)) {
-                for (const classObj of classes) {
-                    newUser[classObj.name] = false; // Default to false (not completed)
-                }
-            }
+            // // Dynamically populate fields for each class category
+            // for (const [category, classes] of Object.entries(classData)) {
+            //     for (const classObj of classes) {
+            //         newUser[classObj.name] = false; // Default to false (not completed)
+            //     }
+            // }
 
             // Add the new user to the database
             await createUser(newUser);
@@ -137,34 +134,34 @@ async function newLoadUserList(client) {
     }
 }
 
-async function generateClassData(allClasses) {
-    const classData = {};
-    try {
-        for (const log of allClasses) {
-            if (!classData[log.prestige_category]) {
-                classData[log.prestige_category] = [];
-            }
+// async function generateClassData(allClasses) {
+//     const classData = {};
+//     try {
+//         for (const log of allClasses) {
+//             if (!classData[log.prestige_category]) {
+//                 classData[log.prestige_category] = [];
+//             }
   
-            classData[log.prestige_category].push({
-                id: log.id,
-                name: log.name,
-                prestige_category: log.prestige_category.toUpperCase(),
-                alt_name: log.alt_name,
-                description: log.description,
-                ai_function_class_names: log.ai_function_class_names,
-                prerequisites: log.prerequisites,
-                thumbnail_url: log.thumbnail_url,
-                completed: false,
-                value: 0,
-                level: log.level
-            });
-        }
-        return classData;
-    }catch(error){
-        console.error('Error generating leaderboard data:', error);
-        return null;  // Return null if there's an error
-    }
-}
+//             classData[log.prestige_category].push({
+//                 id: log.id,
+//                 name: log.name,
+//                 prestige_category: log.prestige_category.toUpperCase(),
+//                 alt_name: log.alt_name,
+//                 description: log.description,
+//                 ai_function_class_names: log.ai_function_class_names,
+//                 prerequisites: log.prerequisites,
+//                 thumbnail_url: log.thumbnail_url,
+//                 completed: false,
+//                 value: 0,
+//                 level: log.level
+//             });
+//         }
+//         return classData;
+//     }catch(error){
+//         console.error('Error generating leaderboard data:', error);
+//         return null;  // Return null if there's an error
+//     }
+// }
 
 module.exports = {
     refreshUserlist,
