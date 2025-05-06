@@ -45,7 +45,7 @@ module.exports = {
         const targetUser = interaction.options.getUser('target');
         const badgeName = interaction.options.getString('name');
         const badgeDescription = interaction.options.getString('description');
-        const badgeWeight = interaction.options.getInteger('weight');
+        const badgeWeight = interaction.options.getInteger('points');
         
 
         // Validate the description length
