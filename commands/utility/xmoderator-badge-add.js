@@ -20,8 +20,8 @@ module.exports = {
                 .setDescription('The description of the badge. (200 character limit)')
                 .setRequired(true))
         .addIntegerOption(option => 
-            option.setName('weight')
-                .setDescription('The importance of the badge (0-100)')
+            option.setName('points')
+                .setDescription('0-50, specifically designated badges can exceed.')
                 .setRequired(true)
                 .setMinValue(0)
                 .setMaxValue(100)),
