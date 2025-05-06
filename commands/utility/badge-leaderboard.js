@@ -180,7 +180,7 @@ function createLeaderboardEmbeds(sortedByWeight, sortedByNumber, patch) {
         // Top players by value earned
         const topValueBadges = new EmbedBuilder()
             .setThumbnail('https://i.imgur.com/UoZsrrM.png') // Use the chart as the thumbnail
-            .setAuthor({ name: `Top Badges by Points`, iconURL: 'https://i.imgur.com/JvvqhbV.png' })
+            .setAuthor({ name: `Top IronPoints Badges by Points`, iconURL: 'https://i.imgur.com/JvvqhbV.png' })
             .setTitle(`Patch ${patch}`)
             .setImage(`attachment://value-chart.png`)
             .setDescription(`\`\`\`\nThe following are a list of top players by their total badge score.\n\n\`\`\``)
@@ -198,7 +198,7 @@ function createLeaderboardEmbeds(sortedByWeight, sortedByNumber, patch) {
         // Top players by total stolen cargo
         const topBadgeEarners = new EmbedBuilder()
             .setThumbnail('https://i.imgur.com/UoZsrrM.png')
-            .setAuthor({ name: `Top Badge Earners`, iconURL: 'https://i.imgur.com/JvvqhbV.png' })
+            .setAuthor({ name: `Top IronPoints Badge Earners`, iconURL: 'https://i.imgur.com/JvvqhbV.png' })
             .setTitle(`Patch ${patch}`)
             .setImage('attachment://acts-chart.png')
             .setDescription(`\`\`\`\nThe following are the top total badge earners.\n\`\`\`\n`)

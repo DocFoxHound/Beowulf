@@ -39,7 +39,7 @@ module.exports = {
                 // Create an embed for each chunk
                 const embeds = badgeChunks.map((chunk, index) => {
                     const embed = new EmbedBuilder()
-                        .setAuthor({ name: `${targetUser.username}'s Badges`, iconURL: 'https://i.imgur.com/JvvqhbV.png' })
+                        .setAuthor({ name: `${targetUser.username}'s IronPoints Badges`, iconURL: 'https://i.imgur.com/JvvqhbV.png' })
                         .setThumbnail(targetUser.displayAvatarURL())
                         // .setImage('https://i.imgur.com/6wRYEg5.png')
                         .setTitle(` `)
