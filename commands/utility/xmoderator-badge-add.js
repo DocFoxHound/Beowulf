@@ -23,7 +23,7 @@ module.exports = {
             option.setName('points')
                 .setDescription('0-50, specifically designated badges can exceed.')
                 .setRequired(true)
-                .setMinValue(0)
+                .setMinValue(-100)
                 .setMaxValue(100)),
     
     /**

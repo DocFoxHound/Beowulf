@@ -27,79 +27,83 @@ module.exports = {
             }
 
             // Sort badges by badge_weight in descending order
-                badges.sort((a, b) => b.badge_weight - a.badge_weight);
+            badges.sort((a, b) => b.badge_weight - a.badge_weight);
             
-                // Split badges into chunks of 25
-                const chunkSize = 25;
-                const badgeChunks = [];
-                for (let i = 0; i < badges.length; i += chunkSize) {
-                    badgeChunks.push(badges.slice(i, i + chunkSize));
+            // Calculate total weight
+            const totalWeight = badges.reduce((sum, badge) => sum + Number(badge.badge_weight || 0), 0);
+            
+            // Split badges into chunks of 25
+            const chunkSize = 25;
+            const badgeChunks = [];
+            for (let i = 0; i < badges.length; i += chunkSize) {
+                badgeChunks.push(badges.slice(i, i + chunkSize));
+            }
+            
+            // Create an embed for each chunk
+            const embeds = badgeChunks.map((chunk, index) => {
+                const embed = new EmbedBuilder()
+                    .setAuthor({ name: `${targetUser.username}'s IronPoints Badges`, iconURL: 'https://i.imgur.com/JvvqhbV.png' })
+                    .setThumbnail(targetUser.displayAvatarURL())
+                    .setDescription(`Total Points: ${totalWeight}`)
+                    // .setImage('https://i.imgur.com/6wRYEg5.png')
+                    .setTitle(` `)
+                    .setColor('#ff0000')
+                    .setTimestamp()
+                    .setFooter({ text: `(Page ${index + 1}/${badgeChunks.length})`});
+            
+                chunk.forEach(badge => {
+                    embed.addFields(
+                        { 
+                            name: `${badge.badge_name} (Points: ${badge.badge_weight})`, 
+                            value: badge.badge_description || 'No description', 
+                            inline: false 
+                        }
+                    );
+                });
+            
+                return embed;
+            });
+            
+            // Create buttons for navigation
+            const buttons = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('previous')
+                        .setLabel('Previous')
+                        .setStyle(ButtonStyle.Primary)
+                        .setDisabled(true),
+                    new ButtonBuilder()
+                        .setCustomId('next')
+                        .setLabel('Next')
+                        .setStyle(ButtonStyle.Primary)
+                        .setDisabled(embeds.length <= 1)
+                );
+            
+            // Send the first embed with navigation buttons
+            const message = await interaction.reply({ embeds: [embeds[0]], components: [buttons] });
+            
+            // Create a collector to handle button interactions
+            const collector = message.createMessageComponentCollector({ time: 300000 });
+            
+            let currentPage = 0;
+            collector.on('collect', async interaction => {
+                if (interaction.customId === 'previous') {
+                    currentPage--;
+                } else if (interaction.customId === 'next') {
+                    currentPage++;
                 }
             
-                // Create an embed for each chunk
-                const embeds = badgeChunks.map((chunk, index) => {
-                    const embed = new EmbedBuilder()
-                        .setAuthor({ name: `${targetUser.username}'s IronPoints Badges`, iconURL: 'https://i.imgur.com/JvvqhbV.png' })
-                        .setThumbnail(targetUser.displayAvatarURL())
-                        // .setImage('https://i.imgur.com/6wRYEg5.png')
-                        .setTitle(` `)
-                        .setColor('#ff0000')
-                        .setTimestamp()
-                        .setFooter({ text: `(Page ${index + 1}/${badgeChunks.length})`});
+                // Update buttons
+                buttons.components[0].setDisabled(currentPage === 0);
+                buttons.components[1].setDisabled(currentPage === embeds.length - 1);
             
-                    chunk.forEach(badge => {
-                        embed.addFields(
-                            { 
-                                name: `${badge.badge_name} (Points: ${badge.badge_weight})`, 
-                                value: badge.badge_description || 'No description', 
-                                inline: false 
-                            }
-                        );
-                    });
+                await interaction.update({ embeds: [embeds[currentPage]], components: [buttons] });
+            });
             
-                    return embed;
-                });
-            
-                // Create buttons for navigation
-                const buttons = new ActionRowBuilder()
-                    .addComponents(
-                        new ButtonBuilder()
-                            .setCustomId('previous')
-                            .setLabel('Previous')
-                            .setStyle(ButtonStyle.Primary)
-                            .setDisabled(true),
-                        new ButtonBuilder()
-                            .setCustomId('next')
-                            .setLabel('Next')
-                            .setStyle(ButtonStyle.Primary)
-                            .setDisabled(embeds.length <= 1)
-                    );
-            
-                // Send the first embed with navigation buttons
-                const message = await interaction.reply({ embeds: [embeds[0]], components: [buttons] });
-            
-                // Create a collector to handle button interactions
-                const collector = message.createMessageComponentCollector({ time: 300000 });
-            
-                let currentPage = 0;
-                collector.on('collect', async interaction => {
-                    if (interaction.customId === 'previous') {
-                        currentPage--;
-                    } else if (interaction.customId === 'next') {
-                        currentPage++;
-                    }
-            
-                    // Update buttons
-                    buttons.components[0].setDisabled(currentPage === 0);
-                    buttons.components[1].setDisabled(currentPage === embeds.length - 1);
-            
-                    await interaction.update({ embeds: [embeds[currentPage]], components: [buttons] });
-                });
-            
-                collector.on('end', async () => {
-                    buttons.components.forEach(button => button.setDisabled(true));
-                    await message.edit({ components: [buttons] });
-                });
+            collector.on('end', async () => {
+                buttons.components.forEach(button => button.setDisabled(true));
+                await message.edit({ components: [buttons] });
+            });
         } catch (error) {
             console.error('Error fetching badges:', error);
             await interaction.reply('An error occurred while fetching the badges. Please try again later.');
