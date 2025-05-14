@@ -231,6 +231,7 @@ client.on('guildMemberAdd', async member => {
             username: member.user.username,
             nickname: null,
             rank: null,
+            roles: member.roles.cache.map(role => role.id),
         };
 
         // Dynamically populate fields for each class category
@@ -275,6 +276,7 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
             username: newMember.user.username,
             nickname: newMember.nickname,
             rank: userRank,
+            roles: memberRoles,
         };
 
         // Dynamically populate fields for each class category

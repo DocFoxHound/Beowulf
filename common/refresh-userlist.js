@@ -13,7 +13,7 @@ async function refreshUserlist(client, openai) {
         const guild = await client.guilds.cache.get(process.env.LIVE_ENVIRONMENT === "true" ? process.env.GUILD_ID : process.env.TEST_GUILD_ID);
         const memberList = await guild.members.cache;
         const allClasses = await getClasses();
-        const classData = await generateClassData(allClasses); // Organize classes by category
+        // const classData = await generateClassData(allClasses); // Organize classes by category
         const prestigeRoles = await getPrestiges(); // Fetch prestige roles dynamically
 
         memberList.forEach(async member => {
@@ -31,7 +31,8 @@ async function refreshUserlist(client, openai) {
                     id: member.id,
                     username: member.user.username,
                     nickname: member.nickname || null,
-                    rank: userRank
+                    rank: userRank,
+                    roles: memberRoles
                 };
 
                 // //Populate the updatedUserData object with the existing data
@@ -75,6 +76,7 @@ async function refreshUserlist(client, openai) {
                     username: member.user.username,
                     nickname: member.nickname || null,
                     rank: userRank,
+                    roles: memberRoles
                 };
 
                 // // Dynamically populate fields for each class category
