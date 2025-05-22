@@ -1,8 +1,8 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('@discordjs/builders');
-const { getAllGameVersions } = require('../../api/gameVersionApi');
-const { getAllSummarizedItems, getAllSummarizedCommodities } = require('../../api/uexApi');
-const { createHitLog } = require('../../api/hitTrackerApi');
-const { getUserById } = require('../../api/userlistApi');
+const { getAllGameVersions } = require('../api/gameVersionApi');
+const { getAllSummarizedItems, getAllSummarizedCommodities } = require('../api/uexApi');
+const { createHitLog } = require('../api/hitTrackerApi');
+const { getUserById } = require('../api/userlistApi');
 
 
 const command = new SlashCommandBuilder()
@@ -13,8 +13,9 @@ const command = new SlashCommandBuilder()
             .setDescription('Was the hit performed flying or FPS?')
             .setRequired(true)
             .addChoices(
-                { name: 'Air', value: 'air' },
-                { name: 'Ground', value: 'ground' }
+                { name: 'Air', value: 'Air' },
+                { name: 'Ground', value: 'Ground' },
+                { name: 'Mixed', value: 'Mixed' }
             ))
     .addStringOption(option => 
         option.setName('cargo-1')

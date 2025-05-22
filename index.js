@@ -16,7 +16,10 @@ const { refreshUserlist } = require("./common/refresh-userlist.js");
 const { saveMessage } = require("./common/message-saver.js");
 const { loadChatlogs } = require("./vector-handling/vector-handler.js");
 const { trimChatLogs } = require("./vector-handling/vector-handler.js");
+const { checkRecentGatherings } = require("./common/check-recent-gatherings.js");
 const { getClasses } = require('./api/classApi.js');
+const bodyParser = require('body-parser');
+const { handleHitPost } = require('./functions/post-new-hit.js');
 // const { queueChannelPoster } = require("./queue-functions/queue-controller.js")
 // const { seshEventCheck } = require("./deprecated-but-keep/seshEventCheck.js");
 
@@ -158,6 +161,9 @@ client.on("ready", async () => {
   );
   setInterval(() => trimChatLogs(),
     43200000 //every 12 hours
+  );
+  setInterval(() => checkRecentGatherings(client, openai),
+    3600000 //every 1 hour
   );
 }),
 
@@ -336,3 +342,34 @@ async function generateClassData(allClasses) {
       return null;  // Return null if there's an error
   }
 }
+
+const express = require('express');
+const app = express();
+app.use(bodyParser.json());
+// Expose /hittrack endpoint for API to POST new HitTrack objects
+app.post('/hittrack', async (req, res) => {
+  try {
+    const hitTrack = req.body;
+    // You can add validation here if needed
+    await handleHitPost(client, openai, hitTrack);
+
+    // Example: Send a message to a Discord channel when a new HitTrack is received
+    // const channel = await client.channels.fetch(process.env.HITTRACK_CHANNEL_ID);
+    // if (channel) {
+    //   await channel.send({
+    //     content: `New HitTrack received:\n**Title:** ${hitTrack.title}\n**User:** ${hitTrack.username}\n**Value:** ${hitTrack.total_value}\n**Story:** ${hitTrack.story}`,
+    //   });
+    // }
+
+    res.status(200).json({ message: 'HitTrack received by Discord bot.' });
+  } catch (error) {
+    console.error('Error handling /hittrack:', error);
+    res.status(500).json({ error: 'Failed to process HitTrack.' });
+  }
+});
+
+// Start the HTTP server on a configurable port
+const PORT = process.env.BOT_HTTP_PORT || 3001;
+app.listen(PORT, () => {
+  console.log(`Discord bot HTTP server listening on port ${PORT}`);
+});
