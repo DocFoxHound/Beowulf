@@ -20,8 +20,8 @@ const { checkRecentGatherings } = require("./common/check-recent-gatherings.js")
 const { getClasses } = require('./api/classApi.js');
 const bodyParser = require('body-parser');
 const { handleHitPost } = require('./functions/post-new-hit.js');
-// const { queueChannelPoster } = require("./queue-functions/queue-controller.js")
-// const { seshEventCheck } = require("./deprecated-but-keep/seshEventCheck.js");
+const { handleFleetLogPost } = require('./functions/post-new-fleet-log.js');
+const { handleFleetCreatePost } = require('./functions/post-new-fleet-create.js');
 
 // Initialize dotenv config file
 const args = process.argv.slice(2);
@@ -365,6 +365,34 @@ app.post('/hittrack', async (req, res) => {
   } catch (error) {
     console.error('Error handling /hittrack:', error);
     res.status(500).json({ error: 'Failed to process HitTrack.' });
+  }
+});
+
+// Expose /fleetlog endpoint for API to POST new ShipLog objects
+app.post('/fleetlog', async (req, res) => {
+  try {
+    const shipLog = req.body;
+    // You can add validation here if needed
+    await handleFleetLogPost(client, openai, shipLog);
+
+    res.status(200).json({ message: 'FleetLog received by Discord bot.' });
+  } catch (error) {
+    console.error('Error handling /fleetlog:', error);
+    res.status(500).json({ error: 'Failed to process FleetLog.' });
+  }
+});
+
+// Expose /fleetcreated endpoint for API to POST new Fleet objects
+app.post('/fleetcreated', async (req, res) => {
+  try {
+    const fleet = req.body;
+    // You can add Discord notification logic here if needed, e.g. send to a channel
+    await handleFleetCreatePost(client, openai, fleet);
+
+    res.status(200).json({ message: 'Fleet creation received by Discord bot.' });
+  } catch (error) {
+    console.error('Error handling /fleetcreated:', error);
+    res.status(500).json({ error: 'Failed to process fleet creation.' });
   }
 });
 

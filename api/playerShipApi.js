@@ -15,17 +15,6 @@ async function createPlayerShip(PlayerShipData) {
     }
 }
 
-// async function getAllPlayerShips() {
-//     const apiUrl = `${process.env.SERVER_URL}${process.env.API_CUSTOM_SHIP}/`;
-//     try {
-//         const response = await axios.get(apiUrl);
-//         return response.data;  // This will be the return value of the function
-//     } catch (error) {
-//         console.error('Error fetching all PlayerShips:', error.response ? error.response.data : error.message);
-//         return null;  // Return null if there's an error
-//     }
-// }
-
 async function getPlayerShipsByUserId(user_id) {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_CUSTOM_SHIP}/user`;
     try {
