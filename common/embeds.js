@@ -358,8 +358,70 @@ async function topHandlers(client, interaction, timeframe){
     }   
 }
 
+function buildEventEmbed({
+    title,
+    description,
+    embedColor,
+    embedImage,
+    start_time,
+    end_time,
+    timestamp,
+    id,
+    rsvpOptionsArr,
+    rsvpMap,
+    fleets
+}) {
+    // Convert start_time to Discord timestamp format
+    let startTimeField = "N/A";
+    if (start_time) {
+        const unix = Math.floor(new Date(start_time).getTime() / 1000);
+        startTimeField = `<t:${unix}:f>`;
+    }
+
+    // Start with the start time field
+    const fields = [
+        { name: "Start Time", value: startTimeField || "N/A", inline: false }
+    ];
+
+    // Add a single field for all participating fleets, just above RSVP options
+    if (Array.isArray(fleets) && fleets.length > 0) {
+        const fleetNames = fleets.map(fleet => fleet.name).join('\n');
+        fields.push({
+            name: "Participating Fleets",
+            value: fleetNames,
+            inline: false
+        });
+    }
+
+    // Add RSVP option fields
+    if (Array.isArray(rsvpOptionsArr)) {
+        rsvpOptionsArr.forEach(opt => {
+            fields.push({
+                name: `${opt.emoji ? opt.emoji + " " : ""}${opt.name}`,
+                value: rsvpMap && rsvpMap[opt.name] && rsvpMap[opt.name].length > 0
+                    ? rsvpMap[opt.name].join("\n")
+                    : "_No one yet_",
+                inline: true
+            });
+        });
+    }
+
+    const embed = new EmbedBuilder()
+        .setTitle(title || "Untitled Event")
+        .setDescription(description || "No description provided.")
+        .setColor(embedColor || 0x2b2d31)
+        .addFields(fields)
+        .setTimestamp(new Date(timestamp))
+        .setFooter({ text: `Event ID: ${id}` });
+
+    if (embedImage) embed.setImage(embedImage);
+
+    return embed;
+}
+
 module.exports = {
     progressEmbed,
     queueEmbed,
     topHandlers,
+    buildEventEmbed,
 };

@@ -22,6 +22,11 @@ const bodyParser = require('body-parser');
 const { handleHitPost } = require('./functions/post-new-hit.js');
 const { handleFleetLogPost } = require('./functions/post-new-fleet-log.js');
 const { handleFleetCreatePost } = require('./functions/post-new-fleet-create.js');
+const { handleScheduleCreate } = require('./functions/create-new-schedule.js');
+const { handleScheduleUpdate } = require('./functions/update-schedule.js');
+const { updateSchedule } = require('./api/scheduleApi.js');
+const { manageEvents } = require('./common/event-management.js');
+const { handleFleetCommanderChange } = require('./functions/fleet-commander-change.js');
 
 // Initialize dotenv config file
 const args = process.argv.slice(2);
@@ -165,15 +170,12 @@ client.on("ready", async () => {
   setInterval(() => checkRecentGatherings(client, openai),
     3600000 //every 1 hour
   );
+  setInterval(() => manageEvents(client, openai),
+    300000 // every 5 minutes
+  );
 }),
 
 client.on("messageCreate", async (message) => {
-  // Check if the message is posted in the specific channel
-  // if (message.channelId === process.env.LIVE_ENVIRONMENT === "true" ? process.env.AUDIT_CHANNEL : process.env.TEST_AUDIT_CHANNEL) {
-  //   seshEventCheck(message, client);
-  //   // Perform actions specific to the audit channel
-  //   // return;
-  // }
   if (!channelIds.includes(message.channelId) || !message.guild || message.system) {
     return;
   }
@@ -272,9 +274,16 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
             return;
         }
 
-        // Get the member's rank
+        // Get the member's rank and prestige levels
         const memberRoles = newMember.roles.cache.map(role => role.id);
         const userRank = await getUserRank(memberRoles);
+
+        // Fetch prestige roles for level calculation
+        const { getPrestiges, getRaptorRank, getCorsairRank, getRaiderRank } = require("./userlist-functions/userlist-controller");
+        const prestigeRoles = await require("./api/prestige-roles-api").getPrestiges();
+        const raptorLevel = await getRaptorRank(memberRoles, prestigeRoles);
+        const corsairLevel = await getCorsairRank(memberRoles, prestigeRoles);
+        const raiderLevel = await getRaiderRank(memberRoles, prestigeRoles);
 
         // Initialize the updatedUser object
         const updatedUser = {
@@ -283,6 +292,9 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
             nickname: newMember.nickname,
             rank: userRank,
             roles: memberRoles,
+            raptor_level: raptorLevel,
+            corsair_level: corsairLevel,
+            raider_level: raiderLevel,
         };
 
         // Dynamically populate fields for each class category
@@ -298,6 +310,55 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
         console.log("User updated successfully");
     } catch (error) {
         console.error("Error updating user:", error);
+    }
+});
+
+client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isButton()) return;
+    console.log("Button interaction received:", interaction.customId);
+
+    // Only allow in specific event channels
+    const allowedChannels = [
+        process.env.LIVE_ENVIRONMENT === "true" ? process.env.EVENTS_PUBLIC_CHANNEL : process.env.TEST_EVENTS_PUBLIC_CHANNEL,
+        process.env.LIVE_ENVIRONMENT === "true" ? process.env.EVENTS_CREW_CHANNEL : process.env.TEST_EVENTS_CREW_CHANNEL,
+        process.env.LIVE_ENVIRONMENT === "true" ? process.env.EVENTS_MARAUDER_CHANNEL : process.env.TEST_EVENTS_MARAUDER_CHANNEL,
+    ];
+    if (!allowedChannels.includes(interaction.channelId)) return;
+    // Parse customId in the format: type_scheduleId_buttonId_optName (e.g., rsvp_5267609524_11758094_Yes)
+    const match = interaction.customId.match(/^([^_]+)_([^_]+)_(.+)$/);
+    if (!match) return;
+
+    const type = match[1];
+    const scheduleId = match[2];
+    const optName = match[3];
+    const userId = interaction.user.id;
+
+    // Fetch the schedule
+    let schedule;
+    try {
+        schedule = await require('./api/scheduleApi').getScheduleById(scheduleId);
+    } catch (e) {
+        await interaction.reply({ content: 'Could not fetch event.', ephemeral: true });
+        return;
+    }
+    if (!schedule) {
+        await interaction.reply({ content: 'Event not found.', ephemeral: true });
+        return;
+    }
+
+    // Call handleScheduleUpdate to update the embed/message and DB
+    try {
+        await require('./functions/update-schedule.js').handleScheduleUpdate(
+            client,
+            openai,
+            schedule,
+            userId,
+            optName
+        );
+        await interaction.reply({ content: `You have RSVP'd as "${optName}".`, ephemeral: true });
+    } catch (err) {
+        console.error('Failed to update RSVP:', err);
+        await interaction.reply({ content: 'Failed to update RSVP.', ephemeral: true });
     }
 });
 
@@ -353,14 +414,6 @@ app.post('/hittrack', async (req, res) => {
     // You can add validation here if needed
     await handleHitPost(client, openai, hitTrack);
 
-    // Example: Send a message to a Discord channel when a new HitTrack is received
-    // const channel = await client.channels.fetch(process.env.HITTRACK_CHANNEL_ID);
-    // if (channel) {
-    //   await channel.send({
-    //     content: `New HitTrack received:\n**Title:** ${hitTrack.title}\n**User:** ${hitTrack.username}\n**Value:** ${hitTrack.total_value}\n**Story:** ${hitTrack.story}`,
-    //   });
-    // }
-
     res.status(200).json({ message: 'HitTrack received by Discord bot.' });
   } catch (error) {
     console.error('Error handling /hittrack:', error);
@@ -393,6 +446,48 @@ app.post('/fleetcreated', async (req, res) => {
   } catch (error) {
     console.error('Error handling /fleetcreated:', error);
     res.status(500).json({ error: 'Failed to process fleet creation.' });
+  }
+});
+
+// Expose /createschedule endpoint for API to POST new Fleet objects
+app.post('/createschedule', async (req, res) => {
+  try {
+    const schedule = req.body;
+    // You can add Discord notification logic here if needed, e.g. send to a channel
+    await handleScheduleCreate(client, openai, schedule);
+
+    res.status(200).json({ message: 'Schedule creation received by Discord bot.' });
+  } catch (error) {
+    console.error('Error handling /createschedule:', error);
+    res.status(500).json({ error: 'Failed to process schedule creation.' });
+  }
+});
+
+// Expose /createschedule endpoint for API to POST new Fleet objects
+app.post('/updateschedule', async (req, res) => {
+  try {
+    const schedule = req.body;
+    // You can add Discord notification logic here if needed, e.g. send to a channel
+    await handleScheduleUpdate(client, openai, schedule);
+
+    res.status(200).json({ message: 'Schedule update received by Discord bot.' });
+  } catch (error) {
+    console.error('Error handling /updateschedule:', error);
+    res.status(500).json({ error: 'Failed to process schedule update.' });
+  }
+});
+
+// Expose /createschedule endpoint for API to POST new Fleet objects
+app.post('/fleetcommanderchange', async (req, res) => {
+  try {
+    const fleet = req.body;
+    // You can add Discord notification logic here if needed, e.g. send to a channel
+    await handleFleetCommanderChange(client, openai, fleet);
+
+    res.status(200).json({ message: 'Commander update received by Discord bot.' });
+  } catch (error) {
+    console.error('Error handling /fleetcommanderchange:', error);
+    res.status(500).json({ error: 'Failed to process fleet command updates.' });
   }
 });
 
