@@ -1,4 +1,5 @@
-const { ChannelType, EmbedBuilder } = require("discord.js");
+const { ChannelType, EmbedBuilder, PermissionsBitField } = require("discord.js");
+const { updateFleet } = require("../api/userFleetApi"); // <-- Import updateFleet
 
 async function handleFleetCreatePost(client, openai, userFleet) {
     const channelId = process.env.LIVE_ENVIRONMENT === "true"
@@ -8,6 +9,33 @@ async function handleFleetCreatePost(client, openai, userFleet) {
     const channel = await client.channels.fetch(channelId);
     if (!channel || channel.type !== ChannelType.GuildForum) {
         throw new Error("Channel not found or is not a forum channel.");
+    }
+
+    // Create a new role for the fleet
+    const guild = channel.guild;
+    let role;
+    try {
+        role = await guild.roles.create({
+            name: `Fleet ${userFleet.name}`,
+            color: 0x57F287,
+            reason: `Role for fleet ${userFleet.name}`,
+            mentionable: true,
+        });
+        // Save the role ID to the fleet object (and persist as needed)
+        userFleet.discord_role = role.id;
+        // If you want to persist this to your DB, do it here:
+        if (typeof userFleet.save === "function") {
+            await userFleet.save();
+        }
+        // Also update in backend via API
+        if (userFleet.id) {
+            await updateFleet(userFleet.id, { 
+                discord_role: role.id,
+                action: "create_role",
+             });
+        }
+    } catch (err) {
+        console.error("Failed to create fleet role:", err);
     }
 
     // Try to fetch the user object for the commander_id

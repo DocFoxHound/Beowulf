@@ -27,6 +27,7 @@ const { handleScheduleUpdate } = require('./functions/update-schedule.js');
 const { updateSchedule } = require('./api/scheduleApi.js');
 const { manageEvents } = require('./common/event-management.js');
 const { handleFleetCommanderChange } = require('./functions/fleet-commander-change.js');
+const { handleFleetMemberChange } = require('./functions/fleet-member-change.js');
 
 // Initialize dotenv config file
 const args = process.argv.slice(2);
@@ -483,6 +484,20 @@ app.post('/fleetcommanderchange', async (req, res) => {
     const fleet = req.body;
     // You can add Discord notification logic here if needed, e.g. send to a channel
     await handleFleetCommanderChange(client, openai, fleet);
+
+    res.status(200).json({ message: 'Commander update received by Discord bot.' });
+  } catch (error) {
+    console.error('Error handling /fleetcommanderchange:', error);
+    res.status(500).json({ error: 'Failed to process fleet command updates.' });
+  }
+});
+
+// Expose /createschedule endpoint for API to POST new Fleet objects
+app.post('/fleetmemberchange', async (req, res) => {
+  try {
+    const fleet = req.body;
+    // You can add Discord notification logic here if needed, e.g. send to a channel
+    await handleFleetMemberChange(client, openai, fleet);
 
     res.status(200).json({ message: 'Commander update received by Discord bot.' });
   } catch (error) {

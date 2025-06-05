@@ -83,7 +83,12 @@ async function createFleet(fleetData) {
     }
 }
 
-// Update a fleet by ID
+/**
+ * Update a fleet by ID.
+ * @param {string|number} id - Fleet ID.
+ * @param {object} updatedFleetData - Data to update, may include 'action' and 'changed_user_id'.
+ * @returns {Promise<object|null>}
+ */
 async function updateFleet(id, updatedFleetData) {
     const apiBase = `${process.env.SERVER_URL}${process.env.API_USER_FLEETS}`;
     try {
