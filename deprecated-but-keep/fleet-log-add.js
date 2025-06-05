@@ -1,10 +1,10 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, EmbedBuilder } = require('discord.js');
-const { getAllShips } = require('../../api/uexApi');
-const { createShipLog } = require('../../api/shipLogApi');
-const { getAllGameVersions } = require('../../api/gameVersionApi');
-const { getPlayerShipsByUserId, getPlayerShipByEntryId } = require('../../api/playerShipApi');
-const { getUserById } = require('../../api/userlistApi');
+const { getAllShips } = require('../api/uexApi');
+const { createShipLog } = require('../api/shipLogApi');
+const { getAllGameVersions } = require('../api/gameVersionApi');
+const { getPlayerShipsByUserId, getPlayerShipByEntryId } = require('../api/playerShipApi');
+const { getUserById } = require('../api/userlistApi');
 
 const command = new SlashCommandBuilder()
     .setName('fleet-log-add')

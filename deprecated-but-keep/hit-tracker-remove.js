@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const { getHitLogByEntryId, getHitLogsByUserId, deleteHitLog } = require('../../api/hitTrackerApi');
-const { getUserById } = require('../../api/userlistApi');
+const { getHitLogByEntryId, getHitLogsByUserId, deleteHitLog } = require('../api/hitTrackerApi');
+const { getUserById } = require('../api/userlistApi');
 
 
 const command = new SlashCommandBuilder()
