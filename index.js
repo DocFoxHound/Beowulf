@@ -495,7 +495,6 @@ app.post('/fleetcommanderchange', async (req, res) => {
 // Expose /createschedule endpoint for API to POST new Fleet objects
 app.post('/fleetmemberchange', async (req, res) => {
   try {
-    console.log("Fleet member change request received:", req.body);
     const fleet = req.body;
     // You can add Discord notification logic here if needed, e.g. send to a channel
     await handleFleetMemberChange(client, openai, fleet);
