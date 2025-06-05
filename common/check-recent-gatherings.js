@@ -46,6 +46,7 @@ async function checkRecentGatherings(client, openai) {
                 if (userIds.length === 0) continue;
 
                 const gatheringData = {
+                    id: Math.floor(10000000 + Math.random() * 90000000),
                     channel_id: channel.id,
                     channel_name: channel.name,
                     user_ids: userIds,
