@@ -137,7 +137,7 @@ client.on("ready", async () => {
   // console.log(client.guilds.fetch(process.env.TEST_GUILD_ID))
   // refreshUserlist(client, openai)
   preloadedDbTables = await preloadFromDb();
-  // processLeaderboards(client, openai)
+  processLeaderboards(client, openai)
 
   // setInterval(() => userCache.clear(),
   //   21600000 // Clear cache every 6 hours, avoids excessive memory bloat
@@ -176,9 +176,9 @@ client.on("ready", async () => {
   setInterval(() => manageEvents(client, openai),
     300000 // every 5 minutes
   );
-  // setInterval(() => processLeaderboards(client, openai),
-  //   3600000 //every 1 hour
-  // );
+  setInterval(() => processLeaderboards(client, openai),
+    14400000 //every 4 hours
+  );
 }),
 
 client.on("messageCreate", async (message) => {

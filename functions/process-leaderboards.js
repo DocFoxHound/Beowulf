@@ -1,5 +1,5 @@
 const axios = require('axios');
-const { createLeaderboardEntriesBulk } = require('../api/leaderboardSBApi');
+const { createLeaderboardEntriesBulk, deleteAllLeaderboardEntries } = require('../api/leaderboardSBApi');
 const crypto = require('crypto'); // Add this at the top
 
 // Helper function to pause execution for ms milliseconds
@@ -16,6 +16,11 @@ function chunkArray(array, size) {
 }
 
 async function processLeaderboards(client, openai) {
+    // Delete all previous leaderboard data before loading new data
+    console.log('Deleting all previous leaderboard entries...');
+    await deleteAllLeaderboardEntries();
+    console.log('All previous leaderboard entries deleted.');
+
     const cigSBUrl = `${process.env.API_CIG_LEADERBOARD_SB}`;
     const createdAtSeries = Date.now()
     const referer = "https://robertsspaceindustries.com/en/community/leaderboards/all?mode=SB";
@@ -125,9 +130,6 @@ async function processLeaderboards(client, openai) {
             // Add other fields to sum as needed
         }
     }
-
-    // userTotals now contains combined stats for users across all maps
-    console.log("Combined user totals across all maps:", Object.values(userTotals));
 
     // Filter for users who appeared on more than one map
     const summarizedPlayers = Object.values(userTotals)
