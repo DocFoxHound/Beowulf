@@ -1,4 +1,5 @@
 const { ChannelType, EmbedBuilder } = require("discord.js");
+const { getFleetById } = require("../api/userFleetApi"); // <-- Add this import
 
 async function handleHitPost(client, openai, hitTrack) {
     const channelId = process.env.LIVE_ENVIRONMENT === "true"
@@ -16,6 +17,19 @@ async function handleHitPost(client, openai, hitTrack) {
         assistMentions = hitTrack.assists.map(id => `<@${id}>`).join(", ");
     }
 
+    // Fetch fleet names from fleet_ids
+    let fleetNames = [];
+    if (Array.isArray(hitTrack.fleet_ids) && hitTrack.fleet_ids.length > 0) {
+        // Fetch all fleet names in parallel
+        const fleetResults = await Promise.all(
+            hitTrack.fleet_ids.map(async (id) => {
+                const fleet = await getFleetById(id);
+                return fleet && fleet.name ? fleet.name : null;
+            })
+        );
+        fleetNames = fleetResults.filter(name => !!name);
+    }
+
     // Create the embed
     const embed = new EmbedBuilder()
         .setTitle(hitTrack.title)
@@ -30,7 +44,7 @@ async function handleHitPost(client, openai, hitTrack) {
             { name: "Patch", value: hitTrack.patch || "N/A", inline: true },
             { name: "Assists", value: assistMentions, inline: true },
             { name: "Fleet Activity", value: hitTrack.fleet_activity ? "Yes" : "No", inline: true },
-            { name: "Fleet Names", value: (hitTrack.fleet_names || []).join(", ") || "None", inline: true },
+            { name: "Fleet Names", value: fleetNames.length > 0 ? fleetNames.join(", ") : "None", inline: true }, // <-- updated
             { name: "Victims", value: (hitTrack.victims || []).join(", ") || "None", inline: true },
             { name: "Video Link", value: hitTrack.video_link || "N/A", inline: false },
             { name: "Additional Media", value: (hitTrack.additional_media_links || []).join(", ") || "None", inline: false },

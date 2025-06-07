@@ -19,11 +19,11 @@ async function checkRecentGatherings(client, openai) {
 
         // 2. Log current gatherings
         for (const [guildId, guild] of client.guilds.cache) {
-            const textChannels = guild.channels.cache.filter(
-                channel => channel.type === 0 // 0 = GuildText
+            const voiceChannels = guild.channels.cache.filter(
+                channel => channel.type === 2 // 2 = GuildVoice
             );
 
-            for (const [channelId, channel] of textChannels) {
+            for (const [channelId, channel] of voiceChannels) {
                 let members;
                 try {
                     members = await channel.members;
@@ -34,7 +34,7 @@ async function checkRecentGatherings(client, openai) {
                     members = guild.members.cache.filter(m => !m.user.bot);
                 }
 
-                const userIds = [];
+                const userIds = []; 
                 const usernames = [];
                 members.forEach(member => {
                     if (!member.user.bot) {
