@@ -13,19 +13,19 @@ async function handleFleetLogPost(client, openai, shipLog) {
     // Build crew mentions
     let crewMentions = "None";
     if (Array.isArray(shipLog.crew_ids) && shipLog.crew_ids.length > 0) {
-        crewMentions = shipLog.crew_ids.map(id => `<@${id}>`).join(", ");
+        crewMentions = shipLog.crew_ids.map(id => `<@${id.toString()}>`).join(", ");
     }
 
     // Build air sub mentions
     let airSubMentions = "None";
     if (Array.isArray(shipLog.air_sub_ids) && shipLog.air_sub_ids.length > 0) {
-        airSubMentions = shipLog.air_sub_ids.map(id => `<@${id}>`).join(", ");
+        airSubMentions = shipLog.air_sub_ids.map(id => `<@${id.toString()}>`).join(", ");
     }
 
     // Build fps sub mentions
     let fpsSubMentions = "None";
     if (Array.isArray(shipLog.fps_sub_ids) && shipLog.fps_sub_ids.length > 0) {
-        fpsSubMentions = shipLog.fps_sub_ids.map(id => `<@${id}>`).join(", ");
+        fpsSubMentions = shipLog.fps_sub_ids.map(id => `<@${id.toString()}>`).join(", ");
     }
 
     // Create the embed
