@@ -28,7 +28,8 @@ async function processLeaderboards(client, openai) {
         "BROKEN-MOON",
         "DYING-STAR",
         "KAREAH",
-        "JERICHO-STATION"
+        "JERICHO-STATION",
+        "MINERS-LAMENT"
     ];
 
     const MAX_BIGINT = 9223372036854775807n;
