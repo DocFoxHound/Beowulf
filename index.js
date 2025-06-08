@@ -326,6 +326,7 @@ client.on('interactionCreate', async (interaction) => {
     // Only allow in specific event channels
     const allowedChannels = [
         process.env.LIVE_ENVIRONMENT === "true" ? process.env.EVENTS_PUBLIC_CHANNEL : process.env.TEST_EVENTS_PUBLIC_CHANNEL,
+        process.env.LIVE_ENVIRONMENT === "true" ? process.env.EVENTS_PROSPECT_CHANNEL : process.env.TEST_EVENTS_PROSPECT_CHANNEL,
         process.env.LIVE_ENVIRONMENT === "true" ? process.env.EVENTS_CREW_CHANNEL : process.env.TEST_EVENTS_CREW_CHANNEL,
         process.env.LIVE_ENVIRONMENT === "true" ? process.env.EVENTS_MARAUDER_CHANNEL : process.env.TEST_EVENTS_MARAUDER_CHANNEL,
     ];
