@@ -109,54 +109,6 @@ async function processLeaderboards(client, openai) {
             console.error(`Error processing map ${mapTitle}:`, error.response ? error.response.data : error.message);
         }
     }
-
-    // ---- After all maps processed ----
-    // Example: Combine all players from all maps into one array
-    const allMapsPlayers = Object.values(mapPlayersByMap).flat();
-
-    // Group by displayname and sum values (e.g., kills, score)
-    const userTotals = {};
-    for (const player of allMapsPlayers) {
-        const name = player.displayname;
-        if (!userTotals[name]) {
-            userTotals[name] = { ...player, maps: [player.map] };
-        } else {
-            // Sum numeric fields (add more as needed)
-            userTotals[name].kills = (parseInt(userTotals[name].kills) || 0) + (parseInt(player.kills) || 0);
-            userTotals[name].score = (parseInt(userTotals[name].score) || 0) + (parseInt(player.score) || 0);
-            // Track maps they've appeared on
-            if (!userTotals[name].maps.includes(player.map)) {
-                userTotals[name].maps.push(player.map);
-            }
-            // Add other fields to sum as needed
-        }
-    }
-
-    // Filter for users who appeared on more than one map
-    const summarizedPlayers = Object.values(userTotals)
-        .filter(player => player.maps.length > 1)
-        .map(player => {
-            // Create a new summarized entry
-            return {
-                ...player,
-                id: randomBigInt().toString(),
-                created_at: Date.now(),
-                map: 'ALL_MAPS' // or any label you want for summary
-            };
-        });
-
-    console.log(`Summarized ${summarizedPlayers.length} players who appeared on multiple maps.`);
-
-    // Send summarized players in batches of 100
-    const summaryBatches = chunkArray(summarizedPlayers, 100);
-    for (let i = 0; i < summaryBatches.length; i++) {
-        try {
-            console.log(`Submitting summary batch ${i + 1} of ${summaryBatches.length} (entries: ${summaryBatches[i].length})`);
-            await createLeaderboardEntriesBulk(summaryBatches[i]);
-        } catch (error) {
-            console.error(`Error submitting summary batch ${i + 1}:`, error.response ? error.response.data : error.message);
-        }
-    }
 }
 
 module.exports = {
