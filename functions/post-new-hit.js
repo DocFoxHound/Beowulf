@@ -1,5 +1,6 @@
 const { ChannelType, EmbedBuilder } = require("discord.js");
 const { getFleetById } = require("../api/userFleetApi"); // <-- Add this import
+const { editHitLog } = require("../api/hitTrackerApi"); // <-- Add this import
 
 async function handleHitPost(client, openai, hitTrack) {
     const channelId = process.env.LIVE_ENVIRONMENT === "true"
@@ -32,10 +33,10 @@ async function handleHitPost(client, openai, hitTrack) {
 
     // Create the embed
     const embed = new EmbedBuilder()
-        .setTitle(hitTrack.title)
+        .setTitle(`${hitTrack.nickname || hitTrack.username}: ${hitTrack.title}`)
         .setDescription(hitTrack.story)
         .addFields(
-            { name: "User", value: `${hitTrack.username || hitTrack.user_id}`, inline: true },
+            { name: "User", value: `${hitTrack.nickname || hitTrack.username}`, inline: true },
             { name: "Type of Piracy", value: hitTrack.type_of_piracy, inline: true },
             { name: "Total Value", value: `${hitTrack.total_value}`, inline: true },
             { name: "Total Cut Value", value: `${hitTrack.total_cut_value}`, inline: true },
@@ -72,6 +73,10 @@ async function handleHitPost(client, openai, hitTrack) {
             await thread.send(mediaLink);
         }
     }
+
+    //save the thread ID to the hitTrack object
+    hitTrack.threadId = thread.id;
+    await editHitLog(hitTrack.id, hitTrack);
 }
 
 module.exports = {

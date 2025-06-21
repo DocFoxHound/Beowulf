@@ -20,6 +20,7 @@ const { checkRecentGatherings } = require("./common/check-recent-gatherings.js")
 const { getClasses } = require('./api/classApi.js');
 const bodyParser = require('body-parser');
 const { handleHitPost } = require('./functions/post-new-hit.js');
+const { handleHitPostDelete } = require('./functions/post-delete-hit.js');
 const { handleFleetLogPost } = require('./functions/post-new-fleet-log.js');
 const { handleFleetCreatePost } = require('./functions/post-new-fleet-create.js');
 const { handleScheduleCreate } = require('./functions/create-new-schedule.js');
@@ -425,6 +426,20 @@ app.post('/hittrack', async (req, res) => {
   } catch (error) {
     console.error('Error handling /hittrack:', error);
     res.status(500).json({ error: 'Failed to process HitTrack.' });
+  }
+});
+
+// Expose /hittrack endpoint for API to POST new HitTrack objects
+app.post('/hittrackdelete', async (req, res) => {
+  try {
+    const hitTrack = req.body;
+    // You can add validation here if needed
+    await handleHitPostDelete(client, openai, hitTrack);
+
+    res.status(200).json({ message: 'HitTrackdelete received by Discord bot.' });
+  } catch (error) {
+    console.error('Error handling /hittrackdelete:', error);
+    res.status(500).json({ error: 'Failed to process HitTrackdelete.' });
   }
 });
 
