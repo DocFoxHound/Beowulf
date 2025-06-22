@@ -75,7 +75,7 @@ async function handleHitPost(client, openai, hitTrack) {
     }
 
     //save the thread ID to the hitTrack object
-    hitTrack.threadId = thread.id;
+    hitTrack.thread_id = thread.id;
     await editHitLog(hitTrack.id, hitTrack);
 }
 

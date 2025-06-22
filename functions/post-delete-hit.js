@@ -1,10 +1,13 @@
 const { ChannelType, EmbedBuilder } = require("discord.js");
 const { getFleetById } = require("../api/userFleetApi"); // <-- Add this import
 const { deleteHitLog } = require("../api/hitTrackerApi"); // <-- Add this import
+const { getHitLogByEntryId } = require("../api/hitTrackerApi"); // <-- Add this import
 
 
-async function handleHitPostDelete(client, openai, hitTrack) {
+async function handleHitPostDelete(client, openai, hitTrackId) {
+    console.log("Handling hit post deletion for:", hitTrackId);
     try {
+        const hitTrack = await getHitLogByEntryId(hitTrackId);
         // Fetch the thread by its ID
         const thread = await client.channels.fetch(hitTrack.thread_id);
 
@@ -24,14 +27,16 @@ async function handleHitPostDelete(client, openai, hitTrack) {
         // Lock the thread to prevent further posting
         await thread.setLocked(true);
 
+        // Prepend "❌ " to the thread title
+        await thread.setName(`❌ ${thread.name}`);
+
         console.log(`Thread ${hitTrack.thread_id} locked and status posted.`);
     } catch (error) {
         console.error('Error handling deleted hit entry:', error);
     }
 
     //save the thread ID to the hitTrack object
-    hitTrack.threadId = thread.id;
-    await deleteHitLog(hitTrack.id);
+    await deleteHitLog(hitTrackId);
 }
 
 module.exports = {

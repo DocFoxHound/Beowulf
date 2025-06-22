@@ -415,8 +415,9 @@ async function generateClassData(allClasses) {
 const express = require('express');
 const app = express();
 app.use(bodyParser.json());
+app.use(express.json());
 // Expose /hittrack endpoint for API to POST new HitTrack objects
-app.post('/hittrack', async (req, res) => {
+app.post('/hittrackcreate', async (req, res) => {
   try {
     const hitTrack = req.body;
     // You can add validation here if needed
@@ -432,9 +433,9 @@ app.post('/hittrack', async (req, res) => {
 // Expose /hittrack endpoint for API to POST new HitTrack objects
 app.post('/hittrackdelete', async (req, res) => {
   try {
-    const hitTrack = req.body;
+    const hitTrackId = req.body.entryId;
     // You can add validation here if needed
-    await handleHitPostDelete(client, openai, hitTrack);
+    await handleHitPostDelete(client, openai, hitTrackId);
 
     res.status(200).json({ message: 'HitTrackdelete received by Discord bot.' });
   } catch (error) {
