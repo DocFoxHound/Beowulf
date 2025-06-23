@@ -138,7 +138,7 @@ client.on("ready", async () => {
   // console.log(client.guilds.fetch(process.env.TEST_GUILD_ID))
   // refreshUserlist(client, openai)
   preloadedDbTables = await preloadFromDb();
-  processLeaderboards(client, openai)
+  // processLeaderboards(client, openai)
 
   // setInterval(() => userCache.clear(),
   //   21600000 // Clear cache every 6 hours, avoids excessive memory bloat
@@ -433,9 +433,9 @@ app.post('/hittrackcreate', async (req, res) => {
 // Expose /hittrack endpoint for API to POST new HitTrack objects
 app.post('/hittrackdelete', async (req, res) => {
   try {
-    const hitTrackId = req.body.entryId;
+    const hitTrack = req.body;
     // You can add validation here if needed
-    await handleHitPostDelete(client, openai, hitTrackId);
+    await handleHitPostDelete(client, openai, hitTrack);
 
     res.status(200).json({ message: 'HitTrackdelete received by Discord bot.' });
   } catch (error) {

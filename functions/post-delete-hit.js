@@ -4,12 +4,12 @@ const { deleteHitLog } = require("../api/hitTrackerApi"); // <-- Add this import
 const { getHitLogByEntryId } = require("../api/hitTrackerApi"); // <-- Add this import
 
 
-async function handleHitPostDelete(client, openai, hitTrackId) {
-    console.log("Handling hit post deletion for:", hitTrackId);
+async function handleHitPostDelete(client, openai, hitTrack) {
     try {
-        const hitTrack = await getHitLogByEntryId(hitTrackId);
+        // const hitTrack = await getHitLogByEntryId(hitTrack);
         // Fetch the thread by its ID
-        const thread = await client.channels.fetch(hitTrack.thread_id);
+        console.log("Fetching thread with ID:", hitTrack.hit.thread_id);
+        const thread = await client.channels.fetch(hitTrack.hit.thread_id);
 
         if (!thread || !thread.isThread()) {
             console.error('Thread not found or is not a thread.');
@@ -30,13 +30,13 @@ async function handleHitPostDelete(client, openai, hitTrackId) {
         // Prepend "❌ " to the thread title
         await thread.setName(`❌ ${thread.name}`);
 
-        console.log(`Thread ${hitTrack.thread_id} locked and status posted.`);
+        console.log(`Thread ${hitTrack.hit.thread_id} locked and status posted.`);
     } catch (error) {
         console.error('Error handling deleted hit entry:', error);
     }
 
     //save the thread ID to the hitTrack object
-    await deleteHitLog(hitTrackId);
+    // await deleteHitLog(hitTrack);
 }
 
 module.exports = {
