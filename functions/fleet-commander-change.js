@@ -5,6 +5,10 @@ async function handleFleetCommanderChange(client, openai, userFleet) {
         ? process.env.FLEET_COMMANDERS_CHANNEL
         : process.env.TEST_FLEET_COMMANDERS_CHANNEL;
 
+    const fleetCommanderId = process.env.LIVE_ENVIRONMENT === "true"
+        ? process.env.FLEET_COMMANDER_ROLE
+        : process.env.TEST_FLEET_COMMANDER_ROLE;
+
     const channel = await client.channels.fetch(channelId);
     if (!channel || channel.type !== ChannelType.GuildText) return;
 
@@ -37,75 +41,48 @@ async function handleFleetCommanderChange(client, openai, userFleet) {
         }
 
         if (action === "add") {
-            // Add the fleet role to the commander
+            // Add the fleetCommanderId role to the commander
             try {
                 const guild = channel.guild;
                 const member = await guild.members.fetch(commanderId);
-                if (member && userFleet.discord_role) {
-                    await member.roles.add(userFleet.discord_role);
+                if (member && fleetCommanderId) {
+                    await member.roles.add(fleetCommanderId);
                 }
             } catch (err) {
-                console.error('Error adding fleet role to commander:', err);
+                console.error('Error adding fleetCommanderId role to commander:', err);
             }
-            await channel.permissionOverwrites.edit(commanderId, {
-                ViewChannel: true,
-                ReadMessageHistory: true,
-                SendMessages: true,
-                EmbedLinks: true,
-                AttachFiles: true,
-                UseExternalEmojis: true,
-                UseExternalStickers: true,
-                MentionEveryone: true,
-                UseApplicationCommands: true,
-            });
             await channel.send({ embeds: [embed] });
         } else if (action === "remove") {
-            // Add the fleet role to the commander
+            // Remove the fleetCommanderId role from the commander
             try {
                 const guild = channel.guild;
                 const member = await guild.members.fetch(commanderId);
-                if (member && userFleet.discord_role) {
-                    await member.roles.remove(userFleet.discord_role);
+                if (member && fleetCommanderId) {
+                    await member.roles.remove(fleetCommanderId);
                 }
             } catch (err) {
-                console.error('Error adding fleet role to commander:', err);
+                console.error('Error removing fleetCommanderId role from commander:', err);
             }
-            await channel.permissionOverwrites.delete(commanderId);
             await channel.send({ embeds: [embed] });
         } else if (action === "close") {
-            // Remove permissions for the commander (or changed_user_id if provided)
-            if (changedUserId) {
-                await channel.permissionOverwrites.delete(changedUserId);
-            } else if (commanderId) {
-                await channel.permissionOverwrites.delete(commanderId);
-            }
-
-            // Remove the fleet role from the commander
+            // Remove the fleetCommanderId role from the commander (and optionally changedUserId)
             try {
                 const guild = channel.guild;
-                if (commanderId && userFleet.discord_role) {
+                if (commanderId && fleetCommanderId) {
                     const commanderMember = await guild.members.fetch(commanderId);
                     if (commanderMember) {
-                        await commanderMember.roles.remove(userFleet.discord_role);
+                        await commanderMember.roles.remove(fleetCommanderId);
                     }
                 }
-                // Remove the fleet role from all members in userFleet.members_ids
-                if (Array.isArray(userFleet.members_ids) && userFleet.discord_role) {
-                    for (const memberId of userFleet.members_ids) {
-                        try {
-                            const member = await guild.members.fetch(memberId);
-                            if (member) {
-                                await member.roles.remove(userFleet.discord_role);
-                            }
-                        } catch (err) {
-                            console.error(`Error removing fleet role from member ${memberId}:`, err);
-                        }
+                if (changedUserId && fleetCommanderId) {
+                    const changedMember = await guild.members.fetch(changedUserId);
+                    if (changedMember) {
+                        await changedMember.roles.remove(fleetCommanderId);
                     }
                 }
             } catch (err) {
-                console.error('Error removing fleet role(s) on close:', err);
+                console.error('Error removing fleetCommanderId role(s) on close:', err);
             }
-
             await channel.send({ embeds: [embed] });
         }
     } catch (err) {

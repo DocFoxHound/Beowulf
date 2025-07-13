@@ -5,7 +5,7 @@ async function handleFleetCreatePost(client, openai, userFleet) {
     const channelId = process.env.LIVE_ENVIRONMENT === "true"
         ? process.env.FLEETLOG_CHANNEL_ID
         : process.env.TEST_FLEETLOG_CHANNEL_ID;
-
+        
     const channel = await client.channels.fetch(channelId);
     if (!channel || channel.type !== ChannelType.GuildForum) {
         throw new Error("Channel not found or is not a forum channel.");
