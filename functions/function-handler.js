@@ -1,7 +1,7 @@
 const piracyAdviceLocation = require("./piracy-advice-location");
 const transactCommodityLocation = require("./transact-commodity-location");
-const queueReminderCheck = require("../queue-functions/queue-controller").queueReminderCheck;
-const { queueControllerForChat } = require("../queue-functions/queue-controller");
+// const queueReminderCheck = require("../queue-functions/queue-controller").queueReminderCheck;
+// const { queueControllerForChat } = require("../queue-functions/queue-controller");
 const progressQuery = require("../deprecated-but-keep/progress-query").progressQuery;
 const handlerQuery = require("./handler-query").handlerQuery;
 const badgeQuery = require("./badge-query").badgeQuery;

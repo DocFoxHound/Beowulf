@@ -8,58 +8,58 @@ const { sendMessageNotifySubject } = require("../threads/send-response")
 
 
 
-async function notifyNewQueue(queue, requestedText, user, openai, client){
-    console.log(`Notify`)
-    channelToNotify = null;
-    switch (queue){
-        case "RAPTOR":
-            channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAPTOR_CHANNEL : process.env.TEST_RAPTOR_CHANNEL;
-            break;
-        case "RAIDER":
-            channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAIDER_CHANNEL : process.env.TEST_RAIDER_CHANNEL;
-            break;
-        case "CORSAIR":
-            channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.CORSAIR_CHANNEL : process.env.TEST_CORSAIR_CHANNEL;
-            break;
-    }
-    messageToBot = `Rewrite the following: "${user} has been added to the ${queue} queue for ${requestedText} class/assessment"`
-    const thread = await createNewThread(channelToNotify, openai);
-    await addMessageToThread(thread, openai, messageToBot, false); //add the message to the thread
-    let run = await runThreadForQueueNotify(thread, openai, true);
+// async function notifyNewQueue(queue, requestedText, user, openai, client){
+//     console.log(`Notify`)
+//     channelToNotify = null;
+//     switch (queue){
+//         case "RAPTOR":
+//             channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.DOGFIGHTING_CHANNEL : process.env.TEST_RAPTOR_CHANNEL;
+//             break;
+//         case "RAIDER":
+//             channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.PIRACY_CHANNEL : process.env.TEST_RAIDER_CHANNEL;
+//             break;
+//         case "CORSAIR":
+//             channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.CORSAIR_CHANNEL : process.env.TEST_CORSAIR_CHANNEL;
+//             break;
+//     }
+//     messageToBot = `Rewrite the following: "${user} has been added to the ${queue} queue for ${requestedText} class/assessment"`
+//     const thread = await createNewThread(channelToNotify, openai);
+//     await addMessageToThread(thread, openai, messageToBot, false); //add the message to the thread
+//     let run = await runThreadForQueueNotify(thread, openai, true);
 
-    if (run.status === "completed") {
-        console.log("Completed Notify")
-        const formattedResponse = await formatResponseForQueueCheck(run.thread_id, openai);
-        await sendMessage(channelToNotify, formattedResponse, client);
-        raptorResultArray = null;
-    }
-}
+//     if (run.status === "completed") {
+//         console.log("Completed Notify")
+//         const formattedResponse = await formatResponseForQueueCheck(run.thread_id, openai);
+//         await sendMessage(channelToNotify, formattedResponse, client);
+//         raptorResultArray = null;
+//     }
+// }
 
-async function notifyOldQueue(queue, requestedText, openai, client){
-    console.log("Notify")
-    channelToNotify = null;
-    switch (queue){
-        case "RAPTOR":
-            channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAPTOR_CHANNEL : process.env.TEST_RAPTOR_CHANNEL;
-            break;
-        case "RAIDER":
-            channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAIDER_CHANNEL : process.env.TEST_RAIDER_CHANNEL;
-            break;
-        case "CORSAIR":
-            channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.CORSAIR_CHANNEL : process.env.TEST_CORSAIR_CHANNEL;
-            break;
-    }
-    messageToBot = `Rewrite the following: "${requestedText}"`
-    const thread = await createNewThread(channelToNotify, openai);
-    await addMessageToThread(thread, openai, messageToBot, false); //add the message to the thread
-    let run = await runThreadForQueueNotify(thread, openai, true);
-    if (run.status === "completed") {
-        console.log("Completed Notify")
-        const formattedResponse = await formatResponseForQueueCheck(run.thread_id, openai);
-        await sendMessage(channelToNotify, formattedResponse, client);
-        raptorResultArray = null;
-    }
-}
+// async function notifyOldQueue(queue, requestedText, openai, client){
+//     console.log("Notify")
+//     channelToNotify = null;
+//     switch (queue){
+//         case "RAPTOR":
+//             channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.DOGFIGHTING_CHANNEL : process.env.TEST_RAPTOR_CHANNEL;
+//             break;
+//         case "RAIDER":
+//             channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.PIRACY_CHANNEL : process.env.TEST_RAIDER_CHANNEL;
+//             break;
+//         case "CORSAIR":
+//             channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.CORSAIR_CHANNEL : process.env.TEST_CORSAIR_CHANNEL;
+//             break;
+//     }
+//     messageToBot = `Rewrite the following: "${requestedText}"`
+//     const thread = await createNewThread(channelToNotify, openai);
+//     await addMessageToThread(thread, openai, messageToBot, false); //add the message to the thread
+//     let run = await runThreadForQueueNotify(thread, openai, true);
+//     if (run.status === "completed") {
+//         console.log("Completed Notify")
+//         const formattedResponse = await formatResponseForQueueCheck(run.thread_id, openai);
+//         await sendMessage(channelToNotify, formattedResponse, client);
+//         raptorResultArray = null;
+//     }
+// }
 
 async function notifyPrestigePromotion(prestige, prestigeLevel, userData, openai, client){
     console.log(`Notify`)
@@ -71,7 +71,7 @@ async function notifyPrestigePromotion(prestige, prestigeLevel, userData, openai
             if(prestigeLevel === 1){
                 channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.GENERAL_CHANNEL : process.env.TEST_GENERAL_CHANNEL;
             }else if(prestigeLevel > 1){
-                channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAPTOR_CHANNEL : process.env.TEST_RAPTOR_CHANNEL;
+                channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.DOGFIGHTING_CHANNEL : process.env.TEST_RAPTOR_CHANNEL;
             }
             break;
         case "RAIDER":
@@ -129,13 +129,11 @@ async function notifyRankPromotion(rank, userData, openai, client){
 
 async function notifyRemovalFromQueue(){
     //YOU NEED TO DO THIS
+    // NO I DONT
 }
 
 module.exports = {
-    notifyNewQueue,
-    notifyOldQueue,
     notifyRemovalFromQueue,
     notifyPrestigePromotion,
     notifyRankPromotion
-    // notifyNewQueueThreadResponse,
 }

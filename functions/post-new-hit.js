@@ -12,10 +12,20 @@ async function handleHitPost(client, openai, hitTrack) {
         throw new Error("Channel not found or is not a forum channel.");
     }
 
-    // Build assist mentions
+    // Build assist mentions and guests
     let assistMentions = "None";
-    if (Array.isArray(hitTrack.assists) && hitTrack.assists.length > 0) {
-        assistMentions = hitTrack.assists.map(id => `<@${id}>`).join(", ");
+    const assistList = Array.isArray(hitTrack.assists) && hitTrack.assists.length > 0
+        ? hitTrack.assists.map(id => `<@${id}>`)
+        : [];
+    const guestList = Array.isArray(hitTrack.guests) && hitTrack.guests.length > 0
+        ? hitTrack.guests
+        : [];
+    if (assistList.length > 0 || guestList.length > 0) {
+        assistMentions = assistList.join(", ");
+        if (guestList.length > 0) {
+            if (assistMentions.length > 0) assistMentions += ", ";
+            assistMentions += guestList.join(", ");
+        }
     }
 
     // Fetch fleet names from fleet_ids
