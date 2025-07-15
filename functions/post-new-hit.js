@@ -65,7 +65,7 @@ async function handleHitPost(client, openai, hitTrack) {
 
     // Create a new post (thread) in the forum channel with the embed
     const thread = await channel.threads.create({
-        name: hitTrack.title,
+        name: `${hitTrack.nickname || hitTrack.username}: ${hitTrack.title}`,
         message: {
             embeds: [embed],
         },
