@@ -46,3 +46,36 @@ module.exports = {
     createRecentGathering,
     deleteRecentGathering
 };
+
+async function updateRecentGathering(id, gatheringData) {
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_RECENT_GATHERINGS}/${id}`;
+    try {
+        const response = await axios.put(apiUrl, gatheringData, {
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error('Error updating recent gathering:', error.response ? error.response.data : error.message);
+        return null;
+    }
+}
+    updateRecentGathering
+
+// RECENT GATHERINGS EXAMPLE
+// {
+//     "id": "12345",
+//     "channel_id": "123456789012345678",
+//     "channel_name": "Dogfighting Practice",
+//     "user_ids": [
+//         "123456789012345678",
+//         "234567890123456789"
+//     ],
+//     "usernames": [
+//         "DocHound",
+//         "Kowolski"
+//     ],
+//     "timestamp": "2023-10-01T10:00:00Z",
+
+// }    

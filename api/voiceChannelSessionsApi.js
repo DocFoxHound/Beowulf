@@ -11,6 +11,17 @@ async function getAllVoiceSessions() {
     }
 }
 
+async function getAllVoiceSessionsLastHour() {
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_VOICE_CHANNEL_SESSION}/lasthour`;
+    try {
+        const response = await axios.get(apiUrl);
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching all voice sessions:', error.response ? error.response.data : error.message);
+        return null;
+    }
+}
+
 async function getAllActiveVoiceSessions() {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_VOICE_CHANNEL_SESSION}/active`;
     try {
@@ -68,6 +79,7 @@ async function deleteVoiceSession(id) {
 }
 module.exports = {
     getAllVoiceSessions,
+    getAllVoiceSessionsLastHour,
     getAllActiveVoiceSessions,
     createVoiceSession,
     updateVoiceSession,
