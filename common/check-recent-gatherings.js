@@ -26,15 +26,15 @@ async function checkRecentGatherings(client, openai) {
             for (const [channelId, channel] of voiceChannels) {
                 let members;
                 try {
-                    members = await channel.members;
+                    members = channel.members;
                 } catch {
-                    members = [];
+                    members = undefined;
                 }
                 if (!members || members.size === 0) {
-                    members = guild.members.cache.filter(m => !m.user.bot);
+                    continue; // Skip channels with no members
                 }
 
-                const userIds = []; 
+                const userIds = [];
                 const usernames = [];
                 members.forEach(member => {
                     if (!member.user.bot) {

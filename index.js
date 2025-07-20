@@ -30,6 +30,8 @@ const { manageEvents } = require('./common/event-management.js');
 const { handleFleetCommanderChange } = require('./functions/fleet-commander-change.js');
 const { handleFleetMemberChange } = require('./functions/fleet-member-change.js');
 const { processLeaderboards } = require('./functions/process-leaderboards.js');
+const { voiceChannelSessions } = require("./common/voice-channel-sessions.js");
+
 
 // Initialize dotenv config file
 const args = process.argv.slice(2);
@@ -52,6 +54,7 @@ const client = new Client({
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildPresences,
+    GatewayIntentBits.GuildVoiceStates,
   ],
 });
 
@@ -173,6 +176,9 @@ client.on("ready", async () => {
   );
   setInterval(() => checkRecentGatherings(client, openai),
     3600000 //every 1 hour
+  );
+  setInterval(() => voiceChannelSessions(client, openai),
+    60000 //every 1 minute
   );
   setInterval(() => manageEvents(client, openai),
     300000 // every 5 minutes
