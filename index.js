@@ -175,7 +175,7 @@ client.on("ready", async () => {
     43200000 //every 12 hours
   );
   setInterval(() => checkRecentGatherings(client, openai),
-    3600000 //every 1 hour
+    300000 //every 5 minutes
   );
   setInterval(() => voiceChannelSessions(client, openai),
     60000 //every 1 minute
