@@ -55,6 +55,7 @@ const client = new Client({
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildPresences,
     GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.GuildEmojisAndStickers,
   ],
 });
 
@@ -534,8 +535,31 @@ app.post('/fleetmemberchange', async (req, res) => {
   }
 });
 
+// Expose /emojidata endpoint for API to GET emoji data from Discord
+app.get('/emojidata', async (req, res) => {
+  try {
+    // Collect emojis from all guilds the bot is in
+    const allEmojis = [];
+    for (const [guildId, guild] of client.guilds.cache) {
+      guild.emojis.cache.forEach(emoji => {
+        allEmojis.push({
+          id: emoji.id,
+          name: emoji.name,
+          url: emoji.url,
+          animated: emoji.animated,
+          guild: guild.name,
+        });
+      });
+    }
+    res.status(200).json({ emojis: allEmojis });
+  } catch (error) {
+    console.error('Error handling /emojidata:', error);
+    res.status(500).json({ error: 'Failed to fetch emoji data.' });
+  }
+});
+
 // Start the HTTP server on a configurable port
-const PORT = process.env.BOT_HTTP_PORT || 3001;
+const PORT = process.env.BOT_HTTP_PORT;
 app.listen(PORT, () => {
   console.log(`Discord bot HTTP server listening on port ${PORT}`);
 });

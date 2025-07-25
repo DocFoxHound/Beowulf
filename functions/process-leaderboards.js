@@ -1,6 +1,7 @@
 const axios = require('axios');
 const { createLeaderboardEntriesBulk, deleteAllLeaderboardEntries } = require('../api/leaderboardSBApi');
 const crypto = require('crypto'); // Add this at the top
+const { processLeaderboards: processLeaderboardLogs } = require('./process-leaderboard-logs');
 
 // Helper function to pause execution for ms milliseconds
 function sleep(ms) {
@@ -109,6 +110,8 @@ async function processLeaderboards(client, openai) {
             console.error(`Error processing map ${mapTitle}:`, error.response ? error.response.data : error.message);
         }
     }
+    // Call process-leaderboard-logs after all maps are processed
+    await processLeaderboardLogs(client, openai);
 }
 
 module.exports = {
