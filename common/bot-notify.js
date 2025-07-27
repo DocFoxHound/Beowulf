@@ -97,32 +97,44 @@ async function notifyPrestigePromotion(prestige, prestigeLevel, userData, openai
     if (run.status === "completed") {
         console.log("Completed Notify")
         const formattedResponse = await formatResponseForQueueCheck(run.thread_id, openai);
-        await sendMessageNotifySubject(channelId, userId, formattedResponse, client);
+        await sendMessageNotifySubject(channelToNotify, userId, formattedResponse, client);
         raptorResultArray = null;
     }
 }
 
 async function notifyRankPromotion(rank, userData, openai, client){
     console.log(`Notify`)
+    console.log(`Rank: ${rank}`);
     let channelToNotify = null;
     let messageToBot = '';
-    switch (rank){
-        case "CREW":
-            messageToBot = `Write a congratulations on ${userData.nickname || userData.username}'s completion of the requirements to make Crew.`
-            channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.GENERAL_CHANNEL : process.env.TEST_GENERAL_CHANNEL;
-            break;
-        case "MARAUDER":
-            messageToBot = `Write a congratulations on ${userData.nickname || userData.username}'s completion of the requirements to make Marauder, but explain that while they qualify for it that doesn't mean they've earned it. The last step is the Marauder challenge specifically for their Prestige, and that this is the hardest part.`
-            channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.CREW_CHANNEL : process.env.TEST_CREW_CHANNEL;
-            break;
-    }
+
+    messageToBot = `Congratulate ${userData.nickname || userData.username} for promoting to ${rank}.`
+    channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.ANNOUNCEMENTS_CHANNEL : process.env.TEST_ANNOUNCEMENTS_CHANNEL;
+
     const thread = await createNewThread(channelToNotify, openai);
     await addMessageToThread(thread, openai, messageToBot, false); //add the message to the thread
     let run = await runThreadForQueueNotify(thread, openai, true);
     if (run.status === "completed") {
         console.log("Completed Notify")
         const formattedResponse = await formatResponseForQueueCheck(run.thread_id, openai);
-        await sendMessageNotifySubject(channelId, userId, formattedResponse, client);
+        await sendMessageNotifySubject(channelToNotify, userData.userId, formattedResponse, client);
+        raptorResultArray = null;
+    }
+}
+
+async function notifyForAward(badgeName, badgeDescription, userName, userId, openai, client){
+    console.log(`Notifying for Badge Award: ${badgeName}`);
+    let channelToNotify = null;
+    let messageToBot = '';
+    messageToBot = `Write a congratulations to ${userName} for earning the badge ${badgeName}, which has the description of: ${badgeDescription}.`
+    channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.GENERAL_CHANNEL : process.env.TEST_GENERAL_CHANNEL;
+    const thread = await createNewThread(channelToNotify, openai);
+    await addMessageToThread(thread, openai, messageToBot, false); //add the message to the thread
+    let run = await runThreadForQueueNotify(thread, openai, true);
+    if (run.status === "completed") {
+        console.log("Completed Notify")
+        const formattedResponse = await formatResponseForQueueCheck(run.thread_id, openai);
+        await sendMessageNotifySubject(channelToNotify, userId, formattedResponse, client);
         raptorResultArray = null;
     }
 }
@@ -135,5 +147,6 @@ async function notifyRemovalFromQueue(){
 module.exports = {
     notifyRemovalFromQueue,
     notifyPrestigePromotion,
-    notifyRankPromotion
+    notifyRankPromotion,
+    notifyForAward
 }

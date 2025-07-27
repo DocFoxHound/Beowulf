@@ -31,6 +31,8 @@ const { handleFleetCommanderChange } = require('./functions/fleet-commander-chan
 const { handleFleetMemberChange } = require('./functions/fleet-member-change.js');
 const { processLeaderboards } = require('./functions/process-leaderboards.js');
 const { voiceChannelSessions } = require("./common/voice-channel-sessions.js");
+const { automatedAwards } = require("./common/automated-awards.js");
+const { promotePlayerNotify } = require("./common/promote-player-notify.js");
 
 
 // Initialize dotenv config file
@@ -147,6 +149,12 @@ client.on("ready", async () => {
   // setInterval(() => userCache.clear(),
   //   21600000 // Clear cache every 6 hours, avoids excessive memory bloat
   // );
+  // setInterval(() => queueReminderCheck(openai, client, null),
+  //   43200000 //every 12 hours
+  // );
+  // setInterval(() => queueChannelPoster(client),
+  //   43200000 //every 12 hours
+  // );
   setInterval(() => processUEXData("terminal_prices"), 
     86400000 //every 24 hours
   );
@@ -159,18 +167,14 @@ client.on("ready", async () => {
   setInterval(async () => preloadedDbTables = preloadFromDb(),
     21600000 //every 6 hours
   );
-  // setInterval(() => queueReminderCheck(openai, client, null),
-  //   43200000 //every 12 hours
-  // );
-  // setInterval(() => queueChannelPoster(client),
-  //   43200000 //every 12 hours
-  // );
   setInterval(() => refreshUserlist(client, openai),
     43201000 //every 12 hours and 1 second
   );
   setInterval(() => loadChatlogs(client, openai),
     60000 // every 1 minutes
-    // 10800000 //every 3 hours
+  );
+    setInterval(() => voiceChannelSessions(client, openai),
+    60000 //every 1 minute
   );
   setInterval(() => trimChatLogs(),
     43200000 //every 12 hours
@@ -178,14 +182,15 @@ client.on("ready", async () => {
   setInterval(() => checkRecentGatherings(client, openai),
     300000 //every 5 minutes
   );
-  setInterval(() => voiceChannelSessions(client, openai),
-    60000 //every 1 minute
-  );
   setInterval(() => manageEvents(client, openai),
     300000 // every 5 minutes
   );
   setInterval(() => processLeaderboards(client, openai),
     14400000 //every 4 hours
+  );
+  setInterval(() => automatedAwards(client, openai),
+    // 60000 //every 1 minute
+    3600000 //every 1 hour
   );
 }),
 
@@ -560,6 +565,25 @@ app.get('/emojidata', async (req, res) => {
   } catch (error) {
     console.error('Error handling /emojidata:', error);
     res.status(500).json({ error: 'Failed to fetch emoji data.' });
+  }
+});
+
+// Expose /promote endpoint for API to GET promote action for a user
+app.get('/promote', async (req, res) => {
+  try {
+    const user_id = req.query.user_id || req.body.user_id;
+    if (!user_id) {
+      return res.status(400).json({ error: 'Missing user_id' });
+    }
+    // Call the promotion handler
+    const result = await promotePlayerNotify(client, openai, user_id);
+    if (result === true) {
+      return res.status(200).json("TRUE");
+    } else {
+      return res.status(500).json({ error: 'Promotion failed' });
+    }
+  } catch (error) {
+    res.status(500).send(error.message);
   }
 });
 
