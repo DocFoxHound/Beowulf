@@ -33,7 +33,10 @@ const { processLeaderboards } = require('./functions/process-leaderboards.js');
 const { voiceChannelSessions } = require("./common/voice-channel-sessions.js");
 const { automatedAwards } = require("./common/automated-awards.js");
 const { promotePlayerNotify } = require("./common/promote-player-notify.js");
-
+const { notifyForAward } = require("./common/bot-notify.js");
+const { grantPrestigeNotify } = require("./common/grant-prestige-notify.js");
+const { getPrestigeRanks } = require("./userlist-functions/userlist-controller.js");
+// const { getPrestiges, getRaptorRank, getCorsairRank, getRaiderRank } = require("./userlist-functions/userlist-controller");
 
 // Initialize dotenv config file
 const args = process.argv.slice(2);
@@ -283,8 +286,8 @@ client.on('guildMemberAdd', async member => {
 
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
     try {
-        const allClasses = await getClasses(); // Fetch all classes dynamically
-        const classData = await generateClassData(allClasses); // Organize classes by category
+        // const allClasses = await getClasses(); // Fetch all classes dynamically
+        // const classData = await generateClassData(allClasses); // Organize classes by category
 
         // Fetch the user's existing data
         const user = await getUserById(newMember.user.id) || null;
@@ -298,11 +301,11 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
         const userRank = await getUserRank(memberRoles);
 
         // Fetch prestige roles for level calculation
-        const { getPrestiges, getRaptorRank, getCorsairRank, getRaiderRank } = require("./userlist-functions/userlist-controller");
-        const prestigeRoles = await require("./api/prestige-roles-api").getPrestiges();
-        const raptorLevel = await getRaptorRank(memberRoles, prestigeRoles);
-        const corsairLevel = await getCorsairRank(memberRoles, prestigeRoles);
-        const raiderLevel = await getRaiderRank(memberRoles, prestigeRoles);
+        // const prestigeRoles = await require("./api/prestige-roles-api").getPrestiges();
+        // const raptorLevel = await getRaptorRank(memberRoles, prestigeRoles);
+        // const corsairLevel = await getCorsairRank(memberRoles, prestigeRoles);
+        // const raiderLevel = await getRaiderRank(memberRoles, prestigeRoles);
+        const prestigeRanks = await getPrestigeRanks(memberRoles);
 
         // Initialize the updatedUser object
         const updatedUser = {
@@ -311,18 +314,18 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
             nickname: newMember.nickname,
             rank: userRank,
             roles: memberRoles,
-            raptor_level: raptorLevel,
-            corsair_level: corsairLevel,
-            raider_level: raiderLevel,
+            raptor_level: prestigeRanks.raptor_level,
+            corsair_level: prestigeRanks.corsair_level,
+            raider_level: prestigeRanks.raider_level,
         };
 
-        // Dynamically populate fields for each class category
-        for (const [category, classes] of Object.entries(classData)) {
-            for (const classObj of classes) {
-                // Add a field for each class in the category
-                updatedUser[classObj.name] = user[classObj.name] || false; // Retain the user's existing completion status
-            }
-        }
+        // // Dynamically populate fields for each class category
+        // for (const [category, classes] of Object.entries(classData)) {
+        //     for (const classObj of classes) {
+        //         // Add a field for each class in the category
+        //         updatedUser[classObj.name] = user[classObj.name] || false; // Retain the user's existing completion status
+        //     }
+        // }
 
         // Update the user's data in the database
         await editUser(user.id, updatedUser);
@@ -581,6 +584,47 @@ app.get('/promote', async (req, res) => {
       return res.status(200).json("TRUE");
     } else {
       return res.status(500).json({ error: 'Promotion failed' });
+    }
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+});
+
+// Expose /notifyaward endpoint for API to GET notify award action for a user
+app.get('/notifyaward', async (req, res) => {
+  console.log("Received GET request to notify award");
+  try {
+    const badgeName = req.query.badgeName || req.body.badgeName;
+    const badgeDescription = req.query.badgeDescription || req.body.badgeDescription;
+    const userName = req.query.userName || req.body.userName;
+    const userId = req.query.userId || req.body.userId;
+    if (!badgeName || !badgeDescription || !userName || !userId) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    const result = await notifyForAward(badgeName, badgeDescription, userName, userId, openai, client);
+    if (result === true) {
+      return res.status(200).json("TRUE");
+    } else {
+      return res.status(500).json({ error: 'Award notification failed' });
+    }
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+});
+
+// Expose /grantprestige endpoint for API to POST grant prestige action for a user
+app.post('/grantprestige', async (req, res) => {
+  console.log("Received POST request to grant prestige");
+  try {
+    const { user_id, prestige_name, prestige_level } = req.body;
+    if (!user_id || !prestige_name || prestige_level === undefined) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    const result = await grantPrestigeNotify(user_id, prestige_name, prestige_level, openai, client);
+    if (result === true) {
+      return res.status(200).json("TRUE");
+    } else {
+      return res.status(500).json({ error: 'Prestige grant failed' });
     }
   } catch (error) {
     res.status(500).send(error.message);

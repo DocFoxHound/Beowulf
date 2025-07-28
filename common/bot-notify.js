@@ -63,32 +63,21 @@ const { sendMessageNotifySubject } = require("../threads/send-response")
 
 async function notifyPrestigePromotion(prestige, prestigeLevel, userData, openai, client){
     console.log(`Notify`)
+    console.log(`Prestige: ${prestige}`);
+    console.log(`Prestige Level: ${prestigeLevel}`);
     let channelToNotify = null;
     let messageToBot = '';
     switch (prestige){
         case "RAPTOR":
-            messageToBot = `Write a short poem on ${userData.nickname || userData.username}'s dogfighting skills and new promotion to ${prestige} ${prestigeLevel}.`
-            if(prestigeLevel === 1){
-                channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.GENERAL_CHANNEL : process.env.TEST_GENERAL_CHANNEL;
-            }else if(prestigeLevel > 1){
-                channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.DOGFIGHTING_CHANNEL : process.env.TEST_RAPTOR_CHANNEL;
-            }
-            break;
+            messageToBot = `Write a short poem on ${userData.nickname || userData.username}'s dogfighting skills and promotion to ${prestige} ${prestigeLevel}.`
+            channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.ANNOUNCEMENTS_CHANNEL : process.env.TEST_ANNOUNCEMENTS_CHANNEL;
         case "RAIDER":
-            messageToBot = `Write a short poem on ${userData.nickname || userData.username}'s piracy skills and new promotion to ${prestige} ${prestigeLevel}.`
-            if(prestigeLevel === 1){
-                channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.GENERAL_CHANNEL : process.env.TEST_GENERAL_CHANNEL;
-            }else if(prestigeLevel > 1){
-                channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAIDER_CHANNEL : process.env.TEST_RAIDER_CHANNEL;
-            }
+            messageToBot = `Write a short poem on ${userData.nickname || userData.username}'s piracy skills and promotion to ${prestige} ${prestigeLevel}.`
+            channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.ANNOUNCEMENTS_CHANNEL : process.env.TEST_ANNOUNCEMENTS_CHANNEL;
             break;
         case "CORSAIR":
-            messageToBot = `Write a short poem on ${userData.nickname || userData.username}'s fleet skills and new promotion to ${prestige} ${prestigeLevel}.`
-            if(prestigeLevel === 1){
-                channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.GENERAL_CHANNEL : process.env.TEST_GENERAL_CHANNEL;
-            }else if(prestigeLevel > 1){
-                channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.CORSAIR_CHANNEL : process.env.TEST_CORSAIR_CHANNEL;
-            }
+            messageToBot = `Write a short poem on ${userData.nickname || userData.username}'s fleet skills and promotion to ${prestige} ${prestigeLevel}.`
+            channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.ANNOUNCEMENTS_CHANNEL : process.env.TEST_ANNOUNCEMENTS_CHANNEL;
             break;
     }
     const thread = await createNewThread(channelToNotify, openai);
@@ -97,7 +86,13 @@ async function notifyPrestigePromotion(prestige, prestigeLevel, userData, openai
     if (run.status === "completed") {
         console.log("Completed Notify")
         const formattedResponse = await formatResponseForQueueCheck(run.thread_id, openai);
-        await sendMessageNotifySubject(channelToNotify, userId, formattedResponse, client);
+        console.log(`Formatted Response Complete`);
+        try{
+            await sendMessageNotifySubject(channelToNotify, userData.id, formattedResponse, client);
+        }catch(error){
+            console.error("Error sending message with user mention: ", error);
+        }
+        
         raptorResultArray = null;
     }
 }

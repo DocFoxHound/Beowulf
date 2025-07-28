@@ -34,6 +34,7 @@ async function sendMessage(channelId, message, client) {
 }
 
 async function sendMessageNotifySubject(channelId, userId, message, client) {
+    console.log("Sending message with user mention")
     const channel = client.channels.cache.get(channelId);
     const userMention = `<@${userId}>`;
     const messageWithMention = `${userMention} ${message}`;

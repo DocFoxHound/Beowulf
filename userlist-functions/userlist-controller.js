@@ -103,82 +103,126 @@ async function getUserRank(memberRoles) {
     }
 }
 
-async function getRaptorRank(memberRoles, prestigeRoles) {
-    try {
-        // Filter roles that contain "RAPTOR" (case-insensitive) in their name
-        const raptorRoles = prestigeRoles.filter(role =>
-            role.name.toLowerCase().includes("raptor")
-        );
+async function getPrestigeRanks(memberRoles) {
+    // Load role IDs from environment variables
+    const raptorRoles = [
+        process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAPTOR_1_ROLE : process.env.RAPTOR_1_TEST_ROLE,
+        process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAPTOR_2_ROLE : process.env.RAPTOR_2_TEST_ROLE,
+        process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAPTOR_3_ROLE : process.env.RAPTOR_3_TEST_ROLE,
+        process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAPTOR_4_ROLE : process.env.RAPTOR_4_TEST_ROLE,
+        process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAPTOR_5_ROLE : process.env.RAPTOR_5_TEST_ROLE
+    ];
+    const corsairRoles = [
+        process.env.LIVE_ENVIRONMENT === "true" ? process.env.CORSAIR_1_ROLE : process.env.CORSAIR_1_TEST_ROLE,
+        process.env.LIVE_ENVIRONMENT === "true" ? process.env.CORSAIR_2_ROLE : process.env.CORSAIR_2_TEST_ROLE,
+        process.env.LIVE_ENVIRONMENT === "true" ? process.env.CORSAIR_3_ROLE : process.env.CORSAIR_3_TEST_ROLE,
+        process.env.LIVE_ENVIRONMENT === "true" ? process.env.CORSAIR_4_ROLE : process.env.CORSAIR_4_TEST_ROLE,
+        process.env.LIVE_ENVIRONMENT === "true" ? process.env.CORSAIR_5_ROLE : process.env.CORSAIR_5_TEST_ROLE
+    ];
+    const raiderRoles = [
+        process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAIDER_1_ROLE : process.env.RAIDER_1_TEST_ROLE,
+        process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAIDER_2_ROLE : process.env.RAIDER_2_TEST_ROLE,
+        process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAIDER_3_ROLE : process.env.RAIDER_3_TEST_ROLE,
+        process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAIDER_4_ROLE : process.env.RAIDER_4_TEST_ROLE,
+        process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAIDER_5_ROLE : process.env.RAIDER_5_TEST_ROLE
+    ];
 
-        // Create a map of role IDs to their corresponding rank levels for quick lookup
-        const rankMap = new Map(raptorRoles.map(role => [role.id, role.rank_level]));
-
-        // Iterate through the memberRoles array and check for a match in the rankMap
-        for (const roleId of memberRoles) {
-            if (rankMap.has(roleId)) {
-                return rankMap.get(roleId); // Return the rank_level value if a match is found
+    // Helper to get highest level for a prestige type
+    function getLevel(roleList) {
+        let maxLevel = 0;
+        roleList.forEach((roleId, idx) => {
+            if (memberRoles.includes(roleId)) {
+                if (idx + 1 > maxLevel) {
+                    maxLevel = idx + 1;
+                }
             }
-        }
-
-        // If no match is found, return 0 or a default value
-        return 0;
-    } catch (error) {
-        console.error("Error in getRaptorRank: ", error);
-        return 0; // Return a default value in case of an error
+        });
+        return maxLevel;
     }
+
+    return {
+        raptor_level: getLevel(raptorRoles),
+        corsair_level: getLevel(corsairRoles),
+        raider_level: getLevel(raiderRoles)
+    };
 }
 
-async function getCorsairRank(memberRoles, prestigeRoles) {
-    try {
-        // Filter roles that contain "RAPTOR" (case-insensitive) in their name
-        const raptorRoles = prestigeRoles.filter(role =>
-            role.name.toLowerCase().includes("corsair")
-        );
+// async function getRaptorRank(memberRoles, prestigeRoles) {
+//     try {
+//         // Filter roles that contain "RAPTOR" (case-insensitive) in their name
+//         const raptorRoles = prestigeRoles.filter(role =>
+//             role.name.toLowerCase().includes("raptor")
+//         );
 
-        // Create a map of role IDs to their corresponding rank levels for quick lookup
-        const rankMap = new Map(raptorRoles.map(role => [role.id, role.rank_level]));
+//         // Create a map of role IDs to their corresponding rank levels for quick lookup
+//         const rankMap = new Map(raptorRoles.map(role => [role.id, role.rank_level]));
 
-        // Iterate through the memberRoles array and check for a match in the rankMap
-        for (const roleId of memberRoles) {
-            if (rankMap.has(roleId)) {
-                return rankMap.get(roleId); // Return the rank_level value if a match is found
-            }
-        }
+//         // Iterate through the memberRoles array and check for a match in the rankMap
+//         for (const roleId of memberRoles) {
+//             if (rankMap.has(roleId)) {
+//                 return rankMap.get(roleId); // Return the rank_level value if a match is found
+//             }
+//         }
 
-        // If no match is found, return 0 or a default value
-        return 0;
-    } catch (error) {
-        console.error("Error in getCorsairRank: ", error);
-        return 0; // Return a default value in case of an error
-    }
-}
+//         // If no match is found, return 0 or a default value
+//         return 0;
+//     } catch (error) {
+//         console.error("Error in getRaptorRank: ", error);
+//         return 0; // Return a default value in case of an error
+//     }
+// }
 
-async function getRaiderRank(memberRoles, prestigeRoles) {
-    try {
-        // const prestigeRoles = await prestigeRoles.getPrestiges();
+// async function getCorsairRank(memberRoles, prestigeRoles) {
+//     try {
+//         // Filter roles that contain "RAPTOR" (case-insensitive) in their name
+//         const raptorRoles = prestigeRoles.filter(role =>
+//             role.name.toLowerCase().includes("corsair")
+//         );
 
-        // Filter roles that contain "RAPTOR" (case-insensitive) in their name
-        const raiderRoles = prestigeRoles.filter(role =>
-            role.name.toLowerCase().includes("raider")
-        );
+//         // Create a map of role IDs to their corresponding rank levels for quick lookup
+//         const rankMap = new Map(raptorRoles.map(role => [role.id, role.rank_level]));
 
-        // Create a map of role IDs to their corresponding rank levels for quick lookup
-        const rankMap = new Map(raiderRoles.map(role => [role.id, role.rank_level]));
+//         // Iterate through the memberRoles array and check for a match in the rankMap
+//         for (const roleId of memberRoles) {
+//             if (rankMap.has(roleId)) {
+//                 return rankMap.get(roleId); // Return the rank_level value if a match is found
+//             }
+//         }
 
-        // Iterate through the memberRoles array and check for a match in the rankMap
-        for (const roleId of memberRoles) {
-            if (rankMap.has(roleId)) {
-                return rankMap.get(roleId); // Return the rank_level value if a match is found
-            }
-        }
+//         // If no match is found, return 0 or a default value
+//         return 0;
+//     } catch (error) {
+//         console.error("Error in getCorsairRank: ", error);
+//         return 0; // Return a default value in case of an error
+//     }
+// }
 
-        // If no match is found, return 0 or a default value
-        return 0;
-    } catch (error) {
-        console.error("Error in getRaiderRank: ", error);
-        return 0; // Return a default value in case of an error
-    }
-}
+// async function getRaiderRank(memberRoles, prestigeRoles) {
+//     try {
+//         // const prestigeRoles = await prestigeRoles.getPrestiges();
+
+//         // Filter roles that contain "RAPTOR" (case-insensitive) in their name
+//         const raiderRoles = prestigeRoles.filter(role =>
+//             role.name.toLowerCase().includes("raider")
+//         );
+
+//         // Create a map of role IDs to their corresponding rank levels for quick lookup
+//         const rankMap = new Map(raiderRoles.map(role => [role.id, role.rank_level]));
+
+//         // Iterate through the memberRoles array and check for a match in the rankMap
+//         for (const roleId of memberRoles) {
+//             if (rankMap.has(roleId)) {
+//                 return rankMap.get(roleId); // Return the rank_level value if a match is found
+//             }
+//         }
+
+//         // If no match is found, return 0 or a default value
+//         return 0;
+//     } catch (error) {
+//         console.error("Error in getRaiderRank: ", error);
+//         return 0; // Return a default value in case of an error
+//     }
+// }
 
 async function getPrestigeRankDb(userId, prestigeCategory) {
     try {
@@ -293,9 +337,7 @@ async function generateDynamicClassFields() {
 module.exports = {
     checkUserListForUser,
     createNewUser,
-    getRaptorRank,
-    getCorsairRank,
-    getRaiderRank,
+    getPrestigeRanks,
     updateUserClassStatus,
     getRaptorRankDb,
     getCorsairRankDb,
