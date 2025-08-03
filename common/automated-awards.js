@@ -94,14 +94,14 @@ async function automatedAwards(client, openai) {
                 try {
                     const user = await getUserById(player.user_id);
                     const displayName = user && (user.nickname || user.username || player.user_id);
-                    await notifyForAward(
-                        badgeReusable.badge_name,
-                        badgeReusable.badge_description || '',
-                        displayName,
-                        player.user_id,
-                        openai,
-                        client
-                    );
+                    // await notifyForAward(
+                    //     badgeReusable.badge_name,
+                    //     badgeReusable.badge_description || '',
+                    //     displayName,
+                    //     player.user_id,
+                    //     openai,
+                    //     client
+                    // );
                 } catch (err) {
                     console.error('Error notifying for award:', err);
                 }
