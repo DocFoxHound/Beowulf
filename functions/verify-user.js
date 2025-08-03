@@ -3,6 +3,7 @@ const { getUserById, editUser } = require('../api/userlistApi');
 const cheerio = require('cheerio');
 
 async function verifyUser(handle, userId) {
+    console.log(`Verifying RSI handle: ${handle} for user ID: ${userId}`);
     const dbUser = await getUserById(userId);
     let newVerificationCode = null;
     if (dbUser && !dbUser.verification_code) {
@@ -25,22 +26,51 @@ async function verifyUser(handle, userId) {
                 bio = $(this).next('.value').text().trim();
             }
         });
+        console.log(`Bio for ${handle}:`, bio);
 
+        // Extract Main Organization
+        let playerOrg = null;
+        $('span.title').each(function() {
+            if ($(this).text().trim() === 'Main organization') {
+                // The parent of span.title, then its next sibling should be the .inner.clearfix div
+                const parent = $(this).parent();
+                const innerDiv = parent.next();
+                if (innerDiv.hasClass('inner') && innerDiv.hasClass('clearfix')) {
+                    const orgLink = innerDiv.find('.thumb a[href^="/orgs/"]');
+                    if (orgLink.length) {
+                        const href = orgLink.attr('href');
+                        if (href) {
+                            const parts = href.split('/');
+                            playerOrg = parts[parts.length - 1];
+                        }
+                    }
+                }
+            }
+        });
+        console.log(`Player organization for ${handle}:`, playerOrg);
+        // If found, update dbUser.player_org
+        if (playerOrg && dbUser) {
+            console.log(`Updating player organization for userId ${userId} to ${playerOrg}`);
+            await editUser(userId, { ...dbUser, player_org: playerOrg });
+        }
         if (bio && dbUser && dbUser.verification_code) {
+            console.log(`Bio for ${handle} contains verification code:`, bio.includes(dbUser.verification_code.toString()));
             if (bio.includes(dbUser.verification_code.toString())) {
+                console.log(`Verification successful for userId ${userId}, handle ${handle}`);
                 await editUser(userId, { ...dbUser, rsi_handle: handle });
                 return `Success! Your RSI handle has been verified.`;
-            } else if (html.includes(dbUser.verification_code.toString())) {
-                await editUser(userId, { ...dbUser, rsi_handle: handle });
-                return `Success! Your RSI handle has been verified (code found elsewhere in profile).`;
             } else {
+                console.log(`Verification failed for userId ${userId}, handle ${handle}: Bio does not contain the verification code.`);
                 return `Bio does not contain the verification code. Please go to 'https://robertsspaceindustries.com/en/account/profile' and place the following code in your 'Bio' section, save, and then re-verify: ${dbUser.verification_code}`;
             }
         } else if (bio) {
+            console.log(`Bio for ${handle} does not contain verification code.`);
             return 'Player data retrieved.';
         }
-        return 'Player not found or error.';
+        console.log(`Player not found or error for userId ${userId}, handle ${handle}`);
+        return `Please go to 'https://robertsspaceindustries.com/en/account/profile' and place the following code in your 'Bio' section, save, and then re-verify: ${newVerificationCode}`;
     } catch (err) {
+        console.log(`Error verifying handle ${handle}:`, err);
         return `Error: ${err.message}`;
     }
 }

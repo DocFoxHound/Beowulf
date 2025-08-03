@@ -139,9 +139,24 @@ async function notifyRemovalFromQueue(){
     // NO I DONT
 }
 
+async function notifyJoinMemberWelcome(userData, openai, client) {
+    console.log(`Sending Join Member Welcome for ${userData.nickname || userData.username}`);
+    let channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.GENERAL_CHANNEL : process.env.TEST_GENERAL_CHANNEL;
+    let messageToBot = `Welcome ${userData.nickname || userData.username} to IronPoint as a new Member! Be sure to mention the website and provide a link (https://www.ironpoint.org/) and bulletize the things they can do on the website: check promotion progress, join a fleet, view leaderboards, record pirate hits. Also be sure to mention the kill-tracking bot called BeowulfHunter and provide a link: (https://github.com/DocFoxHound/BeowulfHunterPy/releases/latest) and describe what it does: tracks and records kills made in-game.`;
+    const thread = await createNewThread(channelToNotify, openai);
+    await addMessageToThread(thread, openai, messageToBot, false);
+    let run = await runThreadForQueueNotify(thread, openai, true);
+    if (run.status === "completed") {
+        console.log("Completed Member Welcome Notify");
+        const formattedResponse = await formatResponseForQueueCheck(run.thread_id, openai);
+        await sendMessageNotifySubject(channelToNotify, userData.id, formattedResponse, client);
+    }
+}
+
 module.exports = {
     notifyRemovalFromQueue,
     notifyPrestigePromotion,
     notifyRankPromotion,
-    notifyForAward
+    notifyForAward,
+    notifyJoinMemberWelcome
 }

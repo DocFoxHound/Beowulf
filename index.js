@@ -297,6 +297,20 @@ client.on('interactionCreate', async (interaction) => {
     if (!interaction.isButton()) return;
     console.log("Button interaction received:", interaction.customId);
 
+    // Handle RSI verification button
+    if (interaction.customId === 'verify_rsi') {
+        const { handleVerifyButtonInteraction } = require('./common/new-user');
+        await handleVerifyButtonInteraction(interaction);
+        return;
+    }
+
+    // Handle Join as Member/Guest buttons
+    if (interaction.customId === 'join_member' || interaction.customId === 'join_guest') {
+        const { handleJoinButtonInteraction } = require('./common/new-user');
+        await handleJoinButtonInteraction(interaction);
+        return;
+    }
+
     // Only allow in specific event channels
     const allowedChannels = [
         process.env.LIVE_ENVIRONMENT === "true" ? process.env.EVENTS_PUBLIC_CHANNEL : process.env.TEST_EVENTS_PUBLIC_CHANNEL,
@@ -586,6 +600,24 @@ app.post('/grantprestige', async (req, res) => {
     }
   } catch (error) {
     res.status(500).send(error.message);
+  }
+});
+
+// Expose /verifyuser endpoint for API to POST RSI handle and userId for verification
+app.post('/verifyuser', async (req, res) => {
+  try {
+    const { handle, userId } = req.body;
+    if (!handle || !userId) {
+      return res.status(400).json({ error: 'Missing required fields: handle and userId' });
+    }
+    const result = await verifyUser(handle, userId);
+    if (typeof result === 'string' && result.includes('Success!')) {
+      return res.status(200).json({ message: result });
+    } else {
+      return res.status(400).json({ error: result });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
