@@ -66,38 +66,52 @@ async function grantPrestigeNotify(user_id, prestige_name, prestige_level, opena
     console.log("User's current prestige roles:", currentPrestigeRoles);
 
 
-    // Detect the current prestige role for the given prestige_name and prestige_level
+
+    // Detect the current prestige role for the given prestige_name by checking the user's roles, not the argument
     const prestigeType = prestige_name.toLowerCase();
-    let currentLevel = parseInt(prestige_level, 10);
-    if (!prestigeRoles[prestigeType] || isNaN(currentLevel) || currentLevel < 0 || currentLevel > 5) {
-        console.error(`Invalid prestige type (${prestigeType}) or level (${currentLevel})`);
+    if (!prestigeRoles[prestigeType]) {
+        console.error(`Invalid prestige type (${prestigeType})`);
         return false;
     }
-
-    // If the user's prestige role array for this type is empty, treat as level 0
-    if (currentPrestigeRoles[prestigeType].length === 0) {
-        currentLevel = 0;
+    // Find the highest prestige role index the user currently has for this type
+    let currentLevel = 0;
+    for (let i = prestigeRoles[prestigeType].length - 1; i >= 0; i--) {
+        if (userRoleIds.includes(prestigeRoles[prestigeType][i])) {
+            currentLevel = i + 1; // Level is 1-based
+            break;
+        }
     }
-
     // If already at max prestige, skip all role changes
     if (currentLevel === 5) {
         console.log(`User is already at max prestige level (${currentLevel}) for ${prestigeType}, skipping role changes.`);
         return true;
     }
 
-    // Remove the current prestige role if present (only if currentLevel > 0)
-    if (currentLevel > 0) {
-        const currentRoleId = prestigeRoles[prestigeType][currentLevel - 1];
-        if (userRoleIds.includes(currentRoleId)) {
-            try {
-                await member.roles.remove(currentRoleId);
-                console.log(`Removed role ${currentRoleId} from user ${user_id}`);
-            } catch (e) {
-                console.error(`Failed to remove role ${currentRoleId}:`, e);
-            }
-        } else {
-            console.log(`User does not have role ${currentRoleId}, nothing to remove.`);
+
+    // Remove all prestige roles of this type before adding the next one, with a single retry if it fails
+    const rolesToRemove = currentPrestigeRoles[prestigeType];
+    async function tryRemoveRoles() {
+        try {
+            await member.roles.remove(rolesToRemove);
+            console.log(`Removed roles [${rolesToRemove.join(", ")}] from user ${user_id}`);
+            return true;
+        } catch (e) {
+            console.error(`Failed to remove prestige roles [${rolesToRemove.join(", ")}] from user ${user_id}:`, e);
+            return false;
         }
+    }
+    if (rolesToRemove.length > 0) {
+        let removed = await tryRemoveRoles();
+        if (!removed) {
+            // Wait 1 second and try again
+            await new Promise(res => setTimeout(res, 1000));
+            removed = await tryRemoveRoles();
+            if (!removed) {
+                console.error(`Second attempt to remove prestige roles [${rolesToRemove.join(", ")}] from user ${user_id} also failed.`);
+            }
+        }
+    } else {
+        console.log(`User does not have any ${prestigeType} prestige roles to remove.`);
     }
 
     // Add the next-level prestige role if it exists

@@ -10,6 +10,10 @@ module.exports = {
         .addStringOption(option => 
             option.setName('version')
                 .setDescription('WILL RESET TRACKERS')
+                .setRequired(true))
+        .addStringOption(option => 
+            option.setName('season')
+                .setDescription('WILL RESET TRACKERS')
                 .setRequired(true)),
     
     /**
@@ -27,11 +31,11 @@ module.exports = {
         }
 
         const newVersion = interaction.options.getString('version');
-        
+        const newSeason = interaction.options.getString('season');
 
         // Validate the description length
-        if (newVersion.length === 0) {
-            await interaction.reply('The field was blank, returning.');
+        if (newVersion.length === 0 || newSeason.length === 0) {
+            await interaction.reply('One or more required fields were blank, returning.');
             return;
         }
 
@@ -39,8 +43,9 @@ module.exports = {
             const result = await createGameVersion({
                 id: new Date().getTime(),
                 version: newVersion,
+                season: newSeason,
             });
-            await interaction.reply(`Game Version updated to: **${newVersion}**, and the trackers will now reflect progress made in this patch. Please use this infrequently as it will interfere with progress. It is best to use it once per major update.`);
+            await interaction.reply(`Game Version updated to: **${newVersion}**, Season: **${newSeason}**. Trackers will now reflect progress made in this patch. Please use this infrequently as it will interfere with progress. It is best to use it once per major update.`);
         } catch (error) {
             console.error('Error adding game version:', error);
             await interaction.reply('An error occurred while adding the game version. Please try again later.');

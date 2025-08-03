@@ -29,13 +29,18 @@ const { updateSchedule } = require('./api/scheduleApi.js');
 const { manageEvents } = require('./common/event-management.js');
 const { handleFleetCommanderChange } = require('./functions/fleet-commander-change.js');
 const { handleFleetMemberChange } = require('./functions/fleet-member-change.js');
-const { processLeaderboards } = require('./functions/process-leaderboards.js');
+const { processPlayerLeaderboards } = require('./functions/process-leaderboards.js');
 const { voiceChannelSessions } = require("./common/voice-channel-sessions.js");
 const { automatedAwards } = require("./common/automated-awards.js");
 const { promotePlayerNotify } = require("./common/promote-player-notify.js");
 const { notifyForAward } = require("./common/bot-notify.js");
 const { grantPrestigeNotify } = require("./common/grant-prestige-notify.js");
 const { getPrestigeRanks } = require("./userlist-functions/userlist-controller.js");
+const { processLeaderboardLogs } = require('./functions/process-leaderboard-logs.js');
+const { processOrgLeaderboards } = require('./functions/process-leaderboards.js');
+const { verifyUser } = require('./functions/verify-user.js');
+const { handleNewGuildMember } = require('./common/new-user.js');
+
 // const { getPrestiges, getRaptorRank, getCorsairRank, getRaiderRank } = require("./userlist-functions/userlist-controller");
 
 // Initialize dotenv config file
@@ -147,17 +152,9 @@ client.on("ready", async () => {
   // console.log(client.guilds.fetch(process.env.TEST_GUILD_ID))
   // refreshUserlist(client, openai)
   preloadedDbTables = await preloadFromDb();
-  // processLeaderboards(client, openai)
+  // await processOrgLeaderboards(client, openai);
 
-  // setInterval(() => userCache.clear(),
-  //   21600000 // Clear cache every 6 hours, avoids excessive memory bloat
-  // );
-  // setInterval(() => queueReminderCheck(openai, client, null),
-  //   43200000 //every 12 hours
-  // );
-  // setInterval(() => queueChannelPoster(client),
-  //   43200000 //every 12 hours
-  // );
+
   setInterval(() => processUEXData("terminal_prices"), 
     86400000 //every 24 hours
   );
@@ -188,7 +185,7 @@ client.on("ready", async () => {
   setInterval(() => manageEvents(client, openai),
     300000 // every 5 minutes
   );
-  setInterval(() => processLeaderboards(client, openai),
+  setInterval(() => processPlayerLeaderboards(client, openai),
     14400000 //every 4 hours
   );
   setInterval(() => automatedAwards(client, openai),
@@ -243,46 +240,7 @@ client.on(Events.InteractionCreate, async interaction => {
 });
 
 // Event Listener: new member joins the server
-client.on('guildMemberAdd', async member => {
-    try {
-        const allClasses = await getClasses(); // Fetch all classes dynamically
-        const classData = await generateClassData(allClasses); // Organize classes by category
-
-        // Check if the user already exists in the database
-        const user = await getUserById(member.user.id) || null;
-        if (user) {
-            console.log(`User ${member.user.username} is already in the UserList.`);
-            return;
-        }
-
-        // Initialize the newUser object
-        const newUser = {
-            id: member.user.id,
-            username: member.user.username,
-            nickname: null,
-            rank: null,
-            roles: member.roles.cache.map(role => role.id),
-        };
-
-        // Dynamically populate fields for each class category
-        for (const [category, classes] of Object.entries(classData)) {
-            for (const classObj of classes) {
-                // Add a field for each class in the category
-                newUser[classObj.name] = false; // Default to false (not completed)
-            }
-        }
-
-        // Add the new user to the database
-        const result = await createUser(newUser);
-        if (result) {
-            console.log(`User ${member.user.username} has been added to the UserList.`);
-        } else {
-            console.error(`Failed to add user ${member.user.username} to the UserList.`);
-        }
-    } catch (error) {
-        console.error('Error adding new user:', error);
-    }
-});
+client.on('guildMemberAdd', handleNewGuildMember);
 
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
     try {

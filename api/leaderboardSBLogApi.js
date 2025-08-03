@@ -22,7 +22,7 @@ async function getLeaderboardLogEntryById(id) {
     }
 }
 
-async function createLeaderboardLogEntry(entryData) {
+async function createPlayerLeaderboardLogEntry(entryData) {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_LEADERBOARD_SB_LOG}/`;
     try {
         const response = await axios.post(apiUrl, entryData, {
@@ -88,7 +88,7 @@ async function deleteAllLeaderboardLogEntries() {
 module.exports = {
     getAllLeaderboardLogEntries,
     getLeaderboardLogEntryById,
-    createLeaderboardLogEntry,
+    createPlayerLeaderboardLogEntry,
     createLeaderboardLogEntriesBulk,
     updateLeaderboardLogEntry,
     deleteLeaderboardLogEntry,
