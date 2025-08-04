@@ -28,39 +28,38 @@ async function verifyUser(handle, userId) {
         });
         console.log(`Bio for ${handle}:`, bio);
 
-        // Extract Main Organization
+        // Extract Main Organization by finding the first <a href="/orgs/ORGNAME">
         let playerOrg = null;
-        $('span.title').each(function() {
-            if ($(this).text().trim() === 'Main organization') {
-                // The parent of span.title, then its next sibling should be the .inner.clearfix div
-                const parent = $(this).parent();
-                const innerDiv = parent.next();
-                if (innerDiv.hasClass('inner') && innerDiv.hasClass('clearfix')) {
-                    const orgLink = innerDiv.find('.thumb a[href^="/orgs/"]');
-                    if (orgLink.length) {
-                        const href = orgLink.attr('href');
-                        if (href) {
-                            const parts = href.split('/');
-                            playerOrg = parts[parts.length - 1];
-                        }
-                    }
-                }
+        const orgLink = $('a[href^="/orgs/"]').first();
+        if (orgLink.length) {
+            const href = orgLink.attr('href');
+            if (href) {
+                const parts = href.split('/');
+                playerOrg = parts[parts.length - 1];
             }
-        });
+        }
         console.log(`Player organization for ${handle}:`, playerOrg);
         // If found, update dbUser.player_org
-        if (playerOrg && dbUser) {
+        if (playerOrg && dbUser && dbUser.player_org !== playerOrg) {
             console.log(`Updating player organization for userId ${userId} to ${playerOrg}`);
-            await editUser(userId, { ...dbUser, player_org: playerOrg });
+            dbUser.player_org = playerOrg;
+            await editUser(userId, { ...dbUser });
         }
-        if (bio && dbUser && dbUser.verification_code) {
-            console.log(`Bio for ${handle} contains verification code:`, bio.includes(dbUser.verification_code.toString()));
-            if (bio.includes(dbUser.verification_code.toString())) {
+        if (dbUser && dbUser.verification_code) {
+            const verificationCodeStr = dbUser.verification_code.toString();
+            let foundCode = false;
+            if (bio && bio.includes(verificationCodeStr)) {
+                foundCode = true;
+            } else if (html && html.includes(verificationCodeStr)) {
+                foundCode = true;
+            }
+            if (foundCode) {
                 console.log(`Verification successful for userId ${userId}, handle ${handle}`);
-                await editUser(userId, { ...dbUser, rsi_handle: handle });
+                // Always save both rsi_handle and player_org
+                await editUser(userId, { ...dbUser, rsi_handle: handle, player_org: dbUser.player_org });
                 return `Success! Your RSI handle has been verified.`;
-            } else {
-                console.log(`Verification failed for userId ${userId}, handle ${handle}: Bio does not contain the verification code.`);
+            } else if (bio) {
+                console.log(`Verification failed for userId ${userId}, handle ${handle}: Verification code not found in bio or HTML.`);
                 return `Bio does not contain the verification code. Please go to 'https://robertsspaceindustries.com/en/account/profile' and place the following code in your 'Bio' section, save, and then re-verify: ${dbUser.verification_code}`;
             }
         } else if (bio) {

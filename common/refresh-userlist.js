@@ -1,11 +1,10 @@
-const { getUserRank, getRaptorRank, getCorsairRank, getRaiderRank } = require("../userlist-functions/userlist-controller")
+const { getUserRank, getPrestigeRanks } = require("../userlist-functions/userlist-controller")
 const { getUserById } = require("../api/userlistApi")
 const { editUser } = require("../api/userlistApi")
 const { createUser } = require("../api/userlistApi")
-const { getClasses } = require("../api/classApi")
 const { getPrestiges } = require("../api/prestige-roles-api");
-const { checkForPrestigePromotionUpdateUserlist, checkForRankPromotionUpdateUserlist, markOffCompletedClassesDeterminedByPrestigeRank } = require("../common/check-for-promotion")
-
+const { checkForPrestigePromotionUpdateUserlist, checkForRankPromotionUpdateUserlist, markOffCompletedClassesDeterminedByPrestigeRank } = require("../deprecated-but-keep/check-for-promotion")
+const { getAllFleets } = require("../api/userFleetApi");
 
 // Import rank role IDs from .env
 const FRIENDLY_ROLE = process.env.FRIENDLY_ROLE;
@@ -38,17 +37,32 @@ async function refreshUserlist(client, openai) {
     try {
         const guild = await client.guilds.cache.get(process.env.LIVE_ENVIRONMENT === "true" ? process.env.GUILD_ID : process.env.TEST_GUILD_ID);
         const memberList = await guild.members.cache;
-        const allClasses = await getClasses();
+        // const allClasses = await getClasses();
         // const classData = await generateClassData(allClasses); // Organize classes by category
         const prestigeRoles = await getPrestiges(); // Fetch prestige roles dynamically
 
         memberList.forEach(async member => {
+            console.log(`Processing member: ${member.user.username} (${member.id})`);
             const oldUserData = await getUserById(member.id) || null;
             const memberRoles = await member.roles.cache.map(role => role.id);
             const userRank = await getUserRank(memberRoles);
-            const raptorLevel = await getRaptorRank(memberRoles, prestigeRoles);
-            const corsairLevel = await getCorsairRank(memberRoles, prestigeRoles);
-            const raiderLevel = await getRaiderRank(memberRoles, prestigeRoles);
+            // Use getPrestigeRanks to get all prestige levels
+            const prestigeLevels = await getPrestigeRanks(memberRoles);
+            const raptorLevel = prestigeLevels.raptor_level;
+            const corsairLevel = prestigeLevels.corsair_level;
+            const raiderLevel = prestigeLevels.raider_level;
+            const fleets = await getAllFleets();
+
+            // Scan fleets for user membership or command
+            let userFleet = null;
+            if (fleets && Array.isArray(fleets)) {
+                for (const fleet of fleets) {
+                    if (fleet.commander_id === member.id || (Array.isArray(fleet.members_ids) && fleet.members_ids.includes(member.id))) {
+                        userFleet = fleet.id;
+                        break; // Only assign first matching fleet
+                    }
+                }
+            }
 
             // Check if user has any rank role
             const hasRankRole = memberRoles.some(roleId => RANK_ROLE_IDS.includes(roleId));
@@ -62,6 +76,7 @@ async function refreshUserlist(client, openai) {
             }
 
             if (oldUserData !== null) { // If the user is in the database
+                console.log(`Updating user: ${member.user.username} (${member.id})`);
                 let updatedUserData = {
                     id: member.id,
                     username: member.user.username,
@@ -70,12 +85,15 @@ async function refreshUserlist(client, openai) {
                     roles: memberRoles,
                     raptor_level: raptorLevel,
                     corsair_level: corsairLevel,
-                    raider_level: raiderLevel
+                    raider_level: raiderLevel,
                     // Optionally add joined_date and rsi_handle if needed
-                    , joined_date, rsi_handle
+                    joined_date,
+                    rsi_handle,
+                    fleet: userFleet
                 };
                 await editUser(member.id, updatedUserData);
             } else { // If the user isn't in the database
+                console.log(`Creating new user: ${member.user.username} (${member.id})`);
                 const newUser = {
                     id: member.id,
                     username: member.user.username,
@@ -84,9 +102,11 @@ async function refreshUserlist(client, openai) {
                     roles: memberRoles,
                     raptor_level: raptorLevel,
                     corsair_level: corsairLevel,
-                    raider_level: raiderLevel
+                    raider_level: raiderLevel,
                     // Optionally add joined_date and rsi_handle if needed
-                    , joined_date, rsi_handle
+                    joined_date,
+                    rsi_handle,
+                    fleet: userFleet
                 };
                 await createUser(newUser);
             }
@@ -105,7 +125,7 @@ async function newLoadUserList(client) {
         const memberList = await guild.members.cache;
 
         // Fetch all classes dynamically
-        const allClasses = await getClasses();
+        // const allClasses = await getClasses();
         // const classData = await generateClassData(allClasses); // Organize classes by category
 
         memberList.forEach(async member => {

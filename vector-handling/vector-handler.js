@@ -16,6 +16,11 @@ async function loadChatlogs(client, openai){
     return;
   }
 
+  // Guard clause: check if chatLog is an array
+  if (!Array.isArray(chatLog)) {
+    console.log("chatLog is not an array. Value:", chatLog);
+    return;
+  }
 
   // # blood-chat, marauder-chat, raptor-lounge, raider-council, corsair-cove, wright-bar, help-me-fly, crew-plus-chat, general-chat, loadout-talk, bot-commands, star-citizen, other-games, off-topic, rig-talk, pet-parlor, salt-mining, memes, sc-feeds, media-team, misc-media, announcements
   //prepare the message

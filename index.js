@@ -17,7 +17,6 @@ const { saveMessage } = require("./common/message-saver.js");
 const { loadChatlogs } = require("./vector-handling/vector-handler.js");
 const { trimChatLogs } = require("./vector-handling/vector-handler.js");
 const { checkRecentGatherings } = require("./common/recent-gatherings.js");
-const { getClasses } = require('./api/classApi.js');
 const bodyParser = require('body-parser');
 const { handleHitPost } = require('./functions/post-new-hit.js');
 const { handleHitPostDelete } = require('./functions/post-delete-hit.js');
@@ -40,6 +39,8 @@ const { processLeaderboardLogs } = require('./functions/process-leaderboard-logs
 const { processOrgLeaderboards } = require('./functions/process-leaderboards.js');
 const { verifyUser } = require('./functions/verify-user.js');
 const { handleNewGuildMember } = require('./common/new-user.js');
+const { handleJoinButtonInteraction } = require('./common/new-user');
+const { handleVerifyButtonInteraction } = require('./common/new-user');
 
 // const { getPrestiges, getRaptorRank, getCorsairRank, getRaiderRank } = require("./userlist-functions/userlist-controller");
 
@@ -152,6 +153,7 @@ client.on("ready", async () => {
   // console.log(client.guilds.fetch(process.env.TEST_GUILD_ID))
   // refreshUserlist(client, openai)
   preloadedDbTables = await preloadFromDb();
+  refreshUserlist(client, openai) //actually leave this here
   // await processOrgLeaderboards(client, openai);
 
 
@@ -244,7 +246,6 @@ client.on('guildMemberAdd', handleNewGuildMember);
 
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
     try {
-        // const allClasses = await getClasses(); // Fetch all classes dynamically
         // const classData = await generateClassData(allClasses); // Organize classes by category
 
         // Fetch the user's existing data
@@ -299,15 +300,13 @@ client.on('interactionCreate', async (interaction) => {
 
     // Handle RSI verification button
     if (interaction.customId === 'verify_rsi') {
-        const { handleVerifyButtonInteraction } = require('./common/new-user');
         await handleVerifyButtonInteraction(interaction);
         return;
     }
 
     // Handle Join as Member/Guest buttons
     if (interaction.customId === 'join_member' || interaction.customId === 'join_guest') {
-        const { handleJoinButtonInteraction } = require('./common/new-user');
-        await handleJoinButtonInteraction(interaction);
+        await handleJoinButtonInteraction(interaction, client, openai);
         return;
     }
 

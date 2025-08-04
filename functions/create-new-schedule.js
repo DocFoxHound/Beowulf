@@ -33,6 +33,8 @@ async function handleScheduleCreate(client, openai, scheduleObject){
         discord_buttons
     } = scheduleObject;
 
+    const RONIN_ID = process.env.LIVE_ENVIRONMENT === "true" ? process.env.RONIN_ROLE : process.env.TEST_RONIN_ROLE;
+
     // Determine channel ID
     let channelId = discord_channel;
 
@@ -202,15 +204,31 @@ async function handleScheduleCreate(client, openai, scheduleObject){
     }
 
     // Post fleet info in the thread
-    if (thread && fleets.length > 0) {
+    if (thread && fleets.length > 0 && (type === 'Fleet' || type === 'RoninFleet')) {
         for (const fleet of fleets) {
-            const memberMentions = (fleet.member_ids || []).map(id => `<@${id}>`).join(' ');
-            let content = `# ${fleet.name}\nHas been called to action!\n${memberMentions}`;
+            // Collect commander and member IDs
+            let commanderMention = fleet.commander_id ? `<@${fleet.commander_id}>` : '';
+            let memberMentions = (fleet.member_ids || []).filter(id => id !== fleet.commander_id).map(id => `<@${id}>`).join(' ');
+            // Build content, commander first
+            let content = `# ${fleet.name}\nHas been called to action!\n`;
+            if (commanderMention) {
+                content += commanderMention + ' ';
+            }
+            if (memberMentions) {
+                content += memberMentions;
+            }
             if (fleet.avatar) {
                 content += `\n${fleet.avatar}`;
             }
             await thread.send({ content });
         }
+    }
+
+    // Post Ronin info to thread
+    if (thread && (type === 'RoninFleet' || type === 'Ronin')) {
+        const roninPing = RONIN_ID ? `<@&${RONIN_ID}>` : '';
+        const roninContent = `${roninPing}\nThe Ronins have been requested to join this event. Please check the details above and respond accordingly.`;
+        await thread.send({ content: roninContent });
     }
 }
 

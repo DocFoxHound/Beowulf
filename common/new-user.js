@@ -1,6 +1,7 @@
 const { getUserById, createUser, editUser } = require('../api/userlistApi');
 const { ButtonBuilder, ActionRowBuilder } = require('discord.js');
 const { verifyUser } = require('../functions/verify-user');
+const { notifyJoinMemberWelcome, notifyJoinGuestWelcome } = require('./bot-notify');
 
 // Track verification attempts and DM message in memory (per process)
 const verificationAttempts = {};
@@ -86,6 +87,10 @@ module.exports = {
     async handleVerifyButtonInteraction(interaction) {
         const userId = interaction.user.id;
         if (!verificationAttempts[userId]) verificationAttempts[userId] = 0;
+        // Always defer immediately to avoid interaction expiration
+        if (!interaction.replied && !interaction.deferred) {
+            await interaction.deferUpdate();
+        }
         try {
             const dbUser = await getUserById(userId);
             const rsiHandle = dbUser?.username || interaction.user.username;
@@ -109,10 +114,7 @@ module.exports = {
                     } catch (dmError) {
                         // Ignore DM errors
                     }
-                    // No ephemeral reply, just acknowledge
-                    if (!interaction.replied && !interaction.deferred) {
-                        await interaction.deferUpdate();
-                    }
+                    // No further interaction response needed
                 } else {
                     // Disable button in DM and show resultMsg
                     if (verificationDMs[userId]) {
@@ -131,9 +133,7 @@ module.exports = {
                             // Ignore DM errors
                         }
                     }
-                    if (!interaction.replied && !interaction.deferred) {
-                        await interaction.deferUpdate();
-                    }
+                    // No further interaction response needed
                 }
             } else {
                 verificationAttempts[userId] = 0;
@@ -173,28 +173,40 @@ module.exports = {
                 } catch (nickError) {
                     // Optionally log or ignore nickname errors
                 }
-                if (!interaction.replied && !interaction.deferred) {
-                    await interaction.deferUpdate();
-                }
+                // No further interaction response needed
             }
         } catch (err) {
             const errorText = err?.message || err?.toString() || 'Unknown error occurred.';
+            // If already deferred/replied, use followUp, else just log error (should never happen)
             if (interaction.replied || interaction.deferred) {
                 await interaction.followUp({ content: errorText, ephemeral: true });
             } else {
-                await interaction.reply({ content: errorText, ephemeral: true });
+                // Should never happen, but log error
+                console.error('Interaction expired before response:', errorText);
             }
         }
     },
-    // Duplicate handleJoinButtonInteraction removed to fix syntax error
     /**
      * Handles Join as Member/Guest button interaction
      * @param {ButtonInteraction} interaction
      */
-    async handleJoinButtonInteraction(interaction) {
+    async handleJoinButtonInteraction(interaction, client, openai) {
         const userId = interaction.user.id;
-        const member = interaction.guild.members.cache.get(userId);
-        if (!member) return;
+        // Always defer immediately to avoid interaction expiration
+        if (!interaction.replied && !interaction.deferred) {
+            await interaction.deferUpdate();
+        }
+        let member = null;
+        let guild = interaction.guild
+            || client.guilds.cache.find(g => g.members.cache.has(userId))
+            || client.guilds.cache.get(process.env.LIVE_ENVIRONMENT === "true" ? process.env.GUILD_ID : process.env.TEST_GUILD_ID);
+        if (guild) {
+            member = guild.members.cache.get(userId);
+        }
+        if (!member) {
+            await interaction.followUp({ content: "Could not find your server membership. Please use this button in the server.", ephemeral: true });
+            return;
+        }
         let roleId;
         if (interaction.customId === 'join_member') {
             roleId = process.env.LIVE_ENVIRONMENT === "true" ? process.env.PROSPECT_ROLE : process.env.TEST_PROSPECT_ROLE;
@@ -204,30 +216,11 @@ module.exports = {
         if (roleId) {
             try {
                 await member.roles.add(roleId);
-                // Send welcome message if joined as Member
-                if (interaction.customId === 'join_member') {
-                    const { notifyJoinMemberWelcome } = require('./bot-notify');
-                    // Get user data for welcome
-                    const dbUser = await getUserById(userId);
-                    // openai and client are not in scope, so try to get from interaction.client
-                    await notifyJoinMemberWelcome(dbUser, interaction.client.openai || null, interaction.client);
-                }
             } catch (roleError) {
                 // Optionally log or ignore role errors
             }
         }
-        if (interaction.customId === 'join_guest') {
-            // Re-retrieve user profile and update nickname
-            try {
-                const dbUser = await getUserById(userId);
-                const handle = dbUser?.username || member.user.username;
-                const playerOrg = dbUser?.player_org || '';
-                await member.setNickname(`[${playerOrg}] ${handle}`);
-            } catch (nickError) {
-                // Optionally log or ignore nickname errors
-            }
-        }
-        // Disable buttons after click
+        // Disable buttons after click (move up so it's immediate)
         if (verificationDMs[userId]) {
             const { ButtonBuilder, ActionRowBuilder } = require('discord.js');
             const memberButton = new ButtonBuilder()
@@ -247,8 +240,32 @@ module.exports = {
                 // Ignore DM errors
             }
         }
-        if (!interaction.replied && !interaction.deferred) {
-            await interaction.deferUpdate();
+        // Run welcome notification in background
+        if (interaction.customId === 'join_member') {
+            (async () => {
+                try {
+                    const dbUser = await getUserById(userId);
+                    await notifyJoinMemberWelcome(dbUser, openai, interaction.client);
+                } catch (e) {
+                    // Optionally log error
+                }
+            })();
         }
+        if (interaction.customId === 'join_guest') {
+            // Re-retrieve user profile after verifyUser to ensure .player_org is up-to-date, then update nickname
+            try {
+                // Re-fetch user profile from DB
+                const dbUser = await getUserById(userId);
+                console.log(`Re-retrieved user profile for ${userId}:`, dbUser);
+                const handle = dbUser?.rsi_handle;
+                const playerOrg = dbUser?.player_org || '';
+                await member.setNickname(`[${playerOrg}] ${handle}`);
+                await notifyJoinGuestWelcome(dbUser, openai, interaction.client);
+            } catch (nickError) {
+                // Optionally log or ignore nickname errors
+            }
+        }
+        // Send followUp welcome message
+        await interaction.followUp({ content: "Welcome to IronPoint!", ephemeral: true });
     },
 }

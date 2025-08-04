@@ -1,7 +1,6 @@
 const userlistApi = require("../api/userlistApi")
 const { getUsers } = require("../api/userlistApi")
 const rankRoles = require("../api/rank-roles-api")
-const getClasses = require("../api/classApi").getClasses;
 const prestigeRoles = require("../api/prestige-roles-api")
 
 async function createNewUser(userData, client, guildId) {
@@ -224,44 +223,44 @@ async function getPrestigeRanks(memberRoles) {
 //     }
 // }
 
-async function getPrestigeRankDb(userId, prestigeCategory) {
-    try {
-        const user = await userlistApi.getUserById(userId);
-        if (!user) return 0;
+// async function getPrestigeRankDb(userId, prestigeCategory) {
+//     try {
+//         const user = await userlistApi.getUserById(userId);
+//         if (!user) return 0;
 
-        // Fetch all classes dynamically
-        const allClasses = await getClasses();
-        const classData = await generateDynamicClassFields(allClasses); // Organize classes by category
+//         // Fetch all classes dynamically
+//         const allClasses = await getClasses();
+//         const classData = await generateDynamicClassFields(allClasses); // Organize classes by category
 
-        // Get the classes for the specified prestige category
-        const prestigeClasses = classData[prestigeCategory];
-        if (!prestigeClasses) return 0;
+//         // Get the classes for the specified prestige category
+//         const prestigeClasses = classData[prestigeCategory];
+//         if (!prestigeClasses) return 0;
 
-        // Group classes by level
-        const classesByLevel = {};
-        for (const classObj of prestigeClasses) {
-            if (!classesByLevel[classObj.level]) {
-                classesByLevel[classObj.level] = [];
-            }
-            classesByLevel[classObj.level].push(classObj);
-        }
+//         // Group classes by level
+//         const classesByLevel = {};
+//         for (const classObj of prestigeClasses) {
+//             if (!classesByLevel[classObj.level]) {
+//                 classesByLevel[classObj.level] = [];
+//             }
+//             classesByLevel[classObj.level].push(classObj);
+//         }
 
-        // Check completion for each level
-        let rank = 0;
-        for (const level in classesByLevel) {
-            const levelClasses = classesByLevel[level];
-            const completed = levelClasses.every(classObj => user[classObj.name] === true);
-            if (completed) {
-                rank = Math.max(rank, parseInt(level)); // Update rank to the highest completed level
-            }
-        }
+//         // Check completion for each level
+//         let rank = 0;
+//         for (const level in classesByLevel) {
+//             const levelClasses = classesByLevel[level];
+//             const completed = levelClasses.every(classObj => user[classObj.name] === true);
+//             if (completed) {
+//                 rank = Math.max(rank, parseInt(level)); // Update rank to the highest completed level
+//             }
+//         }
 
-        return rank;
-    } catch (error) {
-        console.error(`Error in getPrestigeRankDb for ${prestigeCategory}:`, error);
-        return 0; // Return 0 if there's an error
-    }
-}
+//         return rank;
+//     } catch (error) {
+//         console.error(`Error in getPrestigeRankDb for ${prestigeCategory}:`, error);
+//         return 0; // Return 0 if there's an error
+//     }
+// }
 
 // Wrapper functions for specific prestige categories
 async function getRaptorRankDb(userId) {
@@ -347,5 +346,4 @@ module.exports = {
     updatedUserListData,
     generateDynamicClassFields,
     checkUserListForUserById,
-    getPrestigeRankDb
 }

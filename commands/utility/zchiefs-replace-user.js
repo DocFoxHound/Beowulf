@@ -3,7 +3,6 @@ const { CommandInteraction } = require('discord.js');
 const { getUserById } = require('../../api/userlistApi');
 const { editUser } = require('../../api/userlistApi');
 const { deleteUser } = require('../../api/userlistApi');
-const { getClasses } = require('../../api/classApi');
 
 
 module.exports = {
@@ -39,8 +38,8 @@ module.exports = {
             const newUserData = await getUserById(newAccount.id);
 
             // Fetch all classes dynamically
-            const allClasses = await getClasses();
-            const classData = await generateClassData(allClasses); // Organize classes by category
+            // const allClasses = await getClasses();
+            // const classData = await generateClassData(allClasses); // Organize classes by category
 
             // Initialize the updatedUserData object
             const updatedUserData = {
@@ -51,12 +50,12 @@ module.exports = {
             };
 
             // Dynamically populate fields for each class category
-            for (const [category, classes] of Object.entries(classData)) {
-                for (const classObj of classes) {
-                    // Add a field for each class in the category
-                    updatedUserData[classObj.name] = oldUserData[classObj.name] || false; // Default to false if not completed
-                }
-            }
+            // for (const [category, classes] of Object.entries(classData)) {
+            //     for (const classObj of classes) {
+            //         // Add a field for each class in the category
+            //         updatedUserData[classObj.name] = oldUserData[classObj.name] || false; // Default to false if not completed
+            //     }
+            // }
 
             // Update the new user's data and delete the old user
             await editUser(newUserData.id, updatedUserData);
