@@ -42,7 +42,6 @@ async function refreshUserlist(client, openai) {
         const prestigeRoles = await getPrestiges(); // Fetch prestige roles dynamically
 
         memberList.forEach(async member => {
-            console.log(`Processing member: ${member.user.username} (${member.id})`);
             const oldUserData = await getUserById(member.id) || null;
             const memberRoles = await member.roles.cache.map(role => role.id);
             const userRank = await getUserRank(memberRoles);
@@ -76,7 +75,6 @@ async function refreshUserlist(client, openai) {
             }
 
             if (oldUserData !== null) { // If the user is in the database
-                console.log(`Updating user: ${member.user.username} (${member.id})`);
                 let updatedUserData = {
                     id: member.id,
                     username: member.user.username,
@@ -93,7 +91,6 @@ async function refreshUserlist(client, openai) {
                 };
                 await editUser(member.id, updatedUserData);
             } else { // If the user isn't in the database
-                console.log(`Creating new user: ${member.user.username} (${member.id})`);
                 const newUser = {
                     id: member.id,
                     username: member.user.username,
