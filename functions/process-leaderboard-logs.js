@@ -138,6 +138,16 @@ async function processLeaderboardLogs(client, openai) {
                     rank: agg.rank.length ? Math.round(agg.rank.reduce((a,b)=>a+b,0)/agg.rank.length) : 0,
                     created_at
                 });
+                console.log(`Processed leaderboard log entry for user ${matchedUser.id}:`, {
+                    id,
+                    nickname: agg.nickname,
+                    displayname: agg.displayname,
+                    kills: agg.kills,
+                    score: agg.score.length ? agg.score.reduce((a,b)=>a+b,0)/agg.score.length : 0,
+                    flight_time: agg.flight_time.length ? formatFlightTime(agg.flight_time.reduce((a,b)=>a+b,0)/agg.flight_time.length) : '00:00:00',
+                    rating: agg.rating.length ? agg.rating.reduce((a,b)=>a+b,0)/agg.rating.length : 0,
+                    rank: agg.rank.length ? Math.round(agg.rank.reduce((a,b)=>a+b,0)/agg.rank.length) : 0
+                });
                 // Update the user's rsi_handle and rsi_display_name
                 await editUser(matchedUser.id, {
                     rsi_handle: agg.nickname,
