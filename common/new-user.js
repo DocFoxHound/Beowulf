@@ -14,7 +14,7 @@ async function handleNewGuildMember(member) {
         const user = await getUserById(member.user.id) || null;
         let result;
         let actionMsg;
-        const verificationCode = user.verification_code || Date.now();
+        const verificationCode = user ? user.verification_code : Date.now();
         if (user) {
             // Update existing user profile
             const updatedUser = {
