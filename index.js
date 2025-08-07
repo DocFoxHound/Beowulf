@@ -153,7 +153,8 @@ client.on("ready", async () => {
   // console.log(client.guilds.fetch(process.env.TEST_GUILD_ID))
   // refreshUserlist(client, openai)
   preloadedDbTables = await preloadFromDb();
-  refreshUserlist(client, openai) //actually leave this here
+  await refreshUserlist(client, openai) //actually leave this here
+  await processPlayerLeaderboards(client, openai)
   // await processOrgLeaderboards(client, openai);
 
 
