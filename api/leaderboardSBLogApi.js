@@ -30,7 +30,7 @@ async function createPlayerLeaderboardLogEntry(entryData) {
         });
         return response.data;
     } catch (error) {
-        console.error('Error creating leaderboard entry:', error.response ? error.response.data : error.message);
+        console.error('Error creating leaderboard log entry:', error.response ? error.response.data : error.message);
         return null;
     }
 }
