@@ -51,6 +51,8 @@ async function refreshUserlist(client, openai) {
             const corsairLevel = prestigeLevels.corsair_level;
             const raiderLevel = prestigeLevels.raider_level;
             const fleets = await getAllFleets();
+            console.log(`Processing member: ${member.user.username} (${member.id})`);
+            console.log("Raptor, Corsair, Raider:", raptorLevel, corsairLevel, raiderLevel);
 
             // Scan fleets for user membership or command
             let userFleet = null;

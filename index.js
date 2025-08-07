@@ -154,8 +154,7 @@ client.on("ready", async () => {
   // refreshUserlist(client, openai)
   preloadedDbTables = await preloadFromDb();
   await refreshUserlist(client, openai) //actually leave this here
-  await processPlayerLeaderboards(client, openai)
-  // await processOrgLeaderboards(client, openai);
+  // await processPlayerLeaderboards(client, openai)
 
 
   setInterval(() => processUEXData("terminal_prices"), 
