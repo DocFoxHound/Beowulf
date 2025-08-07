@@ -235,6 +235,7 @@ async function processOrgLeaderboards(client, openai) {
             console.error(`Error processing map ${mapTitle}:`, error.response ? error.response.data : error.message);
         }
     }
+    console.log("Completed processing.");
 }
 
 module.exports = {
