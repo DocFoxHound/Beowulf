@@ -144,7 +144,7 @@ async function processLeaderboardLogs(client, openai) {
                     rsi_display_name: agg.displayname
                 });
             }catch(error) {
-                console.error(`Error creating leaderboard log entry for user ${matchedUser.id}:`, error.response ? error.response.data : error.message);
+                console.error(`Error processing leaderboard log entry for user ${matchedUser.id}:`, error.response ? error.response.data : error.message);
             }
         } else {
             // console.log(`No match found for agg.nickname: ${agg.nickname}, agg.displayname: ${agg.displayname}`);
