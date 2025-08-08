@@ -19,21 +19,24 @@ async function checkRecentGatherings(client, openai) {
 
         // 3. For each channel, find intervals with 3+ users present
         for (const [channel_id, sessArr] of Object.entries(channelSessions)) {
+            console.log(`[DEBUG] Processing channel ${channel_id} with ${sessArr.length} sessions.`);
+            console.log(`[DEBUG] sessArr:`, sessArr);
             // Build timeline of join/leave events
             const events = [];
             for (const s of sessArr) {
-                    let username;
-                    try {
-                        const user = await client.users.fetch(s.user_id);
-                        username = user ? user.username : undefined;
-                    } catch (err) {
-                        console.error(`Failed to fetch username for user_id ${s.user_id}:`, err);
-                    }
-                    events.push({ time: new Date(s.joined_at), type: 'join', user_id: s.user_id, username });
-                    events.push({ time: new Date(s.left_at), type: 'leave', user_id: s.user_id, username });
+                let username;
+                try {
+                    const user = await client.users.fetch(s.user_id);
+                    username = user ? user.username : undefined;
+                } catch (err) {
+                    console.error(`Failed to fetch username for user_id ${s.user_id}:`, err);
+                }
+                events.push({ time: new Date(s.joined_at), type: 'join', user_id: s.user_id, username });
+                events.push({ time: new Date(s.left_at), type: 'leave', user_id: s.user_id, username });
             }
             // Sort events by time
             events.sort((a, b) => a.time - b.time);
+            console.log(`[DEBUG] Sorted events for channel ${channel_id}:`, events);
 
             let currentUsers = new Map();
             let gatheringActive = false;
@@ -55,6 +58,7 @@ async function checkRecentGatherings(client, openai) {
                 } else {
                     currentUsers.delete(event.user_id);
                 }
+                console.log(`[DEBUG] After ${event.type}: currentUsers.size=${currentUsers.size}, users=[${Array.from(currentUsers.values()).join(', ')}]`);
                 // Gathering starts
                 if (!gatheringActive && currentUsers.size >= 3) {
                     gatheringActive = true;
