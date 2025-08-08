@@ -2,6 +2,7 @@
 const fs = require("node:fs");
 const { updateVoiceSession, createVoiceSession, getAllActiveVoiceSessions } = require("../api/voiceChannelSessionsApi");
 const { ChannelType } = require("discord.js");
+const { checkRecentGatherings } = require("./recent-gatherings.js");
 
 
 async function voiceChannelSessions(client, openai) {
@@ -157,6 +158,15 @@ async function voiceChannelSessions(client, openai) {
                     console.log(`  User ID: ${userId}`);
                 });
             }
+                // If 3 or more users, call checkRecentGatherings
+                if (users.length >= 3) {
+                    const session = {
+                        channelId: channel.id,
+                        channelName: channel.name,
+                        userIds: users
+                    };
+                    checkRecentGatherings(client, openai, session, users);
+                }
         });
     } catch (error) {
         console.error("Error in voiceChannelSessions:", error);

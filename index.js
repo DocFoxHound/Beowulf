@@ -147,7 +147,6 @@ client.on("ready", async () => {
 
   // preloadedDbTables = await preloadFromDb(); //leave on
   // await refreshUserlist(client, openai) //actually leave this here
-  await checkRecentGatherings(client, openai)
   // await processPlayerLeaderboards(client, openai)
 
 
@@ -175,9 +174,9 @@ client.on("ready", async () => {
   setInterval(() => trimChatLogs(),
     43200000 //every 12 hours
   );
-  setInterval(() => checkRecentGatherings(client, openai),
-    300000 //every 5 minutes
-  );
+  // setInterval(() => checkRecentGatherings(client, openai),
+  //   300000 //every 5 minutes
+  // );
   setInterval(() => manageEvents(client, openai),
     300000 // every 5 minutes
   );

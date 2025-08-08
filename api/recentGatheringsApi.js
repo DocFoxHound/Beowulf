@@ -58,27 +58,25 @@ async function updateRecentGathering(id, gatheringData) {
     }
 }
 
+// GET recent gatherings within a timeframe
+async function getRecentGatheringsWithinTimeframe(start, end) {
+    if (!start || !end) {
+        throw new Error('Start and end parameters are required');
+    }
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_RECENT_GATHERINGS}/timeframe?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
+    try {
+        const response = await axios.get(apiUrl);
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching recent gatherings within timeframe:', error.response ? error.response.data : error.message);
+        return null;
+    }
+}
+
 module.exports = {
     getAllRecentGatherings,
     createRecentGathering,
     updateRecentGathering,
-    deleteRecentGathering
+    deleteRecentGathering,
+    getRecentGatheringsWithinTimeframe
 };
-    
-
-// RECENT GATHERINGS EXAMPLE
-// {
-//     "id": "12345",
-//     "channel_id": "123456789012345678",
-//     "channel_name": "Dogfighting Practice",
-//     "user_ids": [
-//         "123456789012345678",
-//         "234567890123456789"
-//     ],
-//     "usernames": [
-//         "DocHound",
-//         "Kowolski"
-//     ],
-//     "timestamp": "2023-10-01T10:00:00Z",
-
-// }    
