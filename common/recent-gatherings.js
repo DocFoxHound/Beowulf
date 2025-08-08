@@ -4,6 +4,7 @@ const { getAllVoiceSessionsLastHour } = require("../api/voiceChannelSessionsApi.
 
 
 async function checkRecentGatherings(client, openai) {
+    console.log("Checking recent gatherings...");
     try {
         // 1. Get all voice sessions from the last hour
         const sessions = await getAllVoiceSessionsLastHour();
@@ -12,12 +13,14 @@ async function checkRecentGatherings(client, openai) {
         // 2. Group sessions by channel
         const channelSessions = {};
         for (const session of sessions) {
+            console.log(`Session found: ${session.id} in channel ${session.channel_id}`);
             if (!channelSessions[session.channel_id]) channelSessions[session.channel_id] = [];
             channelSessions[session.channel_id].push(session);
         }
 
         // 3. For each channel, find intervals with 3+ users present
         for (const [channel_id, sessArr] of Object.entries(channelSessions)) {
+            console.log(`Processing channel ${channel_id} with ${sessArr.length} sessions`);
             // Build timeline of join/leave events
             const events = [];
             for (const s of sessArr) {
@@ -31,6 +34,7 @@ async function checkRecentGatherings(client, openai) {
             let lastTime = null;
             // Fetch recent gatherings for this channel in the last hour
             const allGatherings = await getAllRecentGatherings();
+            console.log(`Found ${allGatherings ? allGatherings.length : 0} recent gatherings for channel ${channel_id}`);
             const now = new Date();
             let recentGathering = null;
             if (Array.isArray(allGatherings)) {
@@ -39,6 +43,7 @@ async function checkRecentGatherings(client, openai) {
             }
 
             for (const event of events) {
+                console.log(`Processing event: ${event.type} by ${event.username} at ${event.time}`);
                 if (event.type === 'join') {
                     currentUsers.set(event.user_id, event.username);
                 } else {

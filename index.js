@@ -154,6 +154,7 @@ client.on("ready", async () => {
   // refreshUserlist(client, openai)
   preloadedDbTables = await preloadFromDb();
   await refreshUserlist(client, openai) //actually leave this here
+  await checkRecentGatherings(client, openai)
   // await processPlayerLeaderboards(client, openai)
 
 

@@ -12,6 +12,7 @@ async function getAllRecentGatherings() {
 }
 
 async function createRecentGathering(gatheringData) {
+    console.log("Creating recent gathering...");
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_RECENT_GATHERINGS}/`;
     try {
         const response = await axios.post(apiUrl, gatheringData, {
@@ -41,13 +42,8 @@ async function deleteRecentGathering(id) {
     }
 }
 
-module.exports = {
-    getAllRecentGatherings,
-    createRecentGathering,
-    deleteRecentGathering
-};
-
 async function updateRecentGathering(id, gatheringData) {
+    console.log("Updating recent gathering...");
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_RECENT_GATHERINGS}/${id}`;
     try {
         const response = await axios.put(apiUrl, gatheringData, {
@@ -61,7 +57,14 @@ async function updateRecentGathering(id, gatheringData) {
         return null;
     }
 }
-    updateRecentGathering
+
+module.exports = {
+    getAllRecentGatherings,
+    createRecentGathering,
+    updateRecentGathering,
+    deleteRecentGathering
+};
+    
 
 // RECENT GATHERINGS EXAMPLE
 // {
