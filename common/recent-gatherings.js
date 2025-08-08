@@ -61,11 +61,11 @@ async function checkRecentGatherings(client, openai) {
                     gatheringStartTime = event.time;
                     gatheringUserIds = Array.from(currentUsers.keys());
                     gatheringUsernames = Array.from(currentUsers.values());
+                    console.log(`[DEBUG] Gathering started in channel ${channel_id} at ${gatheringStartTime.toISOString()} with users:`, gatheringUsernames);
                 }
                 // Gathering ends
                 if (gatheringActive && currentUsers.size < 3) {
                     gatheringActive = false;
-                    // Log the gathering
                     const gatheringData = {
                         channel_id,
                         channel_name: sessArr[0].channel_name,
@@ -74,7 +74,13 @@ async function checkRecentGatherings(client, openai) {
                         timestamp: gatheringStartTime.toISOString(),
                         end_timestamp: event.time.toISOString(),
                     };
-                    await createRecentGathering(gatheringData);
+                    console.log(`[DEBUG] Attempting to save gathering for channel ${channel_id}:`, gatheringData);
+                    const result = await createRecentGathering(gatheringData);
+                    if (result) {
+                        console.log(`[DEBUG] Gathering saved successfully for channel ${channel_id}:`, result);
+                    } else {
+                        console.error(`[ERROR] Failed to save gathering for channel ${channel_id}. Data:`, gatheringData);
+                    }
                     gatheringStartTime = null;
                     gatheringUserIds = [];
                     gatheringUsernames = [];
@@ -90,9 +96,16 @@ async function checkRecentGatherings(client, openai) {
                     timestamp: gatheringStartTime.toISOString(),
                     end_timestamp: events[events.length-1].time.toISOString(),
                 };
-                await createRecentGathering(gatheringData);
+                console.log(`[DEBUG] Attempting to save final gathering for channel ${channel_id}:`, gatheringData);
+                const result = await createRecentGathering(gatheringData);
+                if (result) {
+                    console.log(`[DEBUG] Final gathering saved successfully for channel ${channel_id}:`, result);
+                } else {
+                    console.error(`[ERROR] Failed to save final gathering for channel ${channel_id}. Data:`, gatheringData);
+                }
             }
         }
+        console.log("Recent gatherings checked successfully.");
     } catch (error) {
         console.error("Error in checkRecentGatherings:", error);
     }
