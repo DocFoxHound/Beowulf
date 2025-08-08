@@ -43,7 +43,7 @@ async function checkRecentGatherings(client, openai) {
             }
 
             for (const event of events) {
-                console.log(`Processing event: ${event.type} by ${event.username} at ${event.time}`);
+                console.log("Event: ", event);
                 if (event.type === 'join') {
                     console.log(`User ${event.username} joined the channel`);
                     currentUsers.set(event.user_id, event.username);
