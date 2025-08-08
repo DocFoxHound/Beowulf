@@ -209,9 +209,9 @@ module.exports = {
         }
         let roleId;
         if (interaction.customId === 'join_member') {
-            roleId = process.env.LIVE_ENVIRONMENT === "true" ? process.env.PROSPECT_ROLE : process.env.TEST_PROSPECT_ROLE;
+            roleId = process.env.LIVE_ENVIRONMENT === "true" ? process.env.APPLICATION_PENDING_ROLE : process.env.TEST_APPLICATION_PENDING_ROLE;
         } else if (interaction.customId === 'join_guest') {
-            roleId = process.env.LIVE_ENVIRONMENT === "true" ? process.env.FRIENDLY_ROLE : process.env.TEST_FRIENDLY_ROLE;
+            roleId = process.env.LIVE_ENVIRONMENT === "true" ? process.env.FRIENDLY_PENDING_ROLE : process.env.TEST_FRIENDLY_PENDING_ROLE;
         }
         if (roleId) {
             try {
