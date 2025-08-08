@@ -55,6 +55,7 @@ async function checkRecentGatherings(client, openai) {
                     console.log(`User ${event.username} left the channel`);
                     currentUsers.delete(event.user_id);
                 }
+                console.log("Current Users: ", Array.from(currentUsers.values()).join(", "));
                 // If 3+ users present, log a gathering
                 if (currentUsers.size >= 3) {
                     console.log(`Gathering detected in channel ${channel_id} with ${currentUsers.size} users`);
