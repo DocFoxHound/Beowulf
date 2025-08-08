@@ -45,8 +45,10 @@ async function checkRecentGatherings(client, openai) {
             for (const event of events) {
                 console.log(`Processing event: ${event.type} by ${event.username} at ${event.time}`);
                 if (event.type === 'join') {
+                    console.log(`User ${event.username} joined the channel`);
                     currentUsers.set(event.user_id, event.username);
                 } else {
+                    console.log(`User ${event.username} left the channel`);
                     currentUsers.delete(event.user_id);
                 }
                 // If 3+ users present, log a gathering
