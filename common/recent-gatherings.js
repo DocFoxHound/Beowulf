@@ -36,7 +36,10 @@ async function checkRecentGatherings(client, openai) {
             events.sort((a, b) => a.time - b.time);
 
             let currentUsers = new Map();
-            let lastTime = null;
+            let gatheringActive = false;
+            let gatheringStartTime = null;
+            let gatheringUserIds = [];
+            let gatheringUsernames = [];
             // Fetch recent gatherings for this channel in the last hour
             const allGatherings = await getAllRecentGatherings();
             const now = new Date();
@@ -47,48 +50,47 @@ async function checkRecentGatherings(client, openai) {
             }
 
             for (const event of events) {
-                console.log("Event: ", event);
                 if (event.type === 'join') {
-                    console.log(`User ${event.username} joined the channel`);
                     currentUsers.set(event.user_id, event.username);
                 } else {
-                    console.log(`User ${event.username} left the channel`);
                     currentUsers.delete(event.user_id);
                 }
-                console.log("Current Users: ", Array.from(currentUsers.values()).join(", "));
-                // If 3+ users present, log a gathering
-                if (currentUsers.size >= 3) {
-                    console.log(`Gathering detected in channel ${channel_id} with ${currentUsers.size} users`);
-                    // Only create or update a gathering if this is a new group or time
-                    if (!lastTime || lastTime.getTime() !== event.time.getTime()) {
-                        console.log("Creating or updating gathering...");
-                        const user_ids = Array.from(currentUsers.keys());
-                        const usernames = Array.from(currentUsers.values());
-                        if (recentGathering) {
-                            // Merge users into the existing gathering
-                            const mergedUserIds = Array.from(new Set([...recentGathering.user_ids, ...user_ids]));
-                            const mergedUsernames = Array.from(new Set([...recentGathering.usernames, ...usernames]));
-                            const updatedGathering = {
-                                ...recentGathering,
-                                user_ids: mergedUserIds,
-                                usernames: mergedUsernames,
-                                timestamp: now.toISOString(),
-                            };
-                            await updateRecentGathering(recentGathering.id, updatedGathering);
-                        } else {
-                            console.log("Creating new gathering...");
-                            const gatheringData = {
-                                channel_id,
-                                channel_name: sessArr[0].channel_name,
-                                user_ids,
-                                usernames,
-                                timestamp: event.time.toISOString(),
-                            };
-                            await createRecentGathering(gatheringData);
-                        }
-                        lastTime = event.time;
-                    }
+                // Gathering starts
+                if (!gatheringActive && currentUsers.size >= 3) {
+                    gatheringActive = true;
+                    gatheringStartTime = event.time;
+                    gatheringUserIds = Array.from(currentUsers.keys());
+                    gatheringUsernames = Array.from(currentUsers.values());
                 }
+                // Gathering ends
+                if (gatheringActive && currentUsers.size < 3) {
+                    gatheringActive = false;
+                    // Log the gathering
+                    const gatheringData = {
+                        channel_id,
+                        channel_name: sessArr[0].channel_name,
+                        user_ids: gatheringUserIds,
+                        usernames: gatheringUsernames,
+                        timestamp: gatheringStartTime.toISOString(),
+                        end_timestamp: event.time.toISOString(),
+                    };
+                    await createRecentGathering(gatheringData);
+                    gatheringStartTime = null;
+                    gatheringUserIds = [];
+                    gatheringUsernames = [];
+                }
+            }
+            // If gathering is still active at the end, log it
+            if (gatheringActive) {
+                const gatheringData = {
+                    channel_id,
+                    channel_name: sessArr[0].channel_name,
+                    user_ids: gatheringUserIds,
+                    usernames: gatheringUsernames,
+                    timestamp: gatheringStartTime.toISOString(),
+                    end_timestamp: events[events.length-1].time.toISOString(),
+                };
+                await createRecentGathering(gatheringData);
             }
         }
     } catch (error) {
