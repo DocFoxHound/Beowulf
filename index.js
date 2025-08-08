@@ -145,8 +145,8 @@ client.on("ready", async () => {
   console.log(`Logged in as ${client.user.tag}!`);
 
 
-  // preloadedDbTables = await preloadFromDb(); //leave on
-  // await refreshUserlist(client, openai) //actually leave this here
+  preloadedDbTables = await preloadFromDb(); //leave on
+  await refreshUserlist(client, openai) //actually leave this here
   // await processPlayerLeaderboards(client, openai)
 
 
