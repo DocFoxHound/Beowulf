@@ -24,6 +24,7 @@ async function checkRecentGatherings(client, openai) {
             // Build timeline of join/leave events
             const events = [];
             for (const s of sessArr) {
+                console.log("Session found: ", s);
                 events.push({ time: new Date(s.joined_at), type: 'join', user_id: s.user_id, username: s.username });
                 events.push({ time: new Date(s.left_at), type: 'leave', user_id: s.user_id, username: s.username });
             }

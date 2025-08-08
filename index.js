@@ -144,15 +144,8 @@ client.on("ready", async () => {
   })).filter(channel => channel.channelId);
   console.log(`Logged in as ${client.user.tag}!`);
 
-  //start off with a fresh reload of the online files
-  // await vectorHandler.refreshChatLogs(channelIdAndName, openai, client)
-  // await vectorHandler.refreshUserList(openai, client)
-  // processUEXData("commodities"); //do NOT await this, it takes forever
-  // await trimChatLogs();
-  // await loadChatlogs(client, openai)
-  // console.log(client.guilds.fetch(process.env.TEST_GUILD_ID))
-  // refreshUserlist(client, openai)
-  preloadedDbTables = await preloadFromDb();
+
+  // preloadedDbTables = await preloadFromDb(); //leave on
   // await refreshUserlist(client, openai) //actually leave this here
   await checkRecentGatherings(client, openai)
   // await processPlayerLeaderboards(client, openai)
