@@ -53,8 +53,10 @@ async function checkRecentGatherings(client, openai, session, users) {
             console.log(`Updated recent gathering for channel ${session.channelName}`);
         } else {
             // Create new gathering
+            // Generate a random BIGINT (up to 18 digits, positive)
+            const randomBigInt = Math.floor(Math.random() * 9e17) + 1e17; // Range: 1e17 to 1e18-1
             const newGathering = {
-                id: `${Date.now()}_${session.channelId}`,
+                id: randomBigInt,
                 channel_id: session.channelId,
                 channel_name: session.channelName,
                 user_ids: userIds,
