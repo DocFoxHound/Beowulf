@@ -13,20 +13,24 @@ async function checkRecentGatherings(client, openai) {
         // 2. Group sessions by channel
         const channelSessions = {};
         for (const session of sessions) {
-            console.log(`Session found: ${session.id} in channel ${session.channel_id}`);
             if (!channelSessions[session.channel_id]) channelSessions[session.channel_id] = [];
             channelSessions[session.channel_id].push(session);
         }
 
         // 3. For each channel, find intervals with 3+ users present
         for (const [channel_id, sessArr] of Object.entries(channelSessions)) {
-            console.log(`Processing channel ${channel_id} with ${sessArr.length} sessions`);
             // Build timeline of join/leave events
             const events = [];
             for (const s of sessArr) {
-                console.log("Session found: ", s);
-                events.push({ time: new Date(s.joined_at), type: 'join', user_id: s.user_id, username: s.username });
-                events.push({ time: new Date(s.left_at), type: 'leave', user_id: s.user_id, username: s.username });
+                    let username;
+                    try {
+                        const user = await client.users.fetch(s.user_id);
+                        username = user ? user.username : undefined;
+                    } catch (err) {
+                        console.error(`Failed to fetch username for user_id ${s.user_id}:`, err);
+                    }
+                    events.push({ time: new Date(s.joined_at), type: 'join', user_id: s.user_id, username });
+                    events.push({ time: new Date(s.left_at), type: 'leave', user_id: s.user_id, username });
             }
             // Sort events by time
             events.sort((a, b) => a.time - b.time);
@@ -35,7 +39,6 @@ async function checkRecentGatherings(client, openai) {
             let lastTime = null;
             // Fetch recent gatherings for this channel in the last hour
             const allGatherings = await getAllRecentGatherings();
-            console.log(`Found ${allGatherings ? allGatherings.length : 0} recent gatherings for channel ${channel_id}`);
             const now = new Date();
             let recentGathering = null;
             if (Array.isArray(allGatherings)) {
