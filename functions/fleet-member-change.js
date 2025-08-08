@@ -1,19 +1,19 @@
 const { ChannelType, EmbedBuilder } = require("discord.js");
 
 async function handleFleetMemberChange(client, openai, userFleet) {
-    const channelId = process.env.LIVE_ENVIRONMENT === "true"
-        ? process.env.FLEET_COMMANDERS_CHANNEL
-        : process.env.TEST_FLEET_COMMANDERS_CHANNEL;
-
-    const channel = await client.channels.fetch(channelId);
-    if (!channel || channel.type !== ChannelType.GuildText) return;
-
-    const action = userFleet.action;
-    const changedUserId = userFleet.changed_user_id;
-
-    if (!action || !changedUserId) return;
-
     try {
+        const channelId = process.env.LIVE_ENVIRONMENT === "true"
+            ? process.env.FLEET_COMMANDERS_CHANNEL
+            : process.env.TEST_FLEET_COMMANDERS_CHANNEL;
+
+        const channel = await client.channels.fetch(channelId);
+        if (!channel || channel.type !== ChannelType.GuildText) return;
+
+        const action = userFleet.action;
+        const changedUserId = userFleet.changed_user_id;
+
+        if (!action || !changedUserId) return;
+
         // Add the fleet role to the member if they joined
         if (action === "add_member" && userFleet.discord_role) {
             try {

@@ -8,7 +8,6 @@ async function handleHitPostDelete(client, openai, hitTrack) {
     try {
         // const hitTrack = await getHitLogByEntryId(hitTrack);
         // Fetch the thread by its ID
-        console.log("Fetching thread with ID:", hitTrack.hit.thread_id);
         const thread = await client.channels.fetch(hitTrack.hit.thread_id);
 
         if (!thread || !thread.isThread()) {
@@ -30,7 +29,6 @@ async function handleHitPostDelete(client, openai, hitTrack) {
         // Prepend "❌ " to the thread title
         await thread.setName(`❌ ${thread.name}`);
 
-        console.log(`Thread ${hitTrack.hit.thread_id} locked and status posted.`);
     } catch (error) {
         console.error('Error handling deleted hit entry:', error);
     }

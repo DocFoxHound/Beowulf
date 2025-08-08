@@ -20,9 +20,8 @@ function chunkArray(array, size) {
 
 async function processPlayerLeaderboards(client, openai) {
     // Delete all previous leaderboard data before loading new data
-    console.log('Deleting all previous leaderboard entries...');
+    console.log('Processing Player Leaderboards...');
     await deleteAllPlayerLeaderboardEntries();
-    console.log('All previous leaderboard entries deleted.');
 
     // Get all game versions and find the highest season number
     let season = "49";
@@ -61,7 +60,6 @@ async function processPlayerLeaderboards(client, openai) {
         try {
             let mapPlayers = [];
             for (let page = 1; page <= 10; page++) {
-                console.log(`Fetching leaderboard for map: ${mapTitle}, page: ${page}`);
                 const requestBody = {
                     mode: "SB",
                     map: mapTitle,
@@ -110,10 +108,8 @@ async function processPlayerLeaderboards(client, openai) {
 
             // Chunk into batches of 100 and submit
             const batches = chunkArray(uniquePlayers, 100);
-            console.log(`Submitting ${uniquePlayers.length} unique players for map "${mapTitle}" in ${batches.length} batches...`);
             for (let i = 0; i < batches.length; i++) {
                 try {
-                    console.log(`Submitting batch ${i + 1} of ${batches.length} (map: ${mapTitle}, entries: ${batches[i].length})`);
                     await createPlayerLeaderboardEntriesBulk(batches[i]);
                 } catch (error) {
                     console.error(`Error submitting batch ${i + 1} for map ${mapTitle}:`, error.response ? error.response.data : error.message);
@@ -126,14 +122,14 @@ async function processPlayerLeaderboards(client, openai) {
     // Call process-leaderboard-logs with allPlayers (unaggregated)
     await processLeaderboardLogs(client, openai);
     await processOrgLeaderboards(client, openai, allPlayers);
+    console.log("Completed processing Player Leaderboards.");
 }
 
 
 async function processOrgLeaderboards(client, openai) {
     // Delete all previous leaderboard data before loading new data
-    console.log('Deleting all previous organization leaderboard entries...');
+    console.log('Processing Org Leaderboards');
     await deleteAllOrgLeaderboardEntries();
-    console.log('All previous organization leaderboard entries deleted.');
 
     // Get all game versions and find the highest season number
     let season = "49";
@@ -142,7 +138,6 @@ async function processOrgLeaderboards(client, openai) {
         if (Array.isArray(gameVersions) && gameVersions.length > 0) {
             season = String(Math.max(...gameVersions.map(gv => Number(gv.season))));
         }
-        console.log("Season: ", season);
     } catch (err) {
         console.error("Error getting game versions for season:", err);
     }
@@ -173,7 +168,6 @@ async function processOrgLeaderboards(client, openai) {
         try {
             let mapOrgs = [];
             for (let page = 1; page <= 3; page++) {
-                console.log(`Fetching leaderboard for map: ${mapTitle}, page: ${page}`);
                 const requestBody = {
                     mode: "SB",
                     map: mapTitle,
@@ -222,10 +216,8 @@ async function processOrgLeaderboards(client, openai) {
 
             // Chunk into batches of 100 and submit
             const batches = chunkArray(uniqueOrgs, 100);
-            console.log(`Submitting ${uniqueOrgs.length} unique organizations for map "${mapTitle}" in ${batches.length} batches...`);
             for (let i = 0; i < batches.length; i++) {
                 try {
-                    console.log(`Submitting batch ${i + 1} of ${batches.length} (map: ${mapTitle}, entries: ${batches[i].length})`);
                     await createOrgLeaderboardEntriesBulk(batches[i]);
                 } catch (error) {
                     console.error(`Error submitting batch ${i + 1} for map ${mapTitle}:`, error.response ? error.response.data : error.message);

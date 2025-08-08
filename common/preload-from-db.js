@@ -5,43 +5,101 @@ const { getTopTerminalTransactions } = require("./get-top-terminal-transactions"
 
 
 async function preloadFromDb(){
+    console.log("Preloading data from the database...");
     //load it all into memory
     // let jsonData = await fs.readFile("./UEX/cities.json", 'utf8');
-    const cities = await UEX.getAllCities();
+    let cities;
+    try {
+        cities = await UEX.getAllCities();
+    } catch (error) {
+        console.error(`Error loading cities: ${error}`);
+    }
     // cities = JSON.parse(cityData);
     // jsonData = await fs.readFile("./UEX/commodities.json", 'utf8');
-    const commodities = await UEX.getAllCommodities();
+    let commodities;
+    try {
+        commodities = await UEX.getAllCommodities();
+    } catch (error) {
+        console.error(`Error loading commodities: ${error}`);
+    }
     // commodities = JSON.parse(commodityData);
     // jsonData = await fs.readFile("./UEX/outposts.json", 'utf8');
-    const outposts = await UEX.getAllOutposts();
+    let outposts;
+    try {
+        outposts = await UEX.getAllOutposts();
+    } catch (error) {
+        console.error(`Error loading outposts: ${error}`);
+    }
     // outposts = JSON.parse(outpostData);
     // jsonData = await fs.readFile("./UEX/planets.json", 'utf8');
-    const planets = await UEX.getAllPlanets();
+    let planets;
+    try {
+        planets = await UEX.getAllPlanets();
+    } catch (error) {
+        console.error(`Error loading planets: ${error}`);
+    }
     // planets = JSON.parse(planetData);
     // jsonData = await fs.readFile("./UEX/space_stations.json", 'utf8');
-    const spaceStations = await UEX.getAllSpaceStations();
+    let spaceStations;
+    try {
+        spaceStations = await UEX.getAllSpaceStations();
+    } catch (error) {
+        console.error(`Error loading space stations: ${error}`);
+    }
     // spaceStations = JSON.parse(spaceStationData);
     // jsonData = await fs.readFile("./UEX/star_systems.json", 'utf8');
-    const starSystems = await UEX.getAllStarSystems();
+    let starSystems;
+    try {
+        starSystems = await UEX.getAllStarSystems();
+    } catch (error) {
+        console.error(`Error loading star systems: ${error}`);
+    }
     // starSystems = JSON.parse(starSystemData);
     // jsonData = await fs.readFile("./UEX/terminal_prices.json", 'utf8');
-    const terminals = await UEX.getAllTerminals();
+    let terminals;
+    try {
+        terminals = await UEX.getAllTerminals();
+    } catch (error) {
+        console.error(`Error loading terminals: ${error}`);
+    }
     // terminals = JSON.parse(terminalData);
-    const terminalPrices = await UEX.getAllTerminalPrices();
+    let terminalPrices;
+    try {
+        terminalPrices = await UEX.getAllTerminalPrices();
+    } catch (error) {
+        console.error(`Error loading terminal prices: ${error}`);
+    }
     // terminalPrices = JSON.parse(terminalPriceData);
     // jsonData = await fs.readFile("./UEX/terminals.json", 'utf8');
     
 
-    const topTerminalTransactions = await getTopTerminalTransactions(terminalPrices);
-    const allTopTransactions = topTerminalTransactions.allTopTransactions;
-    const pyroTopTransactions = topTerminalTransactions.pyroTopTransactions;
-    const stantonTopTransactions = topTerminalTransactions.stantonTopTransactions;
-    const topCommodityBuySellLocations = await getTopCommodityBuySellLocations(terminalPrices);
-    const stantonCommodityBuyList = topCommodityBuySellLocations.stantonCommodityBuyList;
-    const stantonCommoditySellList = topCommodityBuySellLocations.stantonCommoditySellList;
-    const pyroCommodityBuyList = topCommodityBuySellLocations.pyroCommodityBuyList;
-    const pyroCommoditySellList = topCommodityBuySellLocations.pyroCommoditySellList;
+    let topTerminalTransactions;
+    try {
+        topTerminalTransactions = await getTopTerminalTransactions(terminalPrices);
+    } catch (error) {
+        console.error(`Error getting top terminal transactions: ${error}`);
+    }
+    let allTopTransactions, pyroTopTransactions, stantonTopTransactions;
+    if (topTerminalTransactions) {
+        allTopTransactions = topTerminalTransactions.allTopTransactions;
+        pyroTopTransactions = topTerminalTransactions.pyroTopTransactions;
+        stantonTopTransactions = topTerminalTransactions.stantonTopTransactions;
+    }
+    let topCommodityBuySellLocations;
+    try {
+        topCommodityBuySellLocations = await getTopCommodityBuySellLocations(terminalPrices);
+    } catch (error) {
+        console.error(`Error getting top commodity buy/sell locations: ${error}`);
+    }
+    let stantonCommodityBuyList, stantonCommoditySellList, pyroCommodityBuyList, pyroCommoditySellList;
+    if (topCommodityBuySellLocations) {
+        stantonCommodityBuyList = topCommodityBuySellLocations.stantonCommodityBuyList;
+        stantonCommoditySellList = topCommodityBuySellLocations.stantonCommoditySellList;
+        pyroCommodityBuyList = topCommodityBuySellLocations.pyroCommodityBuyList;
+        pyroCommoditySellList = topCommodityBuySellLocations.pyroCommoditySellList;
+    }
     
+    console.log("Preloading data from the database completed.");
     return { // Optionally return these objects if needed elsewhere
         cities,
         commodities,

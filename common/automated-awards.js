@@ -78,7 +78,7 @@ async function automatedAwards(client, openai) {
             if (hasBadge) continue;
             // Only create if player qualifies
             if ((player.qualified_badge_reusables || []).includes(badgeReusable.badge_reusable_id || badgeReusable.id || badgeReusable.name)) {
-                console.log(`Creating badge for player ${player.user_id} - ${badgeReusable.badge_name}`);
+                console.log(`Awarding badge for player ${player.user_id} - ${badgeReusable.badge_name}`);
                 // Generate a random 15-digit number for PostgreSQL BIGINT
                 const generatedId = Math.floor(Math.random() * 9e14) + 1e14;
                 await createBadge({

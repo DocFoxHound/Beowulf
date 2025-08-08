@@ -3,20 +3,30 @@ const { ButtonBuilder, ActionRowBuilder } = require('discord.js');
 const { verifyUser } = require('../functions/verify-user');
 const { notifyJoinMemberWelcome, notifyJoinGuestWelcome } = require('./bot-notify');
 
+
 // Track verification attempts and DM message in memory (per process)
 const verificationAttempts = {};
 const verificationDMs = {};
 
+// Helper to get the guild from client and .env
+function getGuild(client) {
+    const guildId = process.env.LIVE_ENVIRONMENT === "true" ? process.env.GUILD_ID : process.env.TEST_GUILD_ID;
+    return client.guilds.cache.get(guildId);
+}
+
 async function handleNewGuildMember(member) {
     const logChannel = process.env.LIVE_ENVIRONMENT === "true" ? process.env.ENTRY_LOG_CHANNEL : process.env.TEST_ENTRY_LOG_CHANNEL;
+    const guild = getGuild(member.client);
+    console.debug(`[handleNewGuildMember] Called for user: ${member.user.username} (${member.user.id})`);
     try {
         // Check if the user already exists in the database
+        console.debug(`[handleNewGuildMember] Checking if user exists in DB...`);
         const user = await getUserById(member.user.id) || null;
         let result;
         let actionMsg;
         const verificationCode = user ? user.verification_code : Date.now();
         if (user) {
-            // Update existing user profile
+            console.debug(`[handleNewGuildMember] User exists. Updating profile.`);
             const updatedUser = {
                 ...user,
                 username: member.user.username,
@@ -24,11 +34,10 @@ async function handleNewGuildMember(member) {
                 nickname: member.nickname || null,
                 joined_date: user.joined_date || new Date().toISOString(),
             };
-            // You may want to use an updateUser function here; for now, reuse createUser for upsert
             result = await editUser(updatedUser.id, updatedUser);
             actionMsg = `User ${member.user.username} profile has been updated in the UserList.`;
         } else {
-            // Initialize the newUser object
+            console.debug(`[handleNewGuildMember] User does not exist. Creating new profile.`);
             const newUser = {
                 id: member.user.id,
                 username: member.user.username,
@@ -44,8 +53,8 @@ async function handleNewGuildMember(member) {
         }
 
         if (result) {
-            console.log(actionMsg);
-            member.guild.channels.cache.get(logChannel)?.send(actionMsg);
+            console.debug(`[handleNewGuildMember] DB operation successful. Sending log message.`);
+            guild.channels.cache.get(logChannel)?.send(actionMsg);
 
             // Send DM with Verify button
             const verifyButton = new ButtonBuilder()
@@ -57,21 +66,24 @@ async function handleNewGuildMember(member) {
             try {
                 // Only send DM if not already sent
                 if (!verificationDMs[member.user.id]) {
+                    console.debug(`[handleNewGuildMember] Sending DM to user.`);
                     const sentMsg = await member.user.send({ content: dmMessage, components: [row] });
                     verificationDMs[member.user.id] = sentMsg;
+                } else {
+                    console.debug(`[handleNewGuildMember] DM already sent to user.`);
                 }
             } catch (dmError) {
-                console.error(`Could not send DM to ${member.user.username}:`, dmError);
+                console.error(`[handleNewGuildMember] Could not send DM to ${member.user.username}:`, dmError);
             }
         } else {
-            const errorMsg = `Failed to process user ${member.user.username} in the UserList.`;
+            const errorMsg = `[handleNewGuildMember] Failed to process user ${member.user.username} in the UserList.`;
             console.error(errorMsg);
-            member.guild.channels.cache.get(logChannel)?.send(errorMsg);
+            guild.channels.cache.get(logChannel)?.send(errorMsg);
         }
     } catch (error) {
-        const errorMsg = `Error adding new user: ${error}`;
+        const errorMsg = `[handleNewGuildMember] Error adding new user: ${error}`;
         console.error(errorMsg);
-        member.guild.channels.cache.get(logChannel)?.send(errorMsg);
+        guild.channels.cache.get(logChannel)?.send(errorMsg);
     }
 }
 
@@ -86,17 +98,23 @@ module.exports = {
      */
     async handleVerifyButtonInteraction(interaction) {
         const userId = interaction.user.id;
+        console.debug(`[handleVerifyButtonInteraction] Called for user: ${userId}`);
         if (!verificationAttempts[userId]) verificationAttempts[userId] = 0;
         // Always defer immediately to avoid interaction expiration
         if (!interaction.replied && !interaction.deferred) {
+            console.debug(`[handleVerifyButtonInteraction] Deferring interaction update.`);
             await interaction.deferUpdate();
         }
         try {
+            console.debug(`[handleVerifyButtonInteraction] Fetching user from DB...`);
             const dbUser = await getUserById(userId);
             const rsiHandle = dbUser?.username || interaction.user.username;
+            console.debug(`[handleVerifyButtonInteraction] Verifying user: ${rsiHandle}`);
             const resultMsg = await verifyUser(rsiHandle, userId);
+            console.debug(`[handleVerifyButtonInteraction] Verification result: ${resultMsg}`);
             if (/fail|error|not found|incorrect/i.test(resultMsg)) {
                 verificationAttempts[userId]++;
+                console.debug(`[handleVerifyButtonInteraction] Verification failed. Attempt ${verificationAttempts[userId]}`);
                 if (verificationAttempts[userId] < 3) {
                     // Always edit the same DM with verify button and resultMsg
                     const { ButtonBuilder, ActionRowBuilder } = require('discord.js');
@@ -109,10 +127,11 @@ module.exports = {
                     const dmMessage = `${resultMsg}\n\nPlease ensure your RSI bio contains the code: ${verificationCode} and try again. (${verificationAttempts[userId]}/3 attempts)`;
                     try {
                         if (verificationDMs[userId]) {
+                            console.debug(`[handleVerifyButtonInteraction] Editing DM for failed verification.`);
                             await verificationDMs[userId].edit({ content: dmMessage, components: [row] });
                         }
                     } catch (dmError) {
-                        // Ignore DM errors
+                        console.error(`[handleVerifyButtonInteraction] Could not edit DM:`, dmError);
                     }
                     // No further interaction response needed
                 } else {
@@ -128,9 +147,10 @@ module.exports = {
                         const verificationCode = dbUser?.verification_code || Date.now();
                         const finalMsg = `${resultMsg}\n\nYou have reached the maximum number of verification attempts. Please contact DocHound for help. (Code: ${verificationCode})`;
                         try {
+                            console.debug(`[handleVerifyButtonInteraction] Disabling DM button after max attempts.`);
                             await verificationDMs[userId].edit({ content: finalMsg, components: [disabledRow] });
                         } catch (dmError) {
-                            // Ignore DM errors
+                            console.error(`[handleVerifyButtonInteraction] Could not edit DM:`, dmError);
                         }
                     }
                     // No further interaction response needed
@@ -140,9 +160,10 @@ module.exports = {
                 // Delete previous DM if exists
                 if (verificationDMs[userId]) {
                     try {
+                        console.debug(`[handleVerifyButtonInteraction] Deleting previous DM after successful verification.`);
                         await verificationDMs[userId].delete();
                     } catch (dmError) {
-                        // Ignore DM errors
+                        console.error(`[handleVerifyButtonInteraction] Could not delete DM:`, dmError);
                     }
                 }
                 // Send new DM with Join buttons
@@ -159,30 +180,36 @@ module.exports = {
                 const joinMsg = `Verification successful. If you are looking to join IronPoint, please apply here: 'https://robertsspaceindustries.com/en/orgs/IRONPOINT' and then click the "Join as Member" button below. If you are coming from another org or just want to check us out, please click the "Join as Guest" button below.`;
                 let sentJoinMsg;
                 try {
+                    console.debug(`[handleVerifyButtonInteraction] Sending join DM after verification.`);
                     sentJoinMsg = await interaction.user.send({ content: joinMsg, components: [joinRow] });
                 } catch (dmError) {
-                    // Ignore DM errors
+                    console.error(`[handleVerifyButtonInteraction] Could not send join DM:`, dmError);
                 }
                 verificationDMs[userId] = sentJoinMsg;
                 // Change user's nickname to their handle
                 try {
-                    const member = interaction.guild.members.cache.get(userId);
-                    if (member && rsiHandle) {
-                        await member.setNickname(rsiHandle);
+                    const guild = getGuild(interaction.client);
+                    if (guild && rsiHandle) {
+                        const member = guild.members.cache.get(userId);
+                        if (member) {
+                            console.debug(`[handleVerifyButtonInteraction] Setting nickname for user.`);
+                            await member.setNickname(rsiHandle);
+                        }
                     }
                 } catch (nickError) {
-                    // Optionally log or ignore nickname errors
+                    console.error(`[handleVerifyButtonInteraction] Could not set nickname:`, nickError);
                 }
                 // No further interaction response needed
             }
         } catch (err) {
             const errorText = err?.message || err?.toString() || 'Unknown error occurred.';
+            console.error(`[handleVerifyButtonInteraction] Error:`, errorText);
             // If already deferred/replied, use followUp, else just log error (should never happen)
             if (interaction.replied || interaction.deferred) {
                 await interaction.followUp({ content: errorText, ephemeral: true });
             } else {
                 // Should never happen, but log error
-                console.error('Interaction expired before response:', errorText);
+                console.error('[handleVerifyButtonInteraction] Interaction expired before response:', errorText);
             }
         }
     },
@@ -192,8 +219,10 @@ module.exports = {
      */
     async handleJoinButtonInteraction(interaction, client, openai) {
         const userId = interaction.user.id;
+        console.debug(`[handleJoinButtonInteraction] Called for user: ${userId}, customId: ${interaction.customId}`);
         // Always defer immediately to avoid interaction expiration
         if (!interaction.replied && !interaction.deferred) {
+            console.debug(`[handleJoinButtonInteraction] Deferring interaction update.`);
             await interaction.deferUpdate();
         }
         let member = null;
@@ -204,6 +233,7 @@ module.exports = {
             member = guild.members.cache.get(userId);
         }
         if (!member) {
+            console.error(`[handleJoinButtonInteraction] Could not find server membership for user: ${userId}`);
             await interaction.followUp({ content: "Could not find your server membership. Please use this button in the server.", ephemeral: true });
             return;
         }
@@ -215,9 +245,10 @@ module.exports = {
         }
         if (roleId) {
             try {
+                console.debug(`[handleJoinButtonInteraction] Adding role ${roleId} to user: ${userId}`);
                 await member.roles.add(roleId);
             } catch (roleError) {
-                // Optionally log or ignore role errors
+                console.error(`[handleJoinButtonInteraction] Could not add role:`, roleError);
             }
         }
         // Disable buttons after click (move up so it's immediate)
@@ -235,37 +266,40 @@ module.exports = {
                 .setDisabled(true);
             const disabledRow = new ActionRowBuilder().addComponents(memberButton, guestButton);
             try {
+                console.debug(`[handleJoinButtonInteraction] Disabling DM buttons for user: ${userId}`);
                 await verificationDMs[userId].edit({ components: [disabledRow] });
             } catch (dmError) {
-                // Ignore DM errors
+                console.error(`[handleJoinButtonInteraction] Could not edit DM:`, dmError);
             }
         }
         // Run welcome notification in background
         if (interaction.customId === 'join_member') {
             (async () => {
                 try {
+                    console.debug(`[handleJoinButtonInteraction] Running notifyJoinMemberWelcome for user: ${userId}`);
                     const dbUser = await getUserById(userId);
                     await notifyJoinMemberWelcome(dbUser, openai, interaction.client);
                 } catch (e) {
-                    // Optionally log error
+                    console.error(`[handleJoinButtonInteraction] Error in notifyJoinMemberWelcome:`, e);
                 }
             })();
         }
         if (interaction.customId === 'join_guest') {
             // Re-retrieve user profile after verifyUser to ensure .player_org is up-to-date, then update nickname
             try {
+                console.debug(`[handleJoinButtonInteraction] Running notifyJoinGuestWelcome for user: ${userId}`);
                 // Re-fetch user profile from DB
                 const dbUser = await getUserById(userId);
-                console.log(`Re-retrieved user profile for ${userId}:`, dbUser);
                 const handle = dbUser?.rsi_handle;
                 const playerOrg = dbUser?.player_org || '';
                 await member.setNickname(`[${playerOrg}] ${handle}`);
                 await notifyJoinGuestWelcome(dbUser, openai, interaction.client);
             } catch (nickError) {
-                // Optionally log or ignore nickname errors
+                console.error(`[handleJoinButtonInteraction] Error in notifyJoinGuestWelcome or setNickname:`, nickError);
             }
         }
         // Send followUp welcome message
+        console.debug(`[handleJoinButtonInteraction] Sending welcome followUp for user: ${userId}`);
         await interaction.followUp({ content: "Welcome to IronPoint!", ephemeral: true });
     },
 }

@@ -4,82 +4,87 @@ const rankRoles = require("../api/rank-roles-api")
 const prestigeRoles = require("../api/prestige-roles-api")
 
 async function createNewUser(userData, client, guildId) {
-    console.log("Create New User");
-
-    const classData = await generateDynamicClassFields(); // Dynamically fetch class data
-    const newUser = {
-        id: '',
-        username: null,
-        nickname: null,
-        corsair_level: 0,
-        raptor_level: 0,
-        raider_level: 0,
-        rank: null
-    };
-
-    // Dynamically add class fields based on the database data
-    for (const [category, classes] of Object.entries(classData)) {
-        for (const classObj of classes) {
-            const fieldName = `${category}_${classObj.name.toLowerCase().replace(/\s+/g, '_')}`;
-            newUser[fieldName] = false; // Default to false (not completed)
-        }
-    }
-
-    // Check if the user is still in Discord
-    const guild = await client.guilds.fetch(guildId);
-    let member = null;
     try {
-        member = await guild.members.fetch(userData.id);
-    } catch {
-        member = null;
-    }
+        console.log("Create New User");
+        const classData = await generateDynamicClassFields(); // Dynamically fetch class data
+        const newUser = {
+            id: '',
+            username: null,
+            nickname: null,
+            corsair_level: 0,
+            raptor_level: 0,
+            raider_level: 0,
+            rank: null
+        };
 
-    if (member) {
-        console.log("Adding user from Discord to DB");
-        const memberRoles = member.roles.cache.map(role => role.id);
-        newUser.id = userData.id;
-        newUser.username = userData.username;
-        newUser.nickname = userData.nickname || null;
-        newUser.corsair_level = getCorsairRank(memberRoles, false) || 0;
-        newUser.raptor_level = getRaptorRank(memberRoles, false) || 0;
-        newUser.raider_level = getRaiderRank(memberRoles, false) || 0;
-        newUser.rank = getUserRank(memberRoles) || null;
+        // Dynamically add class fields based on the database data
+        for (const [category, classes] of Object.entries(classData)) {
+            for (const classObj of classes) {
+                const fieldName = `${category}_${classObj.name.toLowerCase().replace(/\s+/g, '_')}`;
+                newUser[fieldName] = false; // Default to false (not completed)
+            }
+        }
 
-        userlistApi.createUser(newUser);
-    } else {
-        console.log("Adding user from queue to DB");
-        newUser.id = userData.id;
-        newUser.username = userData.username;
-        newUser.nickname = userData.nickname || null;
-        userlistApi.createUser(newUser);
+        // Check if the user is still in Discord
+        const guild = await client.guilds.fetch(guildId);
+        let member = null;
+        try {
+            member = await guild.members.fetch(userData.id);
+        } catch (err) {
+            console.error(err);
+            member = null;
+        }
+
+        if (member) {
+            console.log("Adding user from Discord to DB");
+            const memberRoles = member.roles.cache.map(role => role.id);
+            newUser.id = userData.id;
+            newUser.username = userData.username;
+            newUser.nickname = userData.nickname || null;
+            newUser.corsair_level = getCorsairRank(memberRoles, false) || 0;
+            newUser.raptor_level = getRaptorRank(memberRoles, false) || 0;
+            newUser.raider_level = getRaiderRank(memberRoles, false) || 0;
+            newUser.rank = getUserRank(memberRoles) || null;
+
+            userlistApi.createUser(newUser);
+        } else {
+            console.log("Adding user from queue to DB");
+            newUser.id = userData.id;
+            newUser.username = userData.username;
+            newUser.nickname = userData.nickname || null;
+            userlistApi.createUser(newUser);
+        }
+    } catch (error) {
+        console.error(error);
     }
 }
 
 async function updatedUserListData(userData){
-
+    // No implementation, so no try-catch needed
 }
 
 async function updateUserClassStatus(userlistData, className, classCompleted) {
-    console.log("Update User Class Status");
-
-    const classData = await generateDynamicClassFields(); // Dynamically fetch class data
-
-    // Find the matching class in the database
-    for (const [category, classes] of Object.entries(classData)) {
-        for (const classObj of classes) {
-            if (
-                classObj.name.toLowerCase() === className.toLowerCase() ||
-                classObj.alt_name.toLowerCase() === className.toLowerCase()
-            ) {
-                const fieldName = `${classObj.name.toLowerCase().replace(/\s+/g, '_')}`;
-                userlistData[fieldName] = classCompleted; // Update the class status
-                return await userlistApi.editUser(userlistData.id, userlistData);
+    try {
+        console.log("Update User Class Status");
+        const classData = await generateDynamicClassFields(); // Dynamically fetch class data
+        // Find the matching class in the database
+        for (const [category, classes] of Object.entries(classData)) {
+            for (const classObj of classes) {
+                if (
+                    classObj.name.toLowerCase() === className.toLowerCase() ||
+                    classObj.alt_name.toLowerCase() === className.toLowerCase()
+                ) {
+                    const fieldName = `${classObj.name.toLowerCase().replace(/\s+/g, '_')}`;
+                    userlistData[fieldName] = classCompleted; // Update the class status
+                    return await userlistApi.editUser(userlistData.id, userlistData);
+                }
             }
         }
+        return null;
+    } catch (error) {
+        console.error(error);
+        return null;
     }
-
-    console.log(`Class "${className}" not found in the database.`);
-    return null;
 }
 
 async function getUserRank(memberRoles) {
@@ -98,239 +103,166 @@ async function getUserRank(memberRoles) {
         }
         return null;
     }catch(error){
-        console.log(error)
+        console.error(error)
     }
 }
 
 async function getPrestigeRanks(memberRoles) {
-    // Load role IDs from environment variables
-    const raptorRoles = [
-        process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAPTOR_1_ROLE : process.env.RAPTOR_1_TEST_ROLE,
-        process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAPTOR_2_ROLE : process.env.RAPTOR_2_TEST_ROLE,
-        process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAPTOR_3_ROLE : process.env.RAPTOR_3_TEST_ROLE,
-        process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAPTOR_4_ROLE : process.env.RAPTOR_4_TEST_ROLE,
-        process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAPTOR_5_ROLE : process.env.RAPTOR_5_TEST_ROLE
-    ];
-    const corsairRoles = [
-        process.env.LIVE_ENVIRONMENT === "true" ? process.env.CORSAIR_1_ROLE : process.env.CORSAIR_1_TEST_ROLE,
-        process.env.LIVE_ENVIRONMENT === "true" ? process.env.CORSAIR_2_ROLE : process.env.CORSAIR_2_TEST_ROLE,
-        process.env.LIVE_ENVIRONMENT === "true" ? process.env.CORSAIR_3_ROLE : process.env.CORSAIR_3_TEST_ROLE,
-        process.env.LIVE_ENVIRONMENT === "true" ? process.env.CORSAIR_4_ROLE : process.env.CORSAIR_4_TEST_ROLE,
-        process.env.LIVE_ENVIRONMENT === "true" ? process.env.CORSAIR_5_ROLE : process.env.CORSAIR_5_TEST_ROLE
-    ];
-    const raiderRoles = [
-        process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAIDER_1_ROLE : process.env.RAIDER_1_TEST_ROLE,
-        process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAIDER_2_ROLE : process.env.RAIDER_2_TEST_ROLE,
-        process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAIDER_3_ROLE : process.env.RAIDER_3_TEST_ROLE,
-        process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAIDER_4_ROLE : process.env.RAIDER_4_TEST_ROLE,
-        process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAIDER_5_ROLE : process.env.RAIDER_5_TEST_ROLE
-    ];
+    try {
+        // Load role IDs from environment variables
+        const raptorRoles = [
+            process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAPTOR_1_ROLE : process.env.RAPTOR_1_TEST_ROLE,
+            process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAPTOR_2_ROLE : process.env.RAPTOR_2_TEST_ROLE,
+            process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAPTOR_3_ROLE : process.env.RAPTOR_3_TEST_ROLE,
+            process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAPTOR_4_ROLE : process.env.RAPTOR_4_TEST_ROLE,
+            process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAPTOR_5_ROLE : process.env.RAPTOR_5_TEST_ROLE
+        ];
+        const corsairRoles = [
+            process.env.LIVE_ENVIRONMENT === "true" ? process.env.CORSAIR_1_ROLE : process.env.CORSAIR_1_TEST_ROLE,
+            process.env.LIVE_ENVIRONMENT === "true" ? process.env.CORSAIR_2_ROLE : process.env.CORSAIR_2_TEST_ROLE,
+            process.env.LIVE_ENVIRONMENT === "true" ? process.env.CORSAIR_3_ROLE : process.env.CORSAIR_3_TEST_ROLE,
+            process.env.LIVE_ENVIRONMENT === "true" ? process.env.CORSAIR_4_ROLE : process.env.CORSAIR_4_TEST_ROLE,
+            process.env.LIVE_ENVIRONMENT === "true" ? process.env.CORSAIR_5_ROLE : process.env.CORSAIR_5_TEST_ROLE
+        ];
+        const raiderRoles = [
+            process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAIDER_1_ROLE : process.env.RAIDER_1_TEST_ROLE,
+            process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAIDER_2_ROLE : process.env.RAIDER_2_TEST_ROLE,
+            process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAIDER_3_ROLE : process.env.RAIDER_3_TEST_ROLE,
+            process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAIDER_4_ROLE : process.env.RAIDER_4_TEST_ROLE,
+            process.env.LIVE_ENVIRONMENT === "true" ? process.env.RAIDER_5_ROLE : process.env.RAIDER_5_TEST_ROLE
+        ];
 
-    // Helper to get highest level for a prestige type
-    function getLevel(roleList) {
-        let maxLevel = 0;
-        roleList.forEach((roleId, idx) => {
-            if (memberRoles.includes(roleId)) {
-                if (idx + 1 > maxLevel) {
-                    maxLevel = idx + 1;
+        // Helper to get highest level for a prestige type
+        function getLevel(roleList) {
+            let maxLevel = 0;
+            roleList.forEach((roleId, idx) => {
+                if (memberRoles.includes(roleId)) {
+                    if (idx + 1 > maxLevel) {
+                        maxLevel = idx + 1;
+                    }
                 }
-            }
-        });
-        return maxLevel;
+            });
+            return maxLevel;
+        }
+
+        return {
+            raptor_level: getLevel(raptorRoles),
+            corsair_level: getLevel(corsairRoles),
+            raider_level: getLevel(raiderRoles)
+        };
+    } catch (error) {
+        console.error(error);
+        return {
+            raptor_level: 0,
+            corsair_level: 0,
+            raider_level: 0
+        };
     }
-
-    return {
-        raptor_level: getLevel(raptorRoles),
-        corsair_level: getLevel(corsairRoles),
-        raider_level: getLevel(raiderRoles)
-    };
 }
-
-// async function getRaptorRank(memberRoles, prestigeRoles) {
-//     try {
-//         // Filter roles that contain "RAPTOR" (case-insensitive) in their name
-//         const raptorRoles = prestigeRoles.filter(role =>
-//             role.name.toLowerCase().includes("raptor")
-//         );
-
-//         // Create a map of role IDs to their corresponding rank levels for quick lookup
-//         const rankMap = new Map(raptorRoles.map(role => [role.id, role.rank_level]));
-
-//         // Iterate through the memberRoles array and check for a match in the rankMap
-//         for (const roleId of memberRoles) {
-//             if (rankMap.has(roleId)) {
-//                 return rankMap.get(roleId); // Return the rank_level value if a match is found
-//             }
-//         }
-
-//         // If no match is found, return 0 or a default value
-//         return 0;
-//     } catch (error) {
-//         console.error("Error in getRaptorRank: ", error);
-//         return 0; // Return a default value in case of an error
-//     }
-// }
-
-// async function getCorsairRank(memberRoles, prestigeRoles) {
-//     try {
-//         // Filter roles that contain "RAPTOR" (case-insensitive) in their name
-//         const raptorRoles = prestigeRoles.filter(role =>
-//             role.name.toLowerCase().includes("corsair")
-//         );
-
-//         // Create a map of role IDs to their corresponding rank levels for quick lookup
-//         const rankMap = new Map(raptorRoles.map(role => [role.id, role.rank_level]));
-
-//         // Iterate through the memberRoles array and check for a match in the rankMap
-//         for (const roleId of memberRoles) {
-//             if (rankMap.has(roleId)) {
-//                 return rankMap.get(roleId); // Return the rank_level value if a match is found
-//             }
-//         }
-
-//         // If no match is found, return 0 or a default value
-//         return 0;
-//     } catch (error) {
-//         console.error("Error in getCorsairRank: ", error);
-//         return 0; // Return a default value in case of an error
-//     }
-// }
-
-// async function getRaiderRank(memberRoles, prestigeRoles) {
-//     try {
-//         // const prestigeRoles = await prestigeRoles.getPrestiges();
-
-//         // Filter roles that contain "RAPTOR" (case-insensitive) in their name
-//         const raiderRoles = prestigeRoles.filter(role =>
-//             role.name.toLowerCase().includes("raider")
-//         );
-
-//         // Create a map of role IDs to their corresponding rank levels for quick lookup
-//         const rankMap = new Map(raiderRoles.map(role => [role.id, role.rank_level]));
-
-//         // Iterate through the memberRoles array and check for a match in the rankMap
-//         for (const roleId of memberRoles) {
-//             if (rankMap.has(roleId)) {
-//                 return rankMap.get(roleId); // Return the rank_level value if a match is found
-//             }
-//         }
-
-//         // If no match is found, return 0 or a default value
-//         return 0;
-//     } catch (error) {
-//         console.error("Error in getRaiderRank: ", error);
-//         return 0; // Return a default value in case of an error
-//     }
-// }
-
-// async function getPrestigeRankDb(userId, prestigeCategory) {
-//     try {
-//         const user = await userlistApi.getUserById(userId);
-//         if (!user) return 0;
-
-//         // Fetch all classes dynamically
-//         const allClasses = await getClasses();
-//         const classData = await generateDynamicClassFields(allClasses); // Organize classes by category
-
-//         // Get the classes for the specified prestige category
-//         const prestigeClasses = classData[prestigeCategory];
-//         if (!prestigeClasses) return 0;
-
-//         // Group classes by level
-//         const classesByLevel = {};
-//         for (const classObj of prestigeClasses) {
-//             if (!classesByLevel[classObj.level]) {
-//                 classesByLevel[classObj.level] = [];
-//             }
-//             classesByLevel[classObj.level].push(classObj);
-//         }
-
-//         // Check completion for each level
-//         let rank = 0;
-//         for (const level in classesByLevel) {
-//             const levelClasses = classesByLevel[level];
-//             const completed = levelClasses.every(classObj => user[classObj.name] === true);
-//             if (completed) {
-//                 rank = Math.max(rank, parseInt(level)); // Update rank to the highest completed level
-//             }
-//         }
-
-//         return rank;
-//     } catch (error) {
-//         console.error(`Error in getPrestigeRankDb for ${prestigeCategory}:`, error);
-//         return 0; // Return 0 if there's an error
-//     }
-// }
 
 // Wrapper functions for specific prestige categories
 async function getRaptorRankDb(userId) {
-    return await getPrestigeRankDb(userId, 'raptor');
+    try {
+        return await getPrestigeRankDb(userId, 'raptor');
+    } catch (error) {
+        console.error(error);
+        return null;
+    }
 }
 
 async function getCorsairRankDb(userId) {
-    return await getPrestigeRankDb(userId, 'corsair');
+    try {
+        return await getPrestigeRankDb(userId, 'corsair');
+    } catch (error) {
+        console.error(error);
+        return null;
+    }
 }
 
 async function getRaiderRankDb(userId) {
-    return await getPrestigeRankDb(userId, 'raider');
+    try {
+        return await getPrestigeRankDb(userId, 'raider');
+    } catch (error) {
+        console.error(error);
+        return null;
+    }
 }
 
 //checks if the user is in a queue already or not
 async function checkUserListForUser(targetUserData){
-    const user = await userlistApi.getUserById(targetUserData.id);
-    //if the user is in the database, we'll return the user data
-    if(user){
-        return user;
-    //if the user IS NOT in the database, we have to create a new queue entry for them
-    }else{
+    try {
+        const user = await userlistApi.getUserById(targetUserData.id);
+        //if the user is in the database, we'll return the user data
+        if(user){
+            return user;
+        //if the user IS NOT in the database, we have to create a new queue entry for them
+        }else{
+            return null;
+        }
+    } catch (error) {
+        console.error(error);
         return null;
     }
 }
 
 //checks if the user is in a queue already or not
 async function checkUserListForUserById(userId){
-    const user = await userlistApi.getUserById(userId);
-    //if the user is in the database, we'll return the user data
-    if(user){
-        return user;
-    //if the user IS NOT in the database, we have to create a new queue entry for them
-    }else{
+    try {
+        const user = await userlistApi.getUserById(userId);
+        //if the user is in the database, we'll return the user data
+        if(user){
+            return user;
+        //if the user IS NOT in the database, we have to create a new queue entry for them
+        }else{
+            return null;
+        }
+    } catch (error) {
+        console.error(error);
         return null;
     }
 }
 
 //checks if the user is in a queue already or not
 async function checkUserListForUserByNameOrId(username){
-    const users = await getUsers();
-        user = null;
+    try {
+        const users = await getUsers();
+        let user = null;
         for (const element of users) {
             if(element.id === username || element.username === username || element.nickname === username){
                 user = element;
             }
         }
-    //if the user is in the database, we'll return the user data
-    if(user){
-        return user;
-    //if the user IS NOT in the database, we have to create a new queue entry for them
-    }else{
+        //if the user is in the database, we'll return the user data
+        if(user){
+            return user;
+        //if the user IS NOT in the database, we have to create a new queue entry for them
+        }else{
+            return null;
+        }
+    } catch (error) {
+        console.error(error);
         return null;
     }
-        
 }
 
 async function generateDynamicClassFields() {
-    const allClasses = await getClasses(); // Fetch all classes from the database
-    const classData = {};
+    try {
+        const allClasses = await getClasses(); // Fetch all classes from the database
+        const classData = {};
 
-    // Organize classes by their prestige category
-    for (const classObj of allClasses) {
-        if (!classData[classObj.prestige_category]) {
-            classData[classObj.prestige_category] = [];
+        // Organize classes by their prestige category
+        for (const classObj of allClasses) {
+            if (!classData[classObj.prestige_category]) {
+                classData[classObj.prestige_category] = [];
+            }
+            classData[classObj.prestige_category].push(classObj);
         }
-        classData[classObj.prestige_category].push(classObj);
-    }
 
-    return classData;
+        return classData;
+    } catch (error) {
+        console.error(error);
+        return {};
+    }
 }
 
 module.exports = {

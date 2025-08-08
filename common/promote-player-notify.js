@@ -2,17 +2,16 @@ const { notifyRankPromotion } = require("./bot-notify");
 
 
 async function promotePlayerNotify(client, openai, user_id) {
-    console.log(`Promote Player Notify for user: ${user_id}`);
-    // Get role IDs from environment
-    const friendlyRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.FRIENDLY_ROLE : process.env.TEST_FRIENDLY_ROLE;
-    const prospectRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.PROSPECT_ROLE : process.env.TEST_PROSPECT_ROLE;
-    const crewRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.CREW_ROLE : process.env.TEST_CREW_ROLE;
-    const marauderRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.MARAUDER_ROLE : process.env.TEST_MARAUDER_ROLE;
-    const bloodedRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.BLOODED_ROLE : process.env.TEST_BLOODED_ROLE;
-
-    // Get the guild
-    const guildId = process.env.LIVE_ENVIRONMENT === "true" ? process.env.GUILD_ID : process.env.TEST_GUILD_ID;
     try {
+        // Get role IDs from environment
+        const friendlyRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.FRIENDLY_ROLE : process.env.TEST_FRIENDLY_ROLE;
+        const prospectRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.PROSPECT_ROLE : process.env.TEST_PROSPECT_ROLE;
+        const crewRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.CREW_ROLE : process.env.TEST_CREW_ROLE;
+        const marauderRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.MARAUDER_ROLE : process.env.TEST_MARAUDER_ROLE;
+        const bloodedRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.BLOODED_ROLE : process.env.TEST_BLOODED_ROLE;
+
+        // Get the guild
+        const guildId = process.env.LIVE_ENVIRONMENT === "true" ? process.env.GUILD_ID : process.env.TEST_GUILD_ID;
         const guild = await client.guilds.fetch(guildId);
         if (!guild) throw new Error("Guild not found");
         // Fetch the member

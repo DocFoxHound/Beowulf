@@ -4,39 +4,32 @@ const fs = require("node:fs");
 const { getAllLessonsLearned } = require("../api/lessonsLearnedApi");
 
 
-async function loadChatlogs(client, openai){
+async function loadChatlogs(client, openai) {
   let chatLog = null;
   let lessonsLearned = null;
   let channelLogs = [];
-  try{
+  try {
     chatLog = await getMessages();
     lessonsLearned = await getAllLessonsLearned();
-  }catch(error){
-    console.log(`Error getting lessons learned: ${error}`);
+  } catch (error) {
+    console.error(`Error getting lessons learned: ${error}`);
     return;
   }
 
   // Guard clause: check if chatLog is an array
   if (!Array.isArray(chatLog)) {
-    console.log("chatLog is not an array. Value:", chatLog);
+    console.error("chatLog is not an array. Value:", chatLog);
     return;
   }
 
-  // # blood-chat, marauder-chat, raptor-lounge, raider-council, corsair-cove, wright-bar, help-me-fly, crew-plus-chat, general-chat, loadout-talk, bot-commands, star-citizen, other-games, off-topic, rig-talk, pet-parlor, salt-mining, memes, sc-feeds, media-team, misc-media, announcements
-  //prepare the message
+  // Prepare the message
   for (const message of chatLog) {
-    try{
-      const channelName = message.message.metadata.channel; // Get the channel name
-      const messageJson = message.message; // Get the message JSON
-      // const messageTimestamp = new Date(message.id).getTime();
+    try {
+      const channelName = message.message.metadata.channel;
+      const messageJson = message.message;
 
-      // // Skip messages older than one minute
-      // if (messageTimestamp < oneMinuteAgo) {
-      //   continue;
-      // }
-
-      //if this is a bot command, ignore it
-      if(channelName === "bot-commands"){
+      // If this is a bot command, ignore it
+      if (channelName === "bot-commands") {
         continue;
       }
 
@@ -49,32 +42,32 @@ async function loadChatlogs(client, openai){
         channelName.includes("bot-commands") ? "bot-commands" :
         channelName.includes("sc-feeds") ? "Star Citizen News and Updates" :
         channelName.includes("announcements") ? "IronPoint Announcements" :
-        "General Discussion"
+        "General Discussion";
 
       // Initialize the array for the channel if it doesn't exist
       if (!channelLogs[channelName]) {
-          channelLogs[channelName] = {
-            header: {
-              channel_name: channelName,
-              channel_category: category
-            },
-            chat_log: []
-          };
+        channelLogs[channelName] = {
+          header: {
+            channel_name: channelName,
+            channel_category: category
+          },
+          chat_log: []
+        };
       }
       // Add the message content to the appropriate channel array
       channelLogs[channelName].chat_log.push(messageJson);
-    }catch(error){
-      console.log(`Error processing message: ${error}`);
+    } catch (error) {
+      console.error(`Error processing message: ${error}`);
     }
   }
 
-  //compile lessons learned
-  for(const lesson of lessonsLearned){
-    try{
-      const channelName = "common-knowledge"; // Get the channel name
-      const messageJson = {id: lesson.id, lesson: lesson.lesson}; // Get the message JSON
+  // Compile lessons learned
+  for (const lesson of lessonsLearned) {
+    try {
+      const channelName = "common-knowledge";
+      const messageJson = { id: lesson.id, lesson: lesson.lesson };
 
-      if(!channelLogs[channelName]){
+      if (!channelLogs[channelName]) {
         channelLogs[channelName] = {
           header: {
             channel_name: channelName,
@@ -83,112 +76,153 @@ async function loadChatlogs(client, openai){
           lessons: []
         };
       }
-      // Add the message content to the appropriate channel array
       channelLogs[channelName].lessons.push(messageJson);
-    }catch(error){
-      console.log(`Error processing lesson learned: ${error}`);
+    } catch (error) {
+      console.error(`Error processing lesson learned: ${error}`);
     }
   }
-  
-  //some constants for this next process part
-  const oneMinuteAgo = Date.now() - 70000;
-  const list = await openai.files.list();
-  const vectorFiles = await openai.beta.vectorStores.files.list(process.env.VECTOR_STORE);
 
-  //upload the message
+  // Some constants for this next process part
+  const oneMinuteAgo = Date.now() - 70000;
+  let list, vectorFiles;
+  try {
+    list = await openai.files.list();
+    vectorFiles = await openai.beta.vectorStores.files.list(process.env.VECTOR_STORE);
+  } catch (error) {
+    console.error(`Error listing files/vector files: ${error}`);
+    return;
+  }
+
+  // Upload the message
   for (const channel in channelLogs) {
     let chatLogArray = null;
     let lastItem = null;
     let lastTime = null;
 
-    if(channel === "common-knowledge"){
-      // console.log(channelLogs[channel].lessons)
-      lessonArray = channelLogs[channel].lessons;
+    if (channel === "common-knowledge") {
+      const lessonArray = channelLogs[channel].lessons;
       const length = lessonArray.length;
       lastItem = lessonArray[length - 1];
       lastTime = lastItem.id;
-    }else{
+    } else {
       chatLogArray = channelLogs[channel].chat_log;
       lastItem = chatLogArray[chatLogArray.length - 1];
-      lastTime = new Date(lastItem.metadata.date).getTime()
+      lastTime = new Date(lastItem.metadata.date).getTime();
     }
 
     // Skip messages older than one minute
-    if(lastTime < oneMinuteAgo){
+    if (lastTime < oneMinuteAgo) {
       continue;
     }
 
-    //delete the previous files
+    // Delete the previous files
     const files = list.data;
-    const oldFile = await files.find(
-      (f) =>
-        f.filename === (channel === "common-knowledge" ? `${channel}.json` :`chatlog_${channel}.json`)
-    );
-    const oldVectorFile = await vectorFiles.data.find(
-      (f) =>
-        f.filename === (channel === "common-knowledge" ? `${channel}.json` :`chatlog_${channel}.json`)
-    );
-    //then delete from vector store
+    let oldFile, oldVectorFile;
     try {
-      await openai.beta.vectorStores.files.del(process.env.VECTOR_STORE, oldVectorFile.id);
+      oldFile = await files.find(
+        (f) =>
+          f.filename === (channel === "common-knowledge" ? `${channel}.json` : `chatlog_${channel}.json`)
+      );
+    } catch (error) {
+      console.error(`Error finding old file: ${error}`);
+    }
+    try {
+      oldVectorFile = await vectorFiles.data.find(
+        (f) =>
+          f.filename === (channel === "common-knowledge" ? `${channel}.json` : `chatlog_${channel}.json`)
+      );
+    } catch (error) {
+      console.error(`Error finding old vector file: ${error}`);
+    }
+    // Then delete from vector store
+    try {
+      if (oldVectorFile && oldVectorFile.id) {
+        await openai.beta.vectorStores.files.del(process.env.VECTOR_STORE, oldVectorFile.id);
+      }
     } catch (error) {
       console.error(`Error removing file from vector store:`, error.message);
     }
-    //delete from file storage
-    try{
-      await openai.files.del(oldFile.id);
-    }catch(error){
-      console.log(`Error deleting file from storage: ${error.message}`);
+    // Delete from file storage
+    try {
+      if (oldFile && oldFile.id) {
+        await openai.files.del(oldFile.id);
+      }
+    } catch (error) {
+      console.error(`Error deleting file from storage: ${error.message}`);
     }
-    
 
-    //create and upload the new file
-    try{
+    // Create and upload the new file
+    try {
       const filePath = channel === "common-knowledge" ? `./chatlogs/${channel}.json` : `./chatlogs/chatlog_${channel}.json`;
       const fileContent = await JSON.stringify(channelLogs[channel], null, 2);
-      // Save to a temp .json file
       fs.writeFileSync(filePath, fileContent);
 
       // Upload to OpenAI
-      const file = await openai.files.create({
-        purpose: 'assistants',
-        file: fs.createReadStream(filePath)
-      });
+      let file;
+      try {
+        file = await openai.files.create({
+          purpose: 'assistants',
+          file: fs.createReadStream(filePath)
+        });
+      } catch (error) {
+        console.error(`Error creating file for OpenAI: ${error}`);
+        continue;
+      }
 
-      // Add to vector store (assumes you have the vectorStoreId already)
-      await openai.beta.vectorStores.files.create(process.env.VECTOR_STORE, {
-        file_id: file.id
-      });
+      // Add to vector store
+      try {
+        await openai.beta.vectorStores.files.create(process.env.VECTOR_STORE, {
+          file_id: file.id
+        });
+      } catch (error) {
+        console.error(`Error adding file to vector store: ${error}`);
+      }
 
       // Clean up the local file
-      await fs.unlinkSync(filePath);
-    }catch(error){
-      console.log(`Error uploading chat log for ${channel}: ${error}`);
+      try {
+        await fs.unlinkSync(filePath);
+      } catch (error) {
+        console.error(`Error cleaning up local file: ${error}`);
+      }
+    } catch (error) {
+      console.error(`Error uploading chat log for ${channel}: ${error}`);
     }
   }
-  console.log("Completed chatLog upload.")
+  console.log("Completed chatLog upload.");
 }
 
-async function trimChatLogs(){
-  console.log("Trimming chat logs.")
-  const chatLog = await getMessages();
+async function trimChatLogs() {
+  console.log("Trimming chat logs.");
+  let chatLog;
+  try {
+    chatLog = await getMessages();
+  } catch (error) {
+    console.error(`Error getting chat logs: ${error}`);
+    return;
+  }
   let channelNames = [];
-  try{
+  try {
     for (const message of chatLog) {
-      const channelName = message.message.metadata.channel; // Get the channel name
-      // Initialize the array for the channel if it doesn't exist
-      if (!channelNames[channelName]) {
-          channelNames.push(channelName)
+      try {
+        const channelName = message.message.metadata.channel;
+        if (!channelNames[channelName]) {
+          channelNames.push(channelName);
+        }
+      } catch (msgError) {
+        console.error(`Error processing message for channel name: ${msgError}`);
       }
     }
-    for(const channel of channelNames){
-      await deleteMessagesByCount(channel, 1000);
+    for (const channel of channelNames) {
+      try {
+        await deleteMessagesByCount(channel, 1000);
+      } catch (delError) {
+        console.error(`Error deleting messages for channel ${channel}: ${delError}`);
+      }
     }
-    console.log("Messages trimmed.")
-  }catch(error){
-    console.log(`Error trimming messages: ${error}`);
+    console.log("Messages trimmed.");
+  } catch (error) {
+    console.error(`Error trimming messages: ${error}`);
   }
-  
 }
 
 

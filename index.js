@@ -87,7 +87,7 @@ for (const folder of commandFolders) {
     if ('data' in command && 'execute' in command) {
       client.commands.set(command.data.name, command);
     } else {
-      console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
+      console.error(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
     }
   }
 }
@@ -281,7 +281,6 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 
         // Update the user's data in the database
         await editUser(user.id, updatedUser);
-        console.log("User updated successfully");
     } catch (error) {
         console.error("Error updating user:", error);
     }
@@ -289,7 +288,6 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isButton()) return;
-    console.log("Button interaction received:", interaction.customId);
 
     // Handle RSI verification button
     if (interaction.customId === 'verify_rsi') {
@@ -362,34 +360,6 @@ client.on("disconnect", () => {
 
 //logs the bot in
 client.login(process.env.LIVE_ENVIRONMENT === "true" ? process.env.CLIENT_TOKEN : process.env.TEST_CLIENT_TOKEN);
-
-async function generateClassData(allClasses) {
-  const classData = {};
-  try {
-      for (const log of allClasses) {
-          if (!classData[log.prestige_category]) {
-              classData[log.prestige_category] = [];
-          }
-
-          classData[log.prestige_category].push({
-              id: log.id,
-              name: log.name,
-              alt_name: log.alt_name,
-              description: log.description,
-              ai_function_class_names: log.ai_function_class_names,
-              prerequisites: log.prerequisites,
-              thumbnail_url: log.thumbnail_url,
-              completed: false,
-              value: 0,
-              level: log.level
-          });
-      }
-      return classData;
-  }catch(error){
-      console.error('Error generating leaderboard data:', error);
-      return null;  // Return null if there's an error
-  }
-}
 
 const express = require('express');
 const app = express();
@@ -509,14 +479,10 @@ app.post('/fleetmemberchange', async (req, res) => {
 
 // Expose /emojidata endpoint for API to GET emoji data from Discord
 app.get('/emojidata', async (req, res) => {
-  console.log("Received request for emoji data");
   try {
     const allEmojis = [];
-    console.log("Guilds in cache:", client.guilds.cache.map(g => `${g.name} (${g.id})`));
     for (const [guildId, guild] of client.guilds.cache) {
-      console.log(`Fetching emojis for guild: ${guild.name} (${guildId})`);
       const emojis = await guild.emojis.fetch();
-      console.log(`Found ${emojis.size} emojis in guild ${guild.name}`);
       emojis.forEach(emoji => {
         allEmojis.push({
           id: emoji.id,
@@ -527,7 +493,6 @@ app.get('/emojidata', async (req, res) => {
         });
       });
     }
-    console.log("All emojis collected:", allEmojis.length);
     res.status(200).json(allEmojis);
   } catch (error) {
     console.error('Error handling /emojidata:', error);
@@ -556,7 +521,6 @@ app.get('/promote', async (req, res) => {
 
 // Expose /notifyaward endpoint for API to GET notify award action for a user
 app.get('/notifyaward', async (req, res) => {
-  console.log("Received GET request to notify award");
   try {
     const badgeName = req.query.badgeName || req.body.badgeName;
     const badgeDescription = req.query.badgeDescription || req.body.badgeDescription;
@@ -578,7 +542,6 @@ app.get('/notifyaward', async (req, res) => {
 
 // Expose /grantprestige endpoint for API to POST grant prestige action for a user
 app.post('/grantprestige', async (req, res) => {
-  console.log("Received POST request to grant prestige");
   try {
     const { user_id, prestige_name, prestige_level } = req.body;
     if (!user_id || !prestige_name || prestige_level === undefined) {

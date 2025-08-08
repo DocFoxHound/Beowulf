@@ -33,7 +33,7 @@ const RANK_ROLE_IDS = [
 
 async function refreshUserlist(client, openai) {
     const logChannel = process.env.LIVE_ENVIRONMENT === "true" ? process.env.ENTRY_LOG_CHANNEL : process.env.TEST_ENTRY_LOG_CHANNEL;
-    console.log("Refreshing Userlist");
+    console.log("refreshUserlist started");
     try {
         const guild = await client.guilds.cache.get(process.env.LIVE_ENVIRONMENT === "true" ? process.env.GUILD_ID : process.env.TEST_GUILD_ID);
         const memberList = await guild.members.cache;
@@ -42,75 +42,83 @@ async function refreshUserlist(client, openai) {
         const prestigeRoles = await getPrestiges(); // Fetch prestige roles dynamically
 
         memberList.forEach(async member => {
-            const oldUserData = await getUserById(member.id) || null;
-            const memberRoles = await member.roles.cache.map(role => role.id);
-            const userRank = await getUserRank(memberRoles);
-            // Use getPrestigeRanks to get all prestige levels
-            const prestigeLevels = await getPrestigeRanks(memberRoles);
-            const raptorLevel = prestigeLevels.raptor_level;
-            const corsairLevel = prestigeLevels.corsair_level;
-            const raiderLevel = prestigeLevels.raider_level;
-            const fleets = await getAllFleets();
-            console.log(`Processing member: ${member.user.username} (${member.id})`);
-            console.log("Raptor, Corsair, Raider:", raptorLevel, corsairLevel, raiderLevel);
+            try {
+                const oldUserData = await getUserById(member.id) || null;
+                const memberRoles = await member.roles.cache.map(role => role.id);
+                const userRank = await getUserRank(memberRoles);
+                // Use getPrestigeRanks to get all prestige levels
+                const prestigeLevels = await getPrestigeRanks(memberRoles);
+                const raptorLevel = prestigeLevels.raptor_level;
+                const corsairLevel = prestigeLevels.corsair_level;
+                const raiderLevel = prestigeLevels.raider_level;
+                const fleets = await getAllFleets();
 
-            // Scan fleets for user membership or command
-            let userFleet = null;
-            if (fleets && Array.isArray(fleets)) {
-                for (const fleet of fleets) {
-                    if (fleet.commander_id === member.id || (Array.isArray(fleet.members_ids) && fleet.members_ids.includes(member.id))) {
-                        userFleet = fleet.id;
-                        break; // Only assign first matching fleet
+                // Scan fleets for user membership or command
+                let userFleet = null;
+                if (fleets && Array.isArray(fleets)) {
+                    for (const fleet of fleets) {
+                        if (fleet.commander_id === member.id || (Array.isArray(fleet.members_ids) && fleet.members_ids.includes(member.id))) {
+                            userFleet = fleet.id;
+                            break;
+                        }
                     }
                 }
-            }
 
-            // Check if user has any rank role
-            const hasRankRole = memberRoles.some(roleId => RANK_ROLE_IDS.includes(roleId));
+                // Check if user has any rank role
+                const hasRankRole = memberRoles.some(roleId => RANK_ROLE_IDS.includes(roleId));
 
-            // If user does not have any rank role, fetch joined_date and rsi_handle
-            let joined_date = null;
-            let rsi_handle = null;
-            if (!hasRankRole && oldUserData) {
-                joined_date = oldUserData.joined_date || null;
-                rsi_handle = oldUserData.rsi_handle || null;
-            }
+                // If user does not have any rank role, fetch joined_date and rsi_handle
+                let joined_date = null;
+                let rsi_handle = null;
+                if (!hasRankRole && oldUserData) {
+                    joined_date = oldUserData.joined_date || null;
+                    rsi_handle = oldUserData.rsi_handle || null;
+                }
 
-            if (oldUserData !== null) { // If the user is in the database
-                let updatedUserData = {
-                    id: member.id,
-                    username: member.user.username,
-                    nickname: member.nickname || null,
-                    rank: userRank,
-                    roles: memberRoles,
-                    raptor_level: raptorLevel,
-                    corsair_level: corsairLevel,
-                    raider_level: raiderLevel,
-                    // Optionally add joined_date and rsi_handle if needed
-                    joined_date,
-                    rsi_handle,
-                    fleet: userFleet
-                };
-                await editUser(member.id, updatedUserData);
-            } else { // If the user isn't in the database
-                const newUser = {
-                    id: member.id,
-                    username: member.user.username,
-                    nickname: member.nickname || null,
-                    rank: userRank,
-                    roles: memberRoles,
-                    raptor_level: raptorLevel,
-                    corsair_level: corsairLevel,
-                    raider_level: raiderLevel,
-                    // Optionally add joined_date and rsi_handle if needed
-                    joined_date,
-                    rsi_handle,
-                    fleet: userFleet
-                };
-                await createUser(newUser);
+                if (oldUserData !== null) {
+                    let updatedUserData = {
+                        id: member.id,
+                        username: member.user.username,
+                        nickname: member.nickname || null,
+                        rank: userRank,
+                        roles: memberRoles,
+                        raptor_level: raptorLevel,
+                        corsair_level: corsairLevel,
+                        raider_level: raiderLevel,
+                        joined_date,
+                        rsi_handle,
+                        fleet: userFleet
+                    };
+                    try {
+                        await editUser(member.id, updatedUserData);
+                    } catch (editErr) {
+                        console.error(`Error editing user ${member.id}:`, editErr);
+                    }
+                } else {
+                    const newUser = {
+                        id: member.id,
+                        username: member.user.username,
+                        nickname: member.nickname || null,
+                        rank: userRank,
+                        roles: memberRoles,
+                        raptor_level: raptorLevel,
+                        corsair_level: corsairLevel,
+                        raider_level: raiderLevel,
+                        joined_date,
+                        rsi_handle,
+                        fleet: userFleet
+                    };
+                    try {
+                        await createUser(newUser);
+                    } catch (createErr) {
+                        console.error(`Error creating user ${member.id}:`, createErr);
+                    }
+                }
+            } catch (memberErr) {
+                console.error(`Error processing member ${member.id}:`, memberErr);
             }
         });
-        console.log("Userlist refreshed successfully.");
+        console.log("refreshUserlist finished");
         return "Userlist updated.";
     } catch (error) {
         console.error('Error refreshing userlist: ', error);
@@ -118,7 +126,7 @@ async function refreshUserlist(client, openai) {
 }
 
 async function newLoadUserList(client) {
-    console.log("Fresh Userlist Load");
+    console.log("newLoadUserList started");
     try {
         const guild = await client.guilds.cache.get(process.env.LIVE_ENVIRONMENT === "true" ? process.env.TEST_GUILD_ID : process.env.GUILD_ID);
         const memberList = await guild.members.cache;
@@ -128,22 +136,23 @@ async function newLoadUserList(client) {
         // const classData = await generateClassData(allClasses); // Organize classes by category
 
         memberList.forEach(async member => {
-            const memberRoles = await member.roles.cache.map(role => role.id);
-            const userRank = await getUserRank(memberRoles);
+            try {
+                const memberRoles = await member.roles.cache.map(role => role.id);
+                const userRank = await getUserRank(memberRoles);
 
-            // Initialize the newUser object
-            const newUser = {
-                id: member.id,
-                username: member.user.username,
-                nickname: member.nickname || null,
-                rank: userRank,
-            };
+                // Initialize the newUser object
+                const newUser = {
+                    id: member.id,
+                    username: member.user.username,
+                    nickname: member.nickname || null,
+                    rank: userRank,
+                };
 
-            // // Dynamically populate fields for each class category
-            // for (const [category, classes] of Object.entries(classData)) {
-            //     for (const classObj of classes) {
-            //         newUser[classObj.name] = false; // Default to false (not completed)
-            //     }
+                // // Dynamically populate fields for each class category
+                // for (const [category, classes] of Object.entries(classData)) {
+                //   for (const classObj of classes) {
+                //     newUser[classObj.name] = false; // Default to false (not completed)
+                //   }
                 // Kick users if joined_date is between 12 and 26 hours old and rsi_handle is null
                 if (joined_date && rsi_handle === null) {
                     const joinedTimestamp = new Date(joined_date).getTime();
@@ -165,12 +174,20 @@ async function newLoadUserList(client) {
                         }
                     }
                 }
-            // }
+                // }
 
-            // Add the new user to the database
-            await createUser(newUser);
+                // Add the new user to the database
+                try {
+                    await createUser(newUser);
+                } catch (createErr) {
+                    console.error(`Error creating user ${member.id}:`, createErr);
+                }
+            } catch (memberErr) {
+                console.error(`Error processing member ${member.id}:`, memberErr);
+            }
         });
 
+        console.log("newLoadUserList finished");
         return "New Users have been loaded - DO NOT USE THIS COMMAND AGAIN; USE THE UPDATE COMMAND";
     } catch (error) {
         console.error('Error loading new userlist: ', error);

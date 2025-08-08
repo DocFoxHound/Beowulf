@@ -6,7 +6,6 @@ const { checkRecentGatherings } = require("./recent-gatherings.js");
 
 
 async function voiceChannelSessions(client, openai) {
-    console.log("Starting voiceChannelSessions...");
     const guildId = process.env.LIVE_ENVIRONMENT === "true" ? process.env.GUILD_ID : process.env.TEST_GUILD_ID;
     try {
         const guild = await client.guilds.fetch(guildId);
@@ -149,15 +148,7 @@ async function voiceChannelSessions(client, openai) {
 
         // Optional: log current state
         guild.channels.cache.filter(c => c.type === ChannelType.GuildVoice).forEach(channel => {
-            console.log(`Voice Channel: ${channel.name} (${channel.id})`);
             const users = channelUserMap[channel.id] || [];
-            if (users.length === 0) {
-                console.log("  No users in this channel.");
-            } else {
-                users.forEach(userId => {
-                    console.log(`  User ID: ${userId}`);
-                });
-            }
                 // If 3 or more users, call checkRecentGatherings
                 if (users.length >= 3) {
                     const session = {

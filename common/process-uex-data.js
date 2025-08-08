@@ -78,7 +78,7 @@ async function processUEXData(whichTable){
                 }
                 await sendToDb(api.title, data);
             } catch (error) {
-                console.log(`Error in getting UEX data: ${error}`);
+                console.error(`Error in getting UEX data: ${error}`);
             }
         }else if(api.title === "ships"){
             try{
@@ -87,7 +87,7 @@ async function processUEXData(whichTable){
                 const data = {ships: ships.data, vehicles: vehicles.data};
                 await sendToDb(api.title, data);
             }catch(error){
-                console.log(`Error in getting UEX data: ${error}`)
+                console.error(`Error in getting UEX data: ${error}`)
             }
             
 
@@ -96,12 +96,10 @@ async function processUEXData(whichTable){
         }else if (api.title === "terminal_prices"){
             totalTerminals = allTerminals.data.length;
             individualTerminalData = [];
-            console.log(`${totalTerminals} Terminals found`)
             // Iterate through allTerminals.data and get an API call (only 60 every minute)
             for(const terminal of allTerminals.data){
                 totalTerminals--;
                 const time = new Date();
-                console.log(`${totalTerminals}: API retrieving ${terminal.name}`);
                 await delay(1050); // Wait for ~1 second, since we can only do 60 calls in 60 seconds
                 const response = await axios.get(`${api.url}${terminal.id}${apiKey}`);
                 const data = response.data;
@@ -110,7 +108,7 @@ async function processUEXData(whichTable){
             await sendToDb(api.title, individualTerminalData);  
         }
     }
-    console.log("Finished updating UEX items.")
+    console.log(`Finished processUEXData`)
 }
 
 function delay(ms) {
@@ -124,17 +122,14 @@ async function sendToDb(title, data) {
             if (item.data && Array.isArray(item.data)) {
                 switch (title) {
                     case "cities":
-                        console.log("Processing cities");
                         for (const d of item.data) {
                             await UEX.createOrUpdateCity(d);
                         }
                         break;
                     case "marketplace":
-                        console.log("Processing marketplace");
                         marketplaceArray = item.data; // Populate marketplaceArray
                         break;
                     case "commodities":
-                        console.log("Processing commodities");
                         // console.log("Marketplace Array:", marketplaceArray); // Verify marketplaceArray is populated
                         for (const d of item.data) {
                             const summaryCommodity = {
@@ -151,8 +146,6 @@ async function sendToDb(title, data) {
                                 let averageHigh = 0;
                                 marketplaceArray.forEach((item) => {
                                     if (item.title.toLowerCase().includes(d.name.toLowerCase()) || item.description.toLowerCase().includes(d.name.toLowerCase())) {
-                                        console.log("Match:", item.title, d.name);
-                                        console.log("Price:", item.price);
                                         averageSoFar = sumPrice / sumItems;
                                         averageLow = 0.1 * averageSoFar;
                                         averageHigh = 5 * averageSoFar;
@@ -166,8 +159,6 @@ async function sendToDb(title, data) {
                                         }
                                     }
                                 });
-                                console.log("Sum Items:", sumItems);
-                                console.log("Sum Price:", sumPrice);
 
                                 const avgPrice = sumPrice / sumItems;
                                 summaryCommodity.price_buy_avg = avgPrice;
@@ -178,7 +169,6 @@ async function sendToDb(title, data) {
                         }
                         break;
                     case "commodities_by_terminal":
-                        console.log("Processing commodities by terminal");
                         for (const d of item.data) {
                             let totalBuy = 0;
                             let totalSell = 0;
@@ -240,7 +230,6 @@ async function sendToDb(title, data) {
                         }
                         break;
                     case "items_by_terminal":
-                        console.log("Processing items by terminal");
                         for (const d of item.data) {
                             let totalBuy = 0;
                             let totalSell = 0;
@@ -293,37 +282,31 @@ async function sendToDb(title, data) {
                         }
                         break;
                     case "outposts":
-                        console.log("Processing outposts");
                         for (const d of item.data) {
                             await UEX.createOrUpdateOutpost(d);
                         }
                         break;
                     case "planets":
-                        console.log("Processing planets");
                         for (const d of item.data) {
                             await UEX.createOrUpdatePlanet(d);
                         }
                         break;
                     case "space_stations":
-                        console.log("Processing space stations");
                         for (const d of item.data) {
                             await UEX.createOrUpdateSpaceStation(d);
                         }
                         break;
                     case "star_systems":
-                        console.log("Processing star systems");
                         for (const d of item.data) {
                             await UEX.createOrUpdateStarSystem(d);
                         }
                         break;
                     case "terminals":
-                        console.log("Processing terminals");
                         for (const d of item.data) {
                             await UEX.createOrUpdateTerminal(d);
                         }
                         break;
                     case "terminal_prices":
-                        console.log("Processing terminal prices");
                         for (const d of item.data) {
                             await UEX.createOrUpdateTerminalPrices(d);
                         }
@@ -332,7 +315,7 @@ async function sendToDb(title, data) {
             }
         }
     } catch (error) {
-        console.log(`Error in sending UEX data to DB: ${error}`);
+        console.error(`Error in sending UEX data to DB: ${error}`);
         return;
     }
 }

@@ -137,7 +137,7 @@ async function addMessageToThread(thread, openai, formattedMessage, isBot, origi
             content: formattedMessage,
         });
     }catch(error){
-        console.log("There was an error adding to this conversation's thread: ", error)
+        console.error("There was an error adding to this conversation's thread: ", error)
         // message.reply("There was an error adding to this conversation's thread.");
     }
 }
