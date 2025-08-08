@@ -51,8 +51,10 @@ async function checkRecentGatherings(client, openai) {
                 }
                 // If 3+ users present, log a gathering
                 if (currentUsers.size >= 3) {
+                    console.log(`Gathering detected in channel ${channel_id} with ${currentUsers.size} users`);
                     // Only create or update a gathering if this is a new group or time
                     if (!lastTime || lastTime.getTime() !== event.time.getTime()) {
+                        console.log("Creating or updating gathering...");
                         const user_ids = Array.from(currentUsers.keys());
                         const usernames = Array.from(currentUsers.values());
                         if (recentGathering) {
@@ -67,6 +69,7 @@ async function checkRecentGatherings(client, openai) {
                             };
                             await updateRecentGathering(recentGathering.id, updatedGathering);
                         } else {
+                            console.log("Creating new gathering...");
                             const gatheringData = {
                                 channel_id,
                                 channel_name: sessArr[0].channel_name,
