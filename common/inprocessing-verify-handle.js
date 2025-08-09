@@ -1,6 +1,7 @@
 const { ButtonBuilder, ActionRowBuilder } = require('discord.js');
 const { verifyUser } = require('../functions/verify-user');
 const { notifyJoinMemberWelcome, notifyJoinGuestWelcome } = require('./bot-notify');
+const { getUserById } = require('../api/userlistApi');
 
 // Track verification attempts and DM message in memory (per process)
 const verificationAttempts = {};
@@ -12,14 +13,14 @@ function getGuild(client) {
 }
 
 async function verifyHandle(client, openai, member){
-    console.log("Getting Handle")
+    const dbUser = await getUserById(member.user.id) || null;
      // Send DM with Verify button
     const verifyButton = new ButtonBuilder()
         .setCustomId('verify_rsi')
         .setLabel('Verify')
         .setStyle(1); // 1 = Primary
     const row = new ActionRowBuilder().addComponents(verifyButton);
-    const dmMessage = `Welcome to the server, ${member.user.username}! Please go to 'https://robertsspaceindustries.com/en/account/profile' and place the following code in your 'Bio' section, save, and then click the verify button below: ${verificationCode}`;
+    const dmMessage = `Welcome to the server, ${member.user.username}! Please go to 'https://robertsspaceindustries.com/en/account/profile' and place the following code in your 'Bio' section, save, and then click the verify button below: ${dbUser.verification_code}`;
     try {
         // Only send DM if not already sent
         if (!verificationDMs[member.user.id]) {
