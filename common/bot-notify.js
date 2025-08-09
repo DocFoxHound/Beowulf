@@ -80,7 +80,7 @@ async function notifyRejoinWelcome(userData, openai, client) {
     let channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.WELCOME_CHANNEL : process.env.TEST_GENERAL_CHANNEL;
     let messageToBot = `Commoent on ${userData.nickname || userData.username}'s return to IronPoint. Make fun of them for leaving and then returning, and then ask them why they wanted to come back.`;
     // Add ping for bloodedToNotify
-    let pingBlooded = `<@${bloodedToNotify}>`;
+    let pingBlooded = `<@&${bloodedToNotify}>`;
     const thread = await createNewThread(channelToNotify, openai);
     await addMessageToThread(thread, openai, messageToBot, false);
     let run = await runThreadForQueueNotify(thread, openai, true);
