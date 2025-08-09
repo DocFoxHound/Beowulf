@@ -283,6 +283,7 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 client.on('interactionCreate', async (interaction) => {
   if (interaction.isButton()) {
     // Handle Handle Verification Modal button (user-specific)
+    console.log("Interaction: ", interaction)
     if (interaction.customId.startsWith('open_handle_verification_modal_')) {
       await showHandleVerificationModal(interaction);
       return;
