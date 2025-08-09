@@ -243,7 +243,7 @@ client.on(Events.InteractionCreate, async interaction => {
 
 // Event Listener: new member joins the server
 client.on('guildMemberAdd', (member) => {
-  handleNewGuildMember(member, client)
+  handleNewGuildMember(member, client, openai)
 });
 
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
