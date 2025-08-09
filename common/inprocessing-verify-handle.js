@@ -42,7 +42,7 @@ async function showHandleVerificationModal(interaction) {
     const handleRow = new ActionRowBuilder().addComponents(handleInput);
     modal.addComponents(instructionsRow, handleRow);
 
-    await interaction.showModal(modal);
+    interaction.showModal(modal);
 }
 
 // Handles modal submission for handle_verification_modal
