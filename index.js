@@ -39,8 +39,9 @@ const { processLeaderboardLogs } = require('./functions/process-leaderboard-logs
 const { processOrgLeaderboards } = require('./functions/process-leaderboards.js');
 const { verifyUser } = require('./functions/verify-user.js');
 const { handleNewGuildMember } = require('./common/new-user.js');
-const { handleJoinButtonInteraction } = require('./common/new-user');
-const { handleVerifyButtonInteraction } = require('./common/new-user');
+const { handleJoinButtonInteraction } = require('./common/inprocessing-verify-handle.js');
+const { handleVerifyButtonInteraction } = require('./common/inprocessing-verify-handle.js');
+const { verifyHandle } = require("./common/inprocessing-verify-handle.js")
 
 // const { getPrestiges, getRaptorRank, getCorsairRank, getRaiderRank } = require("./userlist-functions/userlist-controller");
 
@@ -238,52 +239,52 @@ client.on(Events.InteractionCreate, async interaction => {
 client.on('guildMemberAdd', handleNewGuildMember);
 
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
-    try {
-        // const classData = await generateClassData(allClasses); // Organize classes by category
+  try {
+    // Get VERIFIED_ROLE from .env
+    const VERIFIED_ROLE = process.env.LIVE_ENVIRONMENT === "true" ? process.env.VERIFIED_ROLE : process.env.TEST_VERIFIED_ROLE;
 
-        // Fetch the user's existing data
-        const user = await getUserById(newMember.user.id) || null;
-        if (!user) {
-            console.log("Member update had no user identified, returning");
-            return;
-        }
+    // Get old and new roles
+    const oldRoles = oldMember.roles.cache.map(role => role.id);
+    const newRoles = newMember.roles.cache.map(role => role.id);
 
-        // Get the member's rank and prestige levels
-        const memberRoles = newMember.roles.cache.map(role => role.id);
-        const userRank = await getUserRank(memberRoles);
-
-        // Fetch prestige roles for level calculation
-        // const prestigeRoles = await require("./api/prestige-roles-api").getPrestiges();
-        // const raptorLevel = await getRaptorRank(memberRoles, prestigeRoles);
-        // const corsairLevel = await getCorsairRank(memberRoles, prestigeRoles);
-        // const raiderLevel = await getRaiderRank(memberRoles, prestigeRoles);
-        const prestigeRanks = await getPrestigeRanks(memberRoles);
-
-        // Initialize the updatedUser object
-        const updatedUser = {
-            id: user.id,
-            username: newMember.user.username,
-            nickname: newMember.nickname,
-            rank: userRank,
-            roles: memberRoles,
-            raptor_level: prestigeRanks.raptor_level,
-            corsair_level: prestigeRanks.corsair_level,
-            raider_level: prestigeRanks.raider_level,
-        };
-
-        // // Dynamically populate fields for each class category
-        // for (const [category, classes] of Object.entries(classData)) {
-        //     for (const classObj of classes) {
-        //         // Add a field for each class in the category
-        //         updatedUser[classObj.name] = user[classObj.name] || false; // Retain the user's existing completion status
-        //     }
-        // }
-
-        // Update the user's data in the database
-        await editUser(user.id, updatedUser);
-    } catch (error) {
-        console.error("Error updating user:", error);
+    // Detect if VERIFIED_ROLE was added
+    if (!oldRoles.includes(VERIFIED_ROLE) && newRoles.includes(VERIFIED_ROLE)) {
+      await verifyHandle(client, openai);
     }
+
+    // ...existing code...
+    // Fetch the user's existing data
+    const user = await getUserById(newMember.user.id) || null;
+    if (!user) {
+      console.log("Member update had no user identified, returning");
+      return;
+    }
+
+    // Get the member's rank and prestige levels
+    const memberRoles = newMember.roles.cache.map(role => role.id);
+    const userRank = await getUserRank(memberRoles);
+
+    // Fetch prestige roles for level calculation
+    const prestigeRanks = await getPrestigeRanks(memberRoles);
+
+    // Initialize the updatedUser object
+    const updatedUser = {
+      id: user.id,
+      username: newMember.user.username,
+      nickname: newMember.nickname,
+      rank: userRank,
+      roles: memberRoles,
+      raptor_level: prestigeRanks.raptor_level,
+      corsair_level: prestigeRanks.corsair_level,
+      raider_level: prestigeRanks.raider_level,
+    };
+
+    // ...existing code...
+    // Update the user's data in the database
+    await editUser(user.id, updatedUser);
+  } catch (error) {
+    console.error("Error updating user:", error);
+  }
 });
 
 client.on('interactionCreate', async (interaction) => {
