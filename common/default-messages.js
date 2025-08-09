@@ -21,33 +21,12 @@ async function channelMessagesCheck(client, openai) {
         if (found) break;
     }
     if (!found) {
-        await verificationStepTwo(client);
-    }
-    return found;
-}
-
-async function verificationStepTwo(){
-    // You must pass client to this function when calling it
-    // Example: await verificationStepOne(client)
-    const joinIronPointChannel = process.env.LIVE_ENVIRONMENT === "true" ? process.env.JOIN_IRONPOINT_CHANNEL : process.env.TEST_GENERAL_CHANNEL;
-    const embedTitle = "Step 2: RSI Handle Verification";
-    // Assume client is available in scope or passed as argument
-    // If not, adjust as needed
-    if (typeof arguments[0] !== 'object' || !arguments[0].channels) {
-        throw new Error('Client must be passed as the first argument to verificationStepOne');
-    }
-    const client = arguments[0];
-    const foundMsg = await channelMessagesCheck(client, joinIronPointChannel, embedTitle);
-    if (!foundMsg) {
-        const channel = await client.channels.fetch(joinIronPointChannel);
-        if (!channel || !channel.isTextBased()) return;
+        // Post the embed if not found
         const embed = {
-            title: embedTitle,
+            title: verificationStepOneTitle,
             description: "Please click the button below to verify your RSI handle and complete onboarding.",
             color: 0x3498db
         };
-        // Create button to open modal, customId includes user ID
-        // If user context is not available, use a generic customId
         let userId = client.user ? client.user.id : "unknown";
         const button = new ButtonBuilder()
             .setCustomId(`open_handle_verification_modal_${userId}`)
@@ -56,9 +35,9 @@ async function verificationStepTwo(){
         const row = new ActionRowBuilder().addComponents(button);
         await channel.send({ embeds: [embed], components: [row] });
     }
+    return found;
 }
 
 module.exports = {
     channelMessagesCheck,
-    verificationStepTwo,
 };
