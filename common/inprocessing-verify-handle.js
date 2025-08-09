@@ -14,35 +14,74 @@ function getGuild(client) {
 
 // Function to show the Handle Verification Modal
 async function showHandleVerificationModal(interaction) {
-    const dbUser = await getUserById(interaction.user.id);
-    const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+    let dbUser;
+    try {
+        dbUser = await getUserById(interaction.user.id);
+    } catch (err) {
+        dbUser = null;
+        console.error('[showHandleVerificationModal] Error fetching user from DB:', err);
+    }
+    let ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder;
+    try {
+        ({ ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js'));
+    } catch (err) {
+        console.error('[showHandleVerificationModal] Error requiring discord.js components:', err);
+        return;
+    }
 
-    const verificationCode = dbUser.verification_code;
-    const instructions = `Go to your RSI Profile Settings (https://robertsspaceindustries.com/en/account/profile) and put the following verification code into your 'Bio' section: \n\n${verificationCode}`;
+    let verificationCode;
+    try {
+        verificationCode = dbUser && dbUser.verification_code ? dbUser.verification_code : '[No code found, contact admin]';
+    } catch (err) {
+        verificationCode = '[No code found, contact admin]';
+        console.error('[showHandleVerificationModal] Error accessing verification_code:', err);
+    }
+    let instructions;
+    try {
+        instructions = `Go to your RSI Profile Settings (https://robertsspaceindustries.com/en/account/profile) and put the following verification code into your 'Bio' section: \n\n${verificationCode}`;
+    } catch (err) {
+        instructions = 'Error generating instructions. Please contact admin.';
+        console.error('[showHandleVerificationModal] Error generating instructions:', err);
+    }
 
-    const modal = new ModalBuilder()
-        .setCustomId('handle_verification_modal')
-        .setTitle('Handle Verification');
+    let modal;
+    try {
+        modal = new ModalBuilder()
+            .setCustomId('handle_verification_modal')
+            .setTitle('Handle Verification');
+    } catch (err) {
+        console.error('[showHandleVerificationModal] Error building modal:', err);
+        return;
+    }
 
-    // Instructions field (read-only)
-    const instructionsInput = new TextInputBuilder()
-        .setCustomId('verification_instructions')
-        .setLabel('Instructions')
-        .setStyle(TextInputStyle.Paragraph)
-        .setValue(instructions)
-        .setRequired(false);
+    let instructionsInput, handleInput, instructionsRow, handleRow;
+    try {
+        instructionsInput = new TextInputBuilder()
+            .setCustomId('verification_instructions')
+            .setLabel('Instructions')
+            .setStyle(TextInputStyle.Paragraph)
+            .setValue(instructions)
+            .setRequired(false);
 
-    const handleInput = new TextInputBuilder()
-        .setCustomId('rsi_handle_input')
-        .setLabel('RSI Handle or profile link')
-        .setStyle(TextInputStyle.Short)
-        .setRequired(true);
+        handleInput = new TextInputBuilder()
+            .setCustomId('rsi_handle_input')
+            .setLabel('RSI Handle or profile link')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true);
 
-    const instructionsRow = new ActionRowBuilder().addComponents(instructionsInput);
-    const handleRow = new ActionRowBuilder().addComponents(handleInput);
-    modal.addComponents(instructionsRow, handleRow);
+        instructionsRow = new ActionRowBuilder().addComponents(instructionsInput);
+        handleRow = new ActionRowBuilder().addComponents(handleInput);
+        modal.addComponents(instructionsRow, handleRow);
+    } catch (err) {
+        console.error('[showHandleVerificationModal] Error building modal components:', err);
+        return;
+    }
 
-    await interaction.showModal(modal);
+    try {
+        await interaction.showModal(modal);
+    } catch (err) {
+        console.error('[showHandleVerificationModal] Error showing modal:', err);
+    }
 }
 
 // Handles modal submission for handle_verification_modal
