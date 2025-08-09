@@ -117,10 +117,6 @@ async function automatedAwards(client, openai) {
 function evaluateTrigger(player, triggerObj) {
     const { metric, operator, value } = triggerObj;
     const playerValue = player[metric];
-    // if(player.user_id === '664023164350627843') {
-    //     console.log(`Evaluating ${metric} ${operator} ${value} for player ${player.user_id}: ${playerValue}`);
-    // }
-    console.log(`Evaluating ${metric} ${operator} ${value} for player ${player.user_id}: ${playerValue}`);
 
     switch (operator) {
         case '>=':

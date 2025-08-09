@@ -3,7 +3,6 @@ const { updateSchedule, getNextScheduleByRepeatSeries, getActiveSchedules } = re
 const { handleScheduleCreate } = require('../functions/create-new-schedule');
 
 async function manageEvents(client, openai) {
-    console.log("Starting event management...");
 
     // Get only active schedules from the API
     const schedules = await getActiveSchedules();

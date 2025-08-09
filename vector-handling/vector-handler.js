@@ -188,7 +188,6 @@ async function loadChatlogs(client, openai) {
       console.error(`Error uploading chat log for ${channel}: ${error}`);
     }
   }
-  console.log("Completed chatLog upload.");
 }
 
 async function trimChatLogs() {

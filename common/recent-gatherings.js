@@ -4,7 +4,6 @@ const { getAllVoiceSessionsLastHour } = require("../api/voiceChannelSessionsApi.
 
 
 async function checkRecentGatherings(client, openai, session, users) {
-    console.log("Checking recent gatherings...");
     try {
         // Get current time and one hour ago
         const now = new Date();
@@ -50,7 +49,6 @@ async function checkRecentGatherings(client, openai, session, users) {
                 // Do not touch created_at
             };
             await updateRecentGathering(gathering.id, updatedGathering);
-            console.log(`Updated recent gathering for channel ${session.channelName}`);
         } else {
             // Create new gathering
             // Generate a random BIGINT (up to 18 digits, positive)
@@ -65,9 +63,7 @@ async function checkRecentGatherings(client, openai, session, users) {
                 created_at: now.toISOString()
             };
             await createRecentGathering(newGathering);
-            console.log(`Created new recent gathering for channel ${session.channelName}`);
         }
-        console.log("Recent gatherings checked successfully.");
     } catch (error) {
         console.error("Error in checkRecentGatherings:", error);
     }
