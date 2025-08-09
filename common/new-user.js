@@ -8,7 +8,7 @@ function getGuild(client) {
     return client.guilds.cache.get(guildId);
 }
 
-async function handleNewGuildMember(member) {
+async function handleNewGuildMember(member, client) {
     const logChannel = process.env.LIVE_ENVIRONMENT === "true" ? process.env.ENTRY_LOG_CHANNEL : process.env.TEST_ENTRY_LOG_CHANNEL;
     const newUserRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.NEW_USER_ROLE : process.env.TEST_NEW_USER_ROLE;
     const guild = getGuild(member.client);
