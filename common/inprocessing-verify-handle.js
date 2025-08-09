@@ -47,84 +47,102 @@ async function showHandleVerificationModal(interaction) {
 
 // Handles modal submission for handle_verification_modal
 async function handleVerificationModalSubmit(interaction, client, openai) {
-    const dbUser = await getUserById(interaction.user.id);
-    console.log('[handleVerificationModalSubmit] dbUser:', dbUser);
-    let alreadyReplied = false;
-    let rsiHandleRaw = interaction.fields.getTextInputValue('rsi_handle_input');
-    console.log('[handleVerificationModalSubmit] rsiHandleRaw:', rsiHandleRaw);
-    let rsiHandle = rsiHandleRaw;
-    // If input is a URL, extract handle from the end
-    const urlPattern = /robertsspaceindustries\.com\/en\/citizens\/([A-Za-z0-9_-]+)/i;
-    const match = rsiHandleRaw.match(urlPattern);
-    if (match && match[1]) {
-        rsiHandle = match[1];
-        console.log('[handleVerificationModalSubmit] Extracted handle from URL:', rsiHandle);
-    }
-    rsiHandle = rsiHandle.trim();
-    console.log('[handleVerificationModalSubmit] Final rsiHandle:', rsiHandle);
-
-    // Build profile URL
-    const profileUrl = `https://robertsspaceindustries.com/en/citizens/${rsiHandle}`;
-    console.log('[handleVerificationModalSubmit] profileUrl:', profileUrl);
-
-    // Fetch HTML from profile URL
-    let html = '';
+    console.log('[handleVerificationModalSubmit] Modal submit handler called');
     try {
-        const res = await fetch(profileUrl);
-        html = await res.text();
-        console.log('[handleVerificationModalSubmit] Fetched HTML length:', html.length);
-    } catch (fetchErr) {
-        console.error('[handleVerificationModalSubmit] Error fetching RSI profile:', fetchErr);
-        await interaction.reply({
-            content: `Could not fetch RSI profile for handle "${rsiHandle}". Please check the handle and try again.`,
-            ephemeral: true
-        });
-        alreadyReplied = true;
-    }
+        const dbUser = await getUserById(interaction.user.id);
+        console.log('[handleVerificationModalSubmit] dbUser:', dbUser);
+        let alreadyReplied = false;
+        let rsiHandleRaw = interaction.fields.getTextInputValue('rsi_handle_input');
+        console.log('[handleVerificationModalSubmit] rsiHandleRaw:', rsiHandleRaw);
+        let rsiHandle = rsiHandleRaw;
+        // If input is a URL, extract handle from the end
+        const urlPattern = /robertsspaceindustries\.com\/en\/citizens\/([A-Za-z0-9_-]+)/i;
+        const match = rsiHandleRaw.match(urlPattern);
+        if (match && match[1]) {
+            rsiHandle = match[1];
+            console.log('[handleVerificationModalSubmit] Extracted handle from URL:', rsiHandle);
+        }
+        rsiHandle = rsiHandle.trim();
+        console.log('[handleVerificationModalSubmit] Final rsiHandle:', rsiHandle);
 
-    if (!alreadyReplied) {
-        // Search for verification code in HTML
-        const found = html.includes(dbUser.verification_code);
-        console.log('[handleVerificationModalSubmit] Verification code:', dbUser.verification_code, 'Found:', found);
+        // Build profile URL
+        const profileUrl = `https://robertsspaceindustries.com/en/citizens/${rsiHandle}`;
+        console.log('[handleVerificationModalSubmit] profileUrl:', profileUrl);
+
+        // Fetch HTML from profile URL
+        let html = '';
         try {
-            if (found) {
+            const res = await fetch(profileUrl);
+            html = await res.text();
+            console.log('[handleVerificationModalSubmit] Fetched HTML length:', html.length);
+        } catch (fetchErr) {
+            console.error('[handleVerificationModalSubmit] Error fetching RSI profile:', fetchErr);
+            if (!interaction.replied && !interaction.deferred) {
+                console.log('[handleVerificationModalSubmit] Replying: Could not fetch RSI profile');
                 await interaction.reply({
-                    content: `Success! Your verification code was found on your RSI profile. Click either of the buttons below to join as a Member of IronPoint, or a friendly Guest!`,
-                    ephemeral: true
-                });
-                // Send follow-up ephemeral message with buttons
-                const { ButtonBuilder, ActionRowBuilder, ButtonStyle } = require('discord.js');
-                const memberButton = new ButtonBuilder()
-                    .setCustomId('join_member')
-                    .setLabel('Join as Member')
-                    .setStyle(ButtonStyle.Primary);
-
-                const guestButton = new ButtonBuilder()
-                    .setCustomId('join_guest')
-                    .setLabel('Join as Guest')
-                    .setStyle(ButtonStyle.Secondary);
-
-                const row = new ActionRowBuilder().addComponents(memberButton, guestButton);
-                await interaction.followUp({
-                    content: 'Choose your onboarding type:',
-                    components: [row],
-                    ephemeral: true
-                });
-            } else {
-                await interaction.reply({
-                    content: `Verification failed. Your code was not found on your RSI profile. Please ensure you have added it to your Bio and try again.`,
+                    content: `Could not fetch RSI profile for handle "${rsiHandle}". Please check the handle and try again.`,
                     ephemeral: true
                 });
             }
-        } catch (err) {
-            // If reply fails, log error but do not try to reply again
-            console.error('[handleVerificationModalSubmit] Error handling verification modal submit:', err);
-               if (!interaction.replied && !interaction.deferred) {
-                   await interaction.reply({
-                       content: "An error occurred during verification. Please try again or contact an admin.",
-                       ephemeral: true
-                   });
-               }
+            alreadyReplied = true;
+        }
+
+        if (!alreadyReplied) {
+            // Search for verification code in HTML
+            const found = html.includes(dbUser.verification_code);
+            console.log('[handleVerificationModalSubmit] Verification code:', dbUser.verification_code, 'Found:', found);
+            try {
+                if (found) {
+                    console.log('[handleVerificationModalSubmit] Replying: Success! Verification code found');
+                    await interaction.reply({
+                        content: `Success! Your verification code was found on your RSI profile. Click either of the buttons below to join as a Member of IronPoint, or a friendly Guest!`,
+                        ephemeral: true
+                    });
+                    // Send follow-up ephemeral message with buttons
+                    const { ButtonBuilder, ActionRowBuilder, ButtonStyle } = require('discord.js');
+                    const memberButton = new ButtonBuilder()
+                        .setCustomId('join_member')
+                        .setLabel('Join as Member')
+                        .setStyle(ButtonStyle.Primary);
+
+                    const guestButton = new ButtonBuilder()
+                        .setCustomId('join_guest')
+                        .setLabel('Join as Guest')
+                        .setStyle(ButtonStyle.Secondary);
+
+                    const row = new ActionRowBuilder().addComponents(memberButton, guestButton);
+                    await interaction.followUp({
+                        content: 'Choose your onboarding type:',
+                        components: [row],
+                        ephemeral: true
+                    });
+                } else {
+                    console.log('[handleVerificationModalSubmit] Replying: Verification failed');
+                    await interaction.reply({
+                        content: `Verification failed. Your code was not found on your RSI profile. Please ensure you have added it to your Bio and try again.`,
+                        ephemeral: true
+                    });
+                }
+            } catch (err) {
+                // If reply fails, log error but do not try to reply again
+                console.error('[handleVerificationModalSubmit] Error handling verification modal submit:', err);
+                if (!interaction.replied && !interaction.deferred) {
+                    console.log('[handleVerificationModalSubmit] Replying: Error occurred during verification');
+                    await interaction.reply({
+                        content: "An error occurred during verification. Please try again or contact an admin.",
+                        ephemeral: true
+                    });
+                }
+            }
+        }
+    } catch (outerErr) {
+        console.error('[handleVerificationModalSubmit] Outer error:', outerErr);
+        if (!interaction.replied && !interaction.deferred) {
+            console.log('[handleVerificationModalSubmit] Replying: Outer error occurred');
+            await interaction.reply({
+                content: "A critical error occurred during verification. Please try again or contact an admin.",
+                ephemeral: true
+            });
         }
     }
 }
