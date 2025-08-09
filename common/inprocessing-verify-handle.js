@@ -84,75 +84,80 @@ async function showHandleVerificationModal(interaction) {
     }
 }
 
-// Handles modal submission for handle_verification_modal
 async function handleVerificationModalSubmit(interaction, client, openai) {
-    const dbUser = await getUserById(interaction.user.id);
-    let alreadyReplied = false;
-    let rsiHandleRaw = interaction.fields.getTextInputValue('rsi_handle_input');
-    let rsiHandle = rsiHandleRaw;
-    // If input is a URL, extract handle from the end
-    const urlPattern = /robertsspaceindustries\.com\/en\/citizens\/([A-Za-z0-9_-]+)/i;
-    const match = rsiHandleRaw.match(urlPattern);
-    if (match && match[1]) {
-        rsiHandle = match[1];
-    }
-    rsiHandle = rsiHandle.trim();
-
-    // Build profile URL
-    const profileUrl = `https://robertsspaceindustries.com/en/citizens/${rsiHandle}`;
-
-    // Fetch HTML from profile URL
-    let html = '';
-    try {
-        const res = await fetch(profileUrl);
-        html = await res.text();
-    } catch (fetchErr) {
-        await interaction.reply({
-            content: `Could not fetch RSI profile for handle "${rsiHandle}". Please check the handle and try again.`,
-            ephemeral: true
-        });
-        alreadyReplied = true;
-    }
-
-    if (!alreadyReplied) {
-        // Search for verification code in HTML
-        const found = html.includes(dbUser.verification_code);
-        try {
-            if (found) {
-                await interaction.reply({
-                    content: `Success! Your verification code was found on your RSI profile. Click either of the buttons below to join as a Member of IronPoint, or a friendly Guest!`,
-                    ephemeral: true
-                });
-                // Send follow-up ephemeral message with buttons
-                const { ButtonBuilder, ActionRowBuilder, ButtonStyle } = require('discord.js');
-                const memberButton = new ButtonBuilder()
-                    .setCustomId('join_member')
-                    .setLabel('Join as Member')
-                    .setStyle(ButtonStyle.Primary);
-
-                const guestButton = new ButtonBuilder()
-                    .setCustomId('join_guest')
-                    .setLabel('Join as Guest')
-                    .setStyle(ButtonStyle.Secondary);
-
-                const row = new ActionRowBuilder().addComponents(memberButton, guestButton);
-                await interaction.followUp({
-                    content: 'Choose your onboarding type:',
-                    components: [row],
-                    ephemeral: true
-                });
-            } else {
-                await interaction.reply({
-                    content: `Verification failed. Your code was not found on your RSI profile. Please ensure you have added it to your Bio and try again.`,
-                    ephemeral: true
-                });
-            }
-        } catch (err) {
-            // If reply fails, log error but do not try to reply again
-            console.error('[handleVerificationModalSubmit] Error handling verification modal submit:', err);
-        }
-    }
+    console.log("Test")
 }
+
+
+// // Handles modal submission for handle_verification_modal
+// async function handleVerificationModalSubmit(interaction, client, openai) {
+//     const dbUser = await getUserById(interaction.user.id);
+//     let alreadyReplied = false;
+//     let rsiHandleRaw = interaction.fields.getTextInputValue('rsi_handle_input');
+//     let rsiHandle = rsiHandleRaw;
+//     // If input is a URL, extract handle from the end
+//     const urlPattern = /robertsspaceindustries\.com\/en\/citizens\/([A-Za-z0-9_-]+)/i;
+//     const match = rsiHandleRaw.match(urlPattern);
+//     if (match && match[1]) {
+//         rsiHandle = match[1];
+//     }
+//     rsiHandle = rsiHandle.trim();
+
+//     // Build profile URL
+//     const profileUrl = `https://robertsspaceindustries.com/en/citizens/${rsiHandle}`;
+
+//     // Fetch HTML from profile URL
+//     let html = '';
+//     try {
+//         const res = await fetch(profileUrl);
+//         html = await res.text();
+//     } catch (fetchErr) {
+//         await interaction.reply({
+//             content: `Could not fetch RSI profile for handle "${rsiHandle}". Please check the handle and try again.`,
+//             ephemeral: true
+//         });
+//         alreadyReplied = true;
+//     }
+
+//     if (!alreadyReplied) {
+//         // Search for verification code in HTML
+//         const found = html.includes(dbUser.verification_code);
+//         try {
+//             if (found) {
+//                 await interaction.reply({
+//                     content: `Success! Your verification code was found on your RSI profile. Click either of the buttons below to join as a Member of IronPoint, or a friendly Guest!`,
+//                     ephemeral: true
+//                 });
+//                 // Send follow-up ephemeral message with buttons
+//                 const { ButtonBuilder, ActionRowBuilder, ButtonStyle } = require('discord.js');
+//                 const memberButton = new ButtonBuilder()
+//                     .setCustomId('join_member')
+//                     .setLabel('Join as Member')
+//                     .setStyle(ButtonStyle.Primary);
+
+//                 const guestButton = new ButtonBuilder()
+//                     .setCustomId('join_guest')
+//                     .setLabel('Join as Guest')
+//                     .setStyle(ButtonStyle.Secondary);
+
+//                 const row = new ActionRowBuilder().addComponents(memberButton, guestButton);
+//                 await interaction.followUp({
+//                     content: 'Choose your onboarding type:',
+//                     components: [row],
+//                     ephemeral: true
+//                 });
+//             } else {
+//                 await interaction.reply({
+//                     content: `Verification failed. Your code was not found on your RSI profile. Please ensure you have added it to your Bio and try again.`,
+//                     ephemeral: true
+//                 });
+//             }
+//         } catch (err) {
+//             // If reply fails, log error but do not try to reply again
+//             console.error('[handleVerificationModalSubmit] Error handling verification modal submit:', err);
+//         }
+//     }
+// }
 
 async function handleJoinButtonInteraction(interaction, client, openai) {
     const dbUser = await getUserById(interaction.user.id);
