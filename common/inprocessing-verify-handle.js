@@ -12,31 +12,88 @@ function getGuild(client) {
     return client.guilds.cache.get(guildId);
 }
 
-async function verifyHandle(client, openai, member){
-    const dbUser = await getUserById(member.user.id) || null;
-     // Send DM with Verify button
-    const verifyButton = new ButtonBuilder()
-        .setCustomId('verify_rsi')
-        .setLabel('Verify')
-        .setStyle(1); // 1 = Primary
-    const row = new ActionRowBuilder().addComponents(verifyButton);
-    const dmMessage = `Welcome to the server, ${member.user.username}! Please go to 'https://robertsspaceindustries.com/en/account/profile' and place the following code in your 'Bio' section, save, and then click the verify button below: ${dbUser.verification_code}`;
+async function verifyHandle(client, openai, member) {
+    // Step 1: Prompt for RSI Handle/Dossier link using a modal
+    const { ModalBuilder, TextInputBuilder, TextInputStyle, InteractionType } = require('discord.js');
+    const modal = new ModalBuilder()
+        .setCustomId('rsi_handle_modal')
+        .setTitle('Enter RSI Handle or Dossier Link');
+    const handleInput = new TextInputBuilder()
+        .setCustomId('rsi_handle_input')
+        .setLabel('RSI Handle or Dossier Link')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setPlaceholder('e.g. DocHound or https://robertsspaceindustries.com/citizens/DocHound');
+    modal.addComponents(new ActionRowBuilder().addComponents(handleInput));
     try {
-        // Only send DM if not already sent
-        if (!verificationDMs[member.user.id]) {
-            console.debug(`[handleNewGuildMember] Sending DM to user.`);
-            const sentMsg = await member.user.send({ content: dmMessage, components: [row] });
-            verificationDMs[member.user.id] = sentMsg;
-        } else {
-            console.debug(`[handleNewGuildMember] DM already sent to user.`);
-        }
+        await member.user.send({ content: "Welcome to the server! Please provide your RSI Handle or Dossier link to continue verification." });
+        // You cannot send modals via DM, so instead, send a button that triggers the modal in the server
+        // Save that the user needs to submit their handle
     } catch (dmError) {
-        console.error(`[handleNewGuildMember] Could not send DM to ${member.user.username}:`, dmError);
+        console.error(`[verifyHandle] Could not send DM to ${member.user.username}:`, dmError);
     }
+    // You must trigger the modal from an interaction in the server (e.g., a button click)
+    // See handler below for modal submission
 }
 
 module.exports = {
     verifyHandle,
+
+    /**
+     * Handles RSI Handle modal submission
+     * @param {ModalSubmitInteraction} interaction
+     */
+    async handleRSIModal(interaction) {
+        if (interaction.customId !== 'rsi_handle_modal') return;
+        const userId = interaction.user.id;
+        let rsiHandleOrLink = interaction.fields.getTextInputValue('rsi_handle_input').trim();
+        // If input is a dossier link, extract the handle
+        let rsiHandle = rsiHandleOrLink;
+        const dossierPrefix = 'https://robertsspaceindustries.com/citizens/';
+        if (rsiHandleOrLink.startsWith(dossierPrefix)) {
+            rsiHandle = rsiHandleOrLink.substring(dossierPrefix.length);
+        }
+        // Remove spaces from handle
+        rsiHandle = rsiHandle.replace(/\s+/g, '');
+        // Validate handle: must not be empty and must not contain spaces
+        if (!rsiHandle || /\s/.test(rsiHandle)) {
+            await interaction.reply({ content: "Invalid RSI Handle. Please enter a valid handle with no spaces.", ephemeral: true });
+            return;
+        }
+        // Fetch RSI profile HTML and validate handle
+        const profileUrl = `https://robertsspaceindustries.com/citizens/${rsiHandle}`;
+        let html = '';
+        try {
+            const res = await fetch(profileUrl);
+            html = await res.text();
+        } catch (fetchErr) {
+            console.error(`[handleRSIModal] Error fetching RSI profile:`, fetchErr);
+            await interaction.reply({ content: "Could not reach RSI profile. Please try again later.", ephemeral: true });
+            return;
+        }
+        if (html.includes('NAVIGATING UNCHARTED TERRITORY')) {
+            await interaction.reply({ content: "Invalid RSI Handle. That profile does not exist. Please enter your handle again.", ephemeral: true });
+            return;
+        }
+        // Save RSI handle to DB or memory (implement as needed)
+        const dbUser = await getUserById(userId) || {};
+        dbUser.rsi_handle = rsiHandle;
+        // TODO: Save dbUser.rsi_handle to DB if needed
+        const verifyButton = new ButtonBuilder()
+            .setCustomId('verify_rsi')
+            .setLabel('Verify')
+            .setStyle(1);
+        const row = new ActionRowBuilder().addComponents(verifyButton);
+        const dmMessage = `Thank you! Now, please go to 'https://robertsspaceindustries.com/en/account/profile' and place the following code in your 'Bio' section, save, and then click the verify button below: ${dbUser.verification_code}`;
+        try {
+            const sentMsg = await interaction.user.send({ content: dmMessage, components: [row] });
+            verificationDMs[userId] = sentMsg;
+            await interaction.reply({ content: "RSI Handle/Dossier received! Please check your DM for the next step.", ephemeral: true });
+        } catch (dmError) {
+            console.error(`[handleRSIModal] Could not send DM:`, dmError);
+            await interaction.reply({ content: "Could not send DM. Please check your DM settings.", ephemeral: true });
+        }
+    },
 
     async handleVerifyButtonInteraction(interaction) {
         const userId = interaction.user.id;
