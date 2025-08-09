@@ -12,44 +12,6 @@ function getGuild(client) {
     return client.guilds.cache.get(guildId);
 }
 
-async function messageUserForHandle(client, openai, member) {
-    const joinIronPointChannel = process.env.LIVE_ENVIRONMENT === "true" ? process.env.JOIN_IRONPOINT_CHANNEL : process.env.TEST_GENERAL_CHANNEL;
-    const newUserRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.NEW_USER_ROLE : process.env.TEST_NEW_USER_ROLE;
-    const channel = await client.channels.fetch(joinIronPointChannel);
-    if (!channel) {
-        console.error('Could not find joinIronPointChannel:', joinIronPointChannel);
-        return;
-    }
-
-    // Remove newUserRole from the user
-    try {
-        const guild = getGuild(client);
-        const memberObj = guild.members.cache.get(member.id);
-        if (memberObj && memberObj.roles.cache.has(newUserRole)) {
-            await memberObj.roles.remove(newUserRole);
-        }
-    } catch (err) {
-        console.error('Error removing newUserRole:', err);
-    }
-
-    // Create button to open modal, customId includes user ID
-    const userId = member.user ? member.user.id : member.id;
-    const button = new ButtonBuilder()
-        .setCustomId(`open_handle_verification_modal_${userId}`)
-        .setLabel('Verify RSI Handle')
-        .setStyle(1); // Primary
-
-    const row = new ActionRowBuilder().addComponents(button);
-
-    // Send ephemeral message to the user in the channel
-    await channel.send({
-        content: `${member}, please verify your RSI handle to complete onboarding.`,
-        ephemeral: true,
-        components: [row],
-    });
-}
-
-
 // Function to show the Handle Verification Modal
 async function showHandleVerificationModal(interaction) {
     const dbUser = await getUserById(interaction.user.id);
@@ -85,42 +47,62 @@ async function showHandleVerificationModal(interaction) {
 
 // Handles modal submission for handle_verification_modal
 async function handleVerificationModalSubmit(interaction, client, openai) {
-        const dbUser = await getUserById(interaction.user.id);
+    const dbUser = await getUserById(interaction.user.id);
+    let alreadyReplied = false;
+    let rsiHandleRaw = interaction.fields.getTextInputValue('rsi_handle_input');
+    let rsiHandle = rsiHandleRaw;
+    // If input is a URL, extract handle from the end
+    const urlPattern = /robertsspaceindustries\.com\/en\/citizens\/([A-Za-z0-9_-]+)/i;
+    const match = rsiHandleRaw.match(urlPattern);
+    if (match && match[1]) {
+        rsiHandle = match[1];
+    }
+    rsiHandle = rsiHandle.trim();
+
+    // Build profile URL
+    const profileUrl = `https://robertsspaceindustries.com/en/citizens/${rsiHandle}`;
+
+    // Fetch HTML from profile URL
+    let html = '';
+    try {
+        const res = await fetch(profileUrl);
+        html = await res.text();
+    } catch (fetchErr) {
+        console.error('Error fetching RSI profile:', fetchErr);
+        await interaction.reply({
+            content: `Could not fetch RSI profile for handle "${rsiHandle}". Please check the handle and try again.`,
+            ephemeral: true
+        });
+        alreadyReplied = true;
+    }
+
+    if (!alreadyReplied) {
+        // Search for verification code in HTML
+        const found = html.includes(dbUser.verification_code);
         try {
-            let rsiHandleRaw = interaction.fields.getTextInputValue('rsi_handle_input');
-            let rsiHandle = rsiHandleRaw;
-            // If input is a URL, extract handle from the end
-            const urlPattern = /robertsspaceindustries\.com\/en\/citizens\/([A-Za-z0-9_-]+)/i;
-            const match = rsiHandleRaw.match(urlPattern);
-            if (match && match[1]) {
-                rsiHandle = match[1];
-            }
-            rsiHandle = rsiHandle.trim();
-
-            // Build profile URL
-            const profileUrl = `https://robertsspaceindustries.com/en/citizens/${rsiHandle}`;
-
-            // Fetch HTML from profile URL
-            let html = '';
-            try {
-                const res = await fetch(profileUrl);
-                html = await res.text();
-            } catch (fetchErr) {
-                console.error('Error fetching RSI profile:', fetchErr);
-                await interaction.reply({
-                    content: `Could not fetch RSI profile for handle "${rsiHandle}". Please check the handle and try again.`,
-                    ephemeral: true
-                });
-                return;
-            }
-
-            // Search for verification code in HTML
-            const found = html.includes(dbUser.verification_code);
             if (found) {
                 await interaction.reply({
-                    content: `Success! Your verification code was found on your RSI profile. Welcome aboard!`,
+                    content: `Success! Your verification code was found on your RSI profile. Click either of the buttons below to join as a Member of IronPoint, or a friendly Guest!`,
                     ephemeral: true
                 });
+                    // Send follow-up ephemeral message with buttons
+                    const { ButtonBuilder, ActionRowBuilder, ButtonStyle } = require('discord.js');
+                    const memberButton = new ButtonBuilder()
+                        .setCustomId('join_member')
+                        .setLabel('Join as Member')
+                        .setStyle(ButtonStyle.Primary);
+
+                    const guestButton = new ButtonBuilder()
+                        .setCustomId('join_guest')
+                        .setLabel('Join as Guest')
+                        .setStyle(ButtonStyle.Secondary);
+
+                    const row = new ActionRowBuilder().addComponents(memberButton, guestButton);
+                    await interaction.followUp({
+                        content: 'Choose your onboarding type:',
+                        components: [row],
+                        ephemeral: true
+                    });
             } else {
                 await interaction.reply({
                     content: `Verification failed. Your code was not found on your RSI profile. Please ensure you have added it to your Bio and try again.`,
@@ -128,16 +110,69 @@ async function handleVerificationModalSubmit(interaction, client, openai) {
                 });
             }
         } catch (err) {
+            // If reply fails, log error but do not try to reply again
             console.error('Error handling verification modal submit:', err);
-            await interaction.reply({
-                content: 'There was an error processing your verification. Please try again or contact an admin.',
-                ephemeral: true
-            });
         }
+    }
+}
+
+async function handleJoinButtonInteraction(interaction, client, openai) {
+    const dbUser = await getUserById(interaction.user.id);
+    if (!dbUser) {
+        await interaction.reply({
+            content: 'User not found in database. Please contact an admin.',
+            ephemeral: true
+        });
+        return;
+    }
+
+    // Get role IDs from .env
+    const NEW_USER_ROLE = process.env.LIVE_ENVIRONMENT === "true" ? process.env.NEW_USER_ROLE : process.env.TEST_NEW_USER_ROLE;
+    const APPLICATION_PENDING_ROLE = process.env.LIVE_ENVIRONMENT === "true" ? process.env.APPLICATION_PENDING_ROLE : process.env.TEST_APPLICATION_PENDING_ROLE;
+    const FRIENDLY_PENDING_ROLE = process.env.LIVE_ENVIRONMENT === "true" ? process.env.FRIENDLY_PENDING_ROLE : process.env.TEST_FRIENDLY_ROLE;
+
+    const guild = interaction.guild || client.guilds.cache.get(process.env.LIVE_ENVIRONMENT === "true" ? process.env.GUILD_ID : process.env.TEST_GUILD_ID);
+    const member = guild.members.cache.get(interaction.user.id);
+
+    if (!member) {
+        await interaction.reply({
+            content: 'Could not find your guild member record. Please contact an admin.',
+            ephemeral: true
+        });
+        return;
+    }
+
+    // Remove NEW_USER_ROLE
+    if (member.roles.cache.has(NEW_USER_ROLE)) {
+        await member.roles.remove(NEW_USER_ROLE).catch(() => {});
+    }
+
+    if (interaction.customId === 'join_member') {
+        // Add APPLICATION_PENDING_ROLE
+        await member.roles.add(APPLICATION_PENDING_ROLE).catch(() => {});
+        await notifyJoinMemberWelcome(dbUser, client, openai);
+        await interaction.reply({
+            content: 'Welcome! You have joined as a Member of IronPoint. Enjoy your stay!',
+            ephemeral: true
+        });
+    } else if (interaction.customId === 'join_guest') {
+        // Add FRIENDLY_PENDING_ROLE
+        await member.roles.add(FRIENDLY_PENDING_ROLE).catch(() => {});
+        await notifyJoinGuestWelcome(dbUser, client, openai);
+        await interaction.reply({
+            content: 'Welcome! You have joined as a Guest. Enjoy your stay and feel free to ask questions!',
+            ephemeral: true
+        });
+    } else {
+        await interaction.reply({
+            content: 'Unknown onboarding option. Please try again.',
+            ephemeral: true
+        });
+    }
 }
 
 module.exports = {
-    messageUserForHandle,
     showHandleVerificationModal,
     handleVerificationModalSubmit,
+    handleJoinButtonInteraction
 };

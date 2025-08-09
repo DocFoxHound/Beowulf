@@ -282,9 +282,15 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 
 client.on('interactionCreate', async (interaction) => {
   if (interaction.isButton()) {
-    // Handle RSI verification button
-    if (interaction.customId === 'verify_rsi') {
-      await handleVerifyButtonInteraction(interaction);
+    // Handle Handle Verification Modal button (user-specific)
+    if (interaction.customId.startsWith('open_handle_verification_modal_')) {
+      await showHandleVerificationModal(interaction);
+      return;
+    }
+
+    // Modal submit handler
+    if (interaction.isModalSubmit() && interaction.customId === 'handle_verification_modal') {
+      await handleVerificationModalSubmit(interaction, client, openai);
       return;
     }
 
@@ -293,19 +299,9 @@ client.on('interactionCreate', async (interaction) => {
       await handleJoinButtonInteraction(interaction, client, openai);
       return;
     }
-
-    // Handle Handle Verification Modal button (user-specific)
-    if (interaction.customId.startsWith('open_handle_verification_modal_')) {
-      await showHandleVerificationModal(interaction);
-      return;
-    }
   }
 
-  // Modal submit handler
-  if (interaction.isModalSubmit() && interaction.customId === 'handle_verification_modal') {
-    await handleVerificationModalSubmit(interaction, client, openai);
-    return;
-  }
+  
 
   // Only allow in specific event channels for RSVP buttons
   const allowedChannels = [
