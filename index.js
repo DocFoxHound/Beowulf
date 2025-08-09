@@ -18,6 +18,7 @@ const { loadChatlogs } = require("./vector-handling/vector-handler.js");
 const { trimChatLogs } = require("./vector-handling/vector-handler.js");
 const { checkRecentGatherings } = require("./common/recent-gatherings.js");
 const bodyParser = require('body-parser');
+
 const { handleHitPost } = require('./functions/post-new-hit.js');
 const { handleHitPostDelete } = require('./functions/post-delete-hit.js');
 const { handleFleetLogPost } = require('./functions/post-new-fleet-log.js');
@@ -42,6 +43,12 @@ const { handleNewGuildMember } = require('./common/new-user.js');
 const { messageUserForHandle, showHandleVerificationModal, handleVerificationModalSubmit } = require("./common/inprocessing-verify-handle.js")
 const { channelMessagesCheck } = require('./common/default-messages.js');
 // const { getPrestiges, getRaptorRank, getCorsairRank, getRaiderRank } = require("./userlist-functions/userlist-controller");
+
+
+const express = require('express');
+const app = express();
+app.use(bodyParser.json());
+app.use(express.json());
 
 // Initialize dotenv config file
 const args = process.argv.slice(2);
