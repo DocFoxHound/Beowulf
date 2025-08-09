@@ -48,33 +48,26 @@ async function showHandleVerificationModal(interaction) {
 // Handles modal submission for handle_verification_modal
 async function handleVerificationModalSubmit(interaction, client, openai) {
     const dbUser = await getUserById(interaction.user.id);
-    console.log('[handleVerificationModalSubmit] dbUser:', dbUser);
     let alreadyReplied = false;
     let rsiHandleRaw = interaction.fields.getTextInputValue('rsi_handle_input');
-    console.log('[handleVerificationModalSubmit] rsiHandleRaw:', rsiHandleRaw);
     let rsiHandle = rsiHandleRaw;
     // If input is a URL, extract handle from the end
     const urlPattern = /robertsspaceindustries\.com\/en\/citizens\/([A-Za-z0-9_-]+)/i;
     const match = rsiHandleRaw.match(urlPattern);
     if (match && match[1]) {
         rsiHandle = match[1];
-        console.log('[handleVerificationModalSubmit] Extracted handle from URL:', rsiHandle);
     }
     rsiHandle = rsiHandle.trim();
-    console.log('[handleVerificationModalSubmit] Final rsiHandle:', rsiHandle);
 
     // Build profile URL
     const profileUrl = `https://robertsspaceindustries.com/en/citizens/${rsiHandle}`;
-    console.log('[handleVerificationModalSubmit] profileUrl:', profileUrl);
 
     // Fetch HTML from profile URL
     let html = '';
     try {
         const res = await fetch(profileUrl);
         html = await res.text();
-        console.log('[handleVerificationModalSubmit] Fetched HTML length:', html.length);
     } catch (fetchErr) {
-        console.error('[handleVerificationModalSubmit] Error fetching RSI profile:', fetchErr);
         await interaction.reply({
             content: `Could not fetch RSI profile for handle "${rsiHandle}". Please check the handle and try again.`,
             ephemeral: true
@@ -85,7 +78,6 @@ async function handleVerificationModalSubmit(interaction, client, openai) {
     if (!alreadyReplied) {
         // Search for verification code in HTML
         const found = html.includes(dbUser.verification_code);
-        console.log('[handleVerificationModalSubmit] Verification code:', dbUser.verification_code, 'Found:', found);
         try {
             if (found) {
                 await interaction.reply({
@@ -125,6 +117,7 @@ async function handleVerificationModalSubmit(interaction, client, openai) {
 
 async function handleJoinButtonInteraction(interaction, client, openai) {
     const dbUser = await getUserById(interaction.user.id);
+    console.log('[handleJoinButtonInteraction] dbUser:', dbUser);
     if (!dbUser) {
         await interaction.reply({
             content: 'User not found in database. Please contact an admin.',
@@ -137,9 +130,12 @@ async function handleJoinButtonInteraction(interaction, client, openai) {
     const NEW_USER_ROLE = process.env.LIVE_ENVIRONMENT === "true" ? process.env.NEW_USER_ROLE : process.env.TEST_NEW_USER_ROLE;
     const APPLICATION_PENDING_ROLE = process.env.LIVE_ENVIRONMENT === "true" ? process.env.APPLICATION_PENDING_ROLE : process.env.TEST_APPLICATION_PENDING_ROLE;
     const FRIENDLY_PENDING_ROLE = process.env.LIVE_ENVIRONMENT === "true" ? process.env.FRIENDLY_PENDING_ROLE : process.env.TEST_FRIENDLY_ROLE;
+    console.log('[handleJoinButtonInteraction] Role IDs:', { NEW_USER_ROLE, APPLICATION_PENDING_ROLE, FRIENDLY_PENDING_ROLE });
 
     const guild = interaction.guild || client.guilds.cache.get(process.env.LIVE_ENVIRONMENT === "true" ? process.env.GUILD_ID : process.env.TEST_GUILD_ID);
+    console.log('[handleJoinButtonInteraction] Guild:', guild?.id);
     const member = guild.members.cache.get(interaction.user.id);
+    console.log('[handleJoinButtonInteraction] Member:', member?.id);
 
     if (!member) {
         await interaction.reply({
@@ -151,26 +147,28 @@ async function handleJoinButtonInteraction(interaction, client, openai) {
 
     // Remove NEW_USER_ROLE
     if (member.roles.cache.has(NEW_USER_ROLE)) {
-        await member.roles.remove(NEW_USER_ROLE).catch(() => {});
+        console.log('[handleJoinButtonInteraction] Removing NEW_USER_ROLE:', NEW_USER_ROLE);
+        await member.roles.remove(NEW_USER_ROLE).catch((err) => { console.error('[handleJoinButtonInteraction] Error removing NEW_USER_ROLE:', err); });
     }
 
     if (interaction.customId === 'join_member') {
-        // Add APPLICATION_PENDING_ROLE
-        await member.roles.add(APPLICATION_PENDING_ROLE).catch(() => {});
+        console.log('[handleJoinButtonInteraction] Adding APPLICATION_PENDING_ROLE:', APPLICATION_PENDING_ROLE);
+        await member.roles.add(APPLICATION_PENDING_ROLE).catch((err) => { console.error('[handleJoinButtonInteraction] Error adding APPLICATION_PENDING_ROLE:', err); });
         await notifyJoinMemberWelcome(dbUser, client, openai);
         await interaction.reply({
             content: 'Welcome! You have joined as a Member of IronPoint. Enjoy your stay!',
             ephemeral: true
         });
     } else if (interaction.customId === 'join_guest') {
-        // Add FRIENDLY_PENDING_ROLE
-        await member.roles.add(FRIENDLY_PENDING_ROLE).catch(() => {});
+        console.log('[handleJoinButtonInteraction] Adding FRIENDLY_PENDING_ROLE:', FRIENDLY_PENDING_ROLE);
+        await member.roles.add(FRIENDLY_PENDING_ROLE).catch((err) => { console.error('[handleJoinButtonInteraction] Error adding FRIENDLY_PENDING_ROLE:', err); });
         await notifyJoinGuestWelcome(dbUser, client, openai);
         await interaction.reply({
             content: 'Welcome! You have joined as a Guest. Enjoy your stay and feel free to ask questions!',
             ephemeral: true
         });
     } else {
+        console.log('[handleJoinButtonInteraction] Unknown customId:', interaction.customId);
         await interaction.reply({
             content: 'Unknown onboarding option. Please try again.',
             ephemeral: true
