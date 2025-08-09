@@ -32,6 +32,7 @@ async function messageUserForHandle(client, openai, member) {
     // Send ephemeral message to the user in the channel
     await channel.send({
         content: `${member}, please verify your RSI handle to complete onboarding.`,
+        ephemeral: true,
         components: [row],
     });
 }
@@ -59,7 +60,7 @@ async function showHandleVerificationModal(interaction) {
 
     const handleInput = new TextInputBuilder()
         .setCustomId('rsi_handle_input')
-        .setLabel('Enter your RSI Handle or link to RSI Dossier/Profile (e.g.: Dochound, or https://robertsspaceindustries.com/en/citizens/DocHound')
+        .setLabel('RSI Handle or profile link')
         .setStyle(TextInputStyle.Short)
         .setRequired(true);
 
