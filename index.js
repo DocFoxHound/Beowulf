@@ -245,18 +245,6 @@ client.on('guildMemberAdd', handleNewGuildMember);
 
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
   try {
-    // Get VERIFIED_ROLE from .env
-    const VERIFIED_ROLE = process.env.LIVE_ENVIRONMENT === "true" ? process.env.VERIFIED_ROLE : process.env.TEST_VERIFIED_ROLE;
-
-    // Get old and new roles
-    const oldRoles = oldMember.roles.cache.map(role => role.id);
-    const newRoles = newMember.roles.cache.map(role => role.id);
-
-    // Detect if VERIFIED_ROLE was added
-    if (!oldRoles.includes(VERIFIED_ROLE) && newRoles.includes(VERIFIED_ROLE)) {
-      await messageUserForHandle(client, openai, newMember);
-    }
-
     // ...existing code...
     // Fetch the user's existing data
     const user = await getUserById(newMember.user.id) || null;
