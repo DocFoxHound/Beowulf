@@ -11,7 +11,7 @@ function getGuild(client) {
     return client.guilds.cache.get(guildId);
 }
 
-async function verifyHandle(client, openai){
+async function verifyHandle(client, openai, member){
     console.log("Getting Handle")
      // Send DM with Verify button
     const verifyButton = new ButtonBuilder()

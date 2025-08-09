@@ -248,10 +248,8 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
     const newRoles = newMember.roles.cache.map(role => role.id);
 
     // Detect if VERIFIED_ROLE was added
-    console.log("Before verified check")
     if (!oldRoles.includes(VERIFIED_ROLE) && newRoles.includes(VERIFIED_ROLE)) {
-      console.log("Verified")
-      await verifyHandle(client, openai);
+      await verifyHandle(client, openai, newMember);
     }
 
     // ...existing code...
