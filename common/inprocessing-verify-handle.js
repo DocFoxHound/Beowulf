@@ -91,12 +91,11 @@ async function handleDMVerificationResponse(message, client, openai, dbUser) {
         // 1. Extract orgSID from HTML
         let orgSID = '';
         try {
-            // Find the SID label
-            const sidLabelRegex = /<span[^>]*class=["']label data10["'][^>]*>Spectrum Identification \(SID\)<\/span>\s*<strong[^>]*class=["']value data9["'][^>]*>([^<]+)<\/strong>/;
+            // Find the SID label (class numbers may vary)
+            const sidLabelRegex = /<span[^>]*>Spectrum Identification \(SID\)<\/span>\s*<strong[^>]*>([^<]+)<\/strong>/;
             const sidMatch = html.match(sidLabelRegex);
             if (sidMatch && sidMatch[1]) {
                 orgSID = sidMatch[1].trim();
-            } else {
             }
         } catch (e) {
             console.error('Error extracting orgSID:', e);
@@ -154,29 +153,51 @@ async function handleMemberOrGuestJoin(interaction, client, openai) {
     const newUserRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.NEW_USER_ROLE : process.env.TEST_NEW_USER_ROLE;
     const member = await guild.members.fetch(userId);
 
-    //check that the user still has the newUserRole, which indicates they've not clicked this button yet
-    if(dbUser.roles.includes(newUserRole)){
-        try{
-            await member.roles.remove(newUserRole);
-        } catch (error) {
-            console.error('Error removing new user role:', error);
-        }
-        if(interaction.customId === 'join_member'){
-            try{
-                await member.roles.add(memberPendingRole);
-                notifyJoinMemberWelcome(dbUser, openai, client, guild);
+    // Check that the user still has the newUserRole, which indicates they've not clicked this button yet
+    if (dbUser.roles.includes(newUserRole)) {
+        // Immediately respond with disabled buttons
+        const { ButtonBuilder, ActionRowBuilder } = require('discord.js');
+        const memberBtn = new ButtonBuilder()
+            .setCustomId('join_member')
+            .setLabel('Join as Member')
+            .setStyle(1)
+            .setDisabled(true);
+        const guestBtn = new ButtonBuilder()
+            .setCustomId('join_guest')
+            .setLabel('Join as Guest')
+            .setStyle(2)
+            .setDisabled(true);
+        const row = new ActionRowBuilder().addComponents(memberBtn, guestBtn);
+        await interaction.reply({
+            content: 'Processing your selection...',
+            components: [row],
+            ephemeral: true
+        });
+
+        // Process role changes and notifications asynchronously
+        (async () => {
+            try {
+                await member.roles.remove(newUserRole);
             } catch (error) {
-                console.error('Error adding member role:', error);
+                console.error('Error removing new user role:', error);
             }
-        }
-        if(interaction.customId === 'join_guest'){
-            try{
-                await member.roles.add(friendlyPendingRole);
-                notifyJoinGuestWelcome(dbUser, openai, client, guild);
-            } catch (error) {
-                console.error('Error adding guest role:', error);
+            if (interaction.customId === 'join_member') {
+                try {
+                    await member.roles.add(memberPendingRole);
+                    notifyJoinMemberWelcome(dbUser, openai, client);
+                } catch (error) {
+                    console.error('Error adding member role:', error);
+                }
             }
-        }
+            if (interaction.customId === 'join_guest') {
+                try {
+                    await member.roles.add(friendlyPendingRole);
+                    notifyJoinGuestWelcome(dbUser, openai, client);
+                } catch (error) {
+                    console.error('Error adding guest role:', error);
+                }
+            }
+        })();
     }
 }
 
