@@ -242,7 +242,9 @@ client.on(Events.InteractionCreate, async interaction => {
 });
 
 // Event Listener: new member joins the server
-client.on('guildMemberAdd', handleNewGuildMember(member, client));
+client.on('guildMemberAdd', (member) => {
+  handleNewGuildMember(member, client)
+});
 
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
   try {
