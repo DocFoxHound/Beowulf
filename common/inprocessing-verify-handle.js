@@ -88,6 +88,31 @@ async function handleDMVerificationResponse(message, client, openai, dbUser) {
         const codeFound = html.includes(dbUser.verification_code);
 
         if (codeFound) {
+            // 1. Extract orgSID from HTML
+            let orgSID = '';
+            try {
+                // Find the SID label
+                const sidLabelRegex = /<span[^>]*class=["']label data10["'][^>]*>Spectrum Identification \(SID\)<\/span>\s*<strong[^>]*class=["']value data9["'][^>]*>([^<]+)<\/strong>/;
+                const sidMatch = html.match(sidLabelRegex);
+                if (sidMatch && sidMatch[1]) {
+                    orgSID = sidMatch[1].trim();
+                }
+            } catch (e) {
+                console.error('Error extracting orgSID:', e);
+            }
+
+            // 2. Change user's nickname in guild
+            try {
+                const member = await guild.members.fetch(dbUser.id);
+                let newNick = handle;
+                if (orgSID) {
+                    newNick = `[${orgSID}] ${handle}`;
+                }
+                await member.setNickname(newNick).catch(e => console.error('Error setting nickname:', e));
+            } catch (e) {
+                console.error('Error setting nickname after verification:', e);
+            }
+
             // Success: show buttons to join as Member or Guest
             const { ButtonBuilder, ActionRowBuilder } = require('discord.js');
             const memberBtn = new ButtonBuilder()
