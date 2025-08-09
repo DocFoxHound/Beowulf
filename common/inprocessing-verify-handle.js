@@ -119,6 +119,12 @@ async function handleVerificationModalSubmit(interaction, client, openai) {
         } catch (err) {
             // If reply fails, log error but do not try to reply again
             console.error('[handleVerificationModalSubmit] Error handling verification modal submit:', err);
+               if (!interaction.replied && !interaction.deferred) {
+                   await interaction.reply({
+                       content: "An error occurred during verification. Please try again or contact an admin.",
+                       ephemeral: true
+                   });
+               }
         }
     }
 }
