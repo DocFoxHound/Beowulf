@@ -14,19 +14,22 @@ function getGuild(client) {
 
 // Function to show the Handle Verification Modal
 async function showHandleVerificationModal(interaction) {
-
+    const dbUser = await getUserById(interaction.user.id);
     const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
-    // Build modal with placeholder instructions first
+
+    const verificationCode = dbUser.verification_code;
+    const instructions = `Go to your RSI Profile Settings (https://robertsspaceindustries.com/en/account/profile) and put the following verification code into your 'Bio' section: \n\n${verificationCode}`;
+
     const modal = new ModalBuilder()
         .setCustomId('handle_verification_modal')
         .setTitle('Handle Verification');
 
-    // Placeholder instructions (will be updated after modal is shown)
+    // Instructions field (read-only)
     const instructionsInput = new TextInputBuilder()
         .setCustomId('verification_instructions')
         .setLabel('Instructions')
         .setStyle(TextInputStyle.Paragraph)
-        .setValue('Instructions will appear here.')
+        .setValue(instructions)
         .setRequired(false);
 
     const handleInput = new TextInputBuilder()
@@ -39,12 +42,7 @@ async function showHandleVerificationModal(interaction) {
     const handleRow = new ActionRowBuilder().addComponents(handleInput);
     modal.addComponents(instructionsRow, handleRow);
 
-    // Show modal immediately
     await interaction.showModal(modal);
-
-    // Now fetch user data and update instructions if needed (not possible in modal, but can be sent as a follow-up message if required)
-    const dbUser = await getUserById(interaction.user.id);
-    // If you want to send instructions, send as a follow-up message or update modal logic to use static instructions.
 }
 
 // Handles modal submission for handle_verification_modal
