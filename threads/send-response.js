@@ -33,40 +33,18 @@ async function sendMessage(channelId, message, client) {
     }
 }
 
-async function sendMessageNotifySubject(channelId, userId, message, client, guild) {
-    console.log("Sending message with user mention")
-    let channel;
+async function sendMessageNotifySubject(channelId, userId, message, client) {
+    // const guildId = process.env.LIVE_ENVIRONMENT === "true" ? process.env.GUILD_ID : process.env.TEST_GUILD_ID;
+    // const guild = client.guilds.cache.get(guildId);
+
+    const channel = client.channels.cache.get(channelId);
     const userMention = `<@${userId}>`;
     const messageWithMention = `${userMention} ${message}`;
-    channel = client.channels.cache.get(channelId);
-    if (channel) {
-        try {
-            await channel.send(messageWithMention);
-        } catch (error) {
-            console.error("Error sending message with client.channels.cache: ", error);
-            try {
-                channel = guild.channels.cache.get(channelId);
-                if (channel) {
-                    await channel.send(messageWithMention);
-                } else {
-                    console.error(`Channel with ID ${channelId} not found in guild.channels.cache.`);
-                }
-            } catch (guildError) {
-                console.error("Error sending message with guild.channels.cache: ", guildError);
-            }
-        }
-    } else {
-        console.error(`Channel with ID ${channelId} not found in client.channels.cache.`);
-        channel = guild.channels.cache.get(channelId);
-        if (channel) {
-            try {
-                await channel.send(messageWithMention);
-            } catch (guildError) {
-                console.error("Error sending message with guild.channels.cache: ", guildError);
-            }
-        } else {
-            console.error(`Channel with ID ${channelId} not found in guild.channels.cache.`);
-        }
+    try{
+        await channel.send(messageWithMention);
+    }catch(error){
+        console.error("Error running the thread: ", error);
+        await channel.send("Sorry, there was an error processing your request.");
     }
 }
 

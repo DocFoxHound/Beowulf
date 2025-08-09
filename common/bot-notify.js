@@ -105,7 +105,7 @@ async function notifyJoinMemberWelcome(userData, openai, client, guild) {
         const formattedResponse = await formatResponseForQueueCheck(run.thread_id, openai);
         // Prepend ping to the message
         const messageWithPing = `${pingBlooded} ${formattedResponse}`;
-        await sendMessageNotifySubject(channelToNotify, userData.id, messageWithPing, client, guild);
+        await sendMessageNotifySubject(channelToNotify, userData.id, messageWithPing, client);
     }
 }
 
@@ -122,7 +122,7 @@ async function notifyJoinGuestWelcome(userData, openai, client, guild) {
         const formattedResponse = await formatResponseForQueueCheck(run.thread_id, openai);
         // Prepend ping to the message
         const messageWithPing = `${pingBlooded} ${formattedResponse}`;
-        await sendMessageNotifySubject(channelToNotify, userData.id, messageWithPing, client, guild);
+        await sendMessageNotifySubject(channelToNotify, userData.id, messageWithPing, client);
     }
 }
 
