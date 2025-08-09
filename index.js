@@ -39,9 +39,7 @@ const { processLeaderboardLogs } = require('./functions/process-leaderboard-logs
 const { processOrgLeaderboards } = require('./functions/process-leaderboards.js');
 const { verifyUser } = require('./functions/verify-user.js');
 const { handleNewGuildMember } = require('./common/new-user.js');
-const { handleJoinButtonInteraction } = require('./common/inprocessing-verify-handle.js');
-const { handleVerifyButtonInteraction } = require('./common/inprocessing-verify-handle.js');
-const { verifyHandle } = require("./common/inprocessing-verify-handle.js")
+const { messageUserForHandle, showHandleVerificationModal, handleVerificationModalSubmit } = require("./common/inprocessing-verify-handle.js")
 
 // const { getPrestiges, getRaptorRank, getCorsairRank, getRaiderRank } = require("./userlist-functions/userlist-controller");
 
@@ -191,6 +189,12 @@ client.on("ready", async () => {
 }),
 
 client.on("messageCreate", async (message) => {
+  dbUser = await getUserById(message.author.id);
+  // Listen for DMs for verification
+  if (message.channel.type === 1 && dbUser && !dbUser.verification_code) { // ChannelType.DM
+    await handleDMVerificationResponse(message, client, openai);
+    return;
+  }
   if (!channelIds.includes(message.channelId) || !message.guild || message.system) {
     return;
   }
@@ -249,7 +253,7 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 
     // Detect if VERIFIED_ROLE was added
     if (!oldRoles.includes(VERIFIED_ROLE) && newRoles.includes(VERIFIED_ROLE)) {
-      await verifyHandle(client, openai, newMember);
+      await messageUserForHandle(client, openai, newMember);
     }
 
     // ...existing code...
@@ -288,64 +292,76 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 });
 
 client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isButton()) return;
-
+  if (interaction.isButton()) {
     // Handle RSI verification button
     if (interaction.customId === 'verify_rsi') {
-        await handleVerifyButtonInteraction(interaction);
-        return;
+      await handleVerifyButtonInteraction(interaction);
+      return;
     }
 
     // Handle Join as Member/Guest buttons
     if (interaction.customId === 'join_member' || interaction.customId === 'join_guest') {
-        await handleJoinButtonInteraction(interaction, client, openai);
-        return;
+      await handleJoinButtonInteraction(interaction, client, openai);
+      return;
     }
 
-    // Only allow in specific event channels
-    const allowedChannels = [
-        process.env.LIVE_ENVIRONMENT === "true" ? process.env.EVENTS_PUBLIC_CHANNEL : process.env.TEST_EVENTS_PUBLIC_CHANNEL,
-        process.env.LIVE_ENVIRONMENT === "true" ? process.env.EVENTS_PROSPECT_CHANNEL : process.env.TEST_EVENTS_PROSPECT_CHANNEL,
-        process.env.LIVE_ENVIRONMENT === "true" ? process.env.EVENTS_CREW_CHANNEL : process.env.TEST_EVENTS_CREW_CHANNEL,
-        process.env.LIVE_ENVIRONMENT === "true" ? process.env.EVENTS_MARAUDER_CHANNEL : process.env.TEST_EVENTS_MARAUDER_CHANNEL,
-    ];
-    if (!allowedChannels.includes(interaction.channelId)) return;
-    // Parse customId in the format: type_scheduleId_buttonId_optName (e.g., rsvp_5267609524_11758094_Yes)
-    const match = interaction.customId.match(/^([^_]+)_([^_]+)_(.+)$/);
-    if (!match) return;
-
-    const type = match[1];
-    const scheduleId = match[2];
-    const optName = match[3];
-    const userId = interaction.user.id;
-
-    // Fetch the schedule
-    let schedule;
-    try {
-        schedule = await require('./api/scheduleApi').getScheduleById(scheduleId);
-    } catch (e) {
-        await interaction.reply({ content: 'Could not fetch event.', ephemeral: true });
-        return;
+    // Handle Handle Verification Modal button (user-specific)
+    if (interaction.customId.startsWith('open_handle_verification_modal_')) {
+      await showHandleVerificationModal(interaction);
+      return;
     }
-    if (!schedule) {
-        await interaction.reply({ content: 'Event not found.', ephemeral: true });
-        return;
-    }
+  }
 
-    // Call handleScheduleUpdate to update the embed/message and DB
-    try {
-        await require('./functions/update-schedule.js').handleScheduleUpdate(
-            client,
-            openai,
-            schedule,
-            userId,
-            optName
-        );
-        await interaction.reply({ content: `You have RSVP'd as "${optName}".`, ephemeral: true });
-    } catch (err) {
-        console.error('Failed to update RSVP:', err);
-        await interaction.reply({ content: 'Failed to update RSVP.', ephemeral: true });
-    }
+  // Modal submit handler
+  if (interaction.isModalSubmit() && interaction.customId === 'handle_verification_modal') {
+    await handleVerificationModalSubmit(interaction, client, openai);
+    return;
+  }
+
+  // Only allow in specific event channels for RSVP buttons
+  const allowedChannels = [
+    process.env.LIVE_ENVIRONMENT === "true" ? process.env.EVENTS_PUBLIC_CHANNEL : process.env.TEST_EVENTS_PUBLIC_CHANNEL,
+    process.env.LIVE_ENVIRONMENT === "true" ? process.env.EVENTS_PROSPECT_CHANNEL : process.env.TEST_EVENTS_PROSPECT_CHANNEL,
+    process.env.LIVE_ENVIRONMENT === "true" ? process.env.EVENTS_CREW_CHANNEL : process.env.TEST_EVENTS_CREW_CHANNEL,
+    process.env.LIVE_ENVIRONMENT === "true" ? process.env.EVENTS_MARAUDER_CHANNEL : process.env.TEST_EVENTS_MARAUDER_CHANNEL,
+  ];
+  if (!allowedChannels.includes(interaction.channelId)) return;
+  // Parse customId in the format: type_scheduleId_buttonId_optName (e.g., rsvp_5267609524_11758094_Yes)
+  const match = interaction.customId.match(/^([^_]+)_([^_]+)_(.+)$/);
+  if (!match) return;
+
+  const type = match[1];
+  const scheduleId = match[2];
+  const optName = match[3];
+  const userId = interaction.user.id;
+
+  // Fetch the schedule
+  let schedule;
+  try {
+    schedule = await require('./api/scheduleApi').getScheduleById(scheduleId);
+  } catch (e) {
+    await interaction.reply({ content: 'Could not fetch event.', ephemeral: true });
+    return;
+  }
+  if (!schedule) {
+    await interaction.reply({ content: 'Event not found.', ephemeral: true });
+    return;
+  }
+
+  // Call handleScheduleUpdate to update the embed/message and DB
+  try {
+    await require('./functions/update-schedule.js').handleScheduleUpdate(
+      client,
+      openai,
+      schedule,
+      userId,
+      optName
+    );
+    await interaction.reply({ content: `You have RSVP'd as "${optName}".`, ephemeral: true });
+  } catch (err) {
+    console.error('Failed to update RSVP:', err);
+    await interaction.reply({ content: 'Failed to update RSVP.', ephemeral: true });
+  }
 });
 
 // Error handling to prevent crashes
