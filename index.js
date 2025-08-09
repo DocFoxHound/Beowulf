@@ -190,9 +190,11 @@ client.on("ready", async () => {
 client.on("messageCreate", async (message) => {
   // Listen for DMs for verification
   if (message.channel.type === 1) { // ChannelType.DM
+    console.log("DM Detected")
     const dbUser = await getUserById(message.author.id);
     const newUserRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.NEW_USER_ROLE : process.env.TEST_NEW_USER_ROLE;
     if(dbUser.roles && dbUser.roles.includes(newUserRole)){
+      console.log("DM is proper")
       await handleDMVerificationResponse(message, client, openai, dbUser);
     }
     return;
