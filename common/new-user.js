@@ -12,14 +12,7 @@ async function handleNewGuildMember(member) {
     const logChannel = process.env.LIVE_ENVIRONMENT === "true" ? process.env.ENTRY_LOG_CHANNEL : process.env.TEST_ENTRY_LOG_CHANNEL;
     const newUserRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.NEW_USER_ROLE : process.env.TEST_NEW_USER_ROLE;
     const guild = getGuild(member.client);
-        // Assign newUserRole if not already present
-        if (!member.roles.cache.has(newUserRole)) {
-            try {
-                await member.roles.add(newUserRole);
-            } catch (roleErr) {
-                console.error("Error adding new user role: ", roleErr);
-            }
-        }
+    
     try {
         // Check if the user already exists in the database
         const user = await getUserById(member.user.id) || null;
@@ -38,8 +31,11 @@ async function handleNewGuildMember(member) {
             actionMsg = `User ${member.user.username} profile has been updated in the UserList.`;
 
             const friendlyPendingRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.FRIENDLY_PENDING_ROLE : process.env.TEST_FRIENDLY_ROLE;
+            const verifiedRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.VERIFIED_ROLE : process.env.TEST_VERIFIED_ROLE;
             try {
                 await member.roles.add(friendlyPendingRole);
+                await member.roles.remove(newUserRole);
+                await member.roles.add(verifiedRole);
             } catch (roleErr) {
                 console.error("Error adding friendly pending role: ", roleErr);
             }
@@ -56,6 +52,14 @@ async function handleNewGuildMember(member) {
                 joined_date: new Date().toISOString(),
             };
             result = await createUser(newUser);
+            // Assign newUserRole if not already present
+            if (!member.roles.cache.has(newUserRole)) {
+                try {
+                    await member.roles.add(newUserRole);
+                } catch (roleErr) {
+                    console.error("Error adding new user role: ", roleErr);
+                }
+            }
             actionMsg = `User ${member.user.username} has been successfully added to the UserList.`;
         }
 

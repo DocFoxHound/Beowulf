@@ -39,7 +39,7 @@ const { processLeaderboardLogs } = require('./functions/process-leaderboard-logs
 const { processOrgLeaderboards } = require('./functions/process-leaderboards.js');
 const { verifyUser } = require('./functions/verify-user.js');
 const { handleNewGuildMember } = require('./common/new-user.js');
-const { messageUserForHandle, showHandleVerificationModal, handleVerificationModalSubmit } = require("./common/inprocessing-verify-handle.js")
+const { sendHandleVerificationMessage, handleDMVerificationResponse, handleMemberOrGuestJoin } = require("./common/inprocessing-verify-handle.js");
 const { channelMessagesCheck } = require('./common/default-messages.js');
 // const { getPrestiges, getRaptorRank, getCorsairRank, getRaiderRank } = require("./userlist-functions/userlist-controller");
 
@@ -146,7 +146,6 @@ client.on("ready", async () => {
 
   preloadedDbTables = await preloadFromDb(); //leave on
   await refreshUserlist(client, openai) //actually leave this here
-  await channelMessagesCheck(client, openai)
   // await processPlayerLeaderboards(client, openai)
 
 
@@ -190,10 +189,13 @@ client.on("ready", async () => {
 }),
 
 client.on("messageCreate", async (message) => {
-  dbUser = await getUserById(message.author.id);
   // Listen for DMs for verification
-  if (message.channel.type === 1 && dbUser && !dbUser.verification_code) { // ChannelType.DM
-    await handleDMVerificationResponse(message, client, openai);
+  if (message.channel.type === 1) { // ChannelType.DM
+    const dbUser = await getUserById(message.author.id);
+    const newUserRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.NEW_USER_ROLE : process.env.TEST_NEW_USER_ROLE;
+    if(dbUser.roles && dbUser.roles.includes(newUserRole)){
+      await handleDMVerificationResponse(message, client, openai, dbUser);
+    }
     return;
   }
   if (!channelIds.includes(message.channelId) || !message.guild || message.system) {
@@ -255,10 +257,21 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 
     // Get the member's rank and prestige levels
     const memberRoles = newMember.roles.cache.map(role => role.id);
+    const verifiedRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.VERIFIED_ROLE : process.env.TEST_VERIFIED_ROLE;
+    const newUserRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.NEW_USER_ROLE : process.env.TEST_NEW_USER_ROLE;
     const userRank = await getUserRank(memberRoles);
 
     // Fetch prestige roles for level calculation
     const prestigeRanks = await getPrestigeRanks(memberRoles);
+
+    // Check if user gained the verifiedRole
+    const oldRoles = oldMember.roles.cache.map(role => role.id);
+    if (!oldRoles.includes(verifiedRole) && memberRoles.includes(verifiedRole) && memberRoles.includes(newUserRole)) {
+      // User just gained the verifiedRole
+      if (typeof sendHandleVerificationMessage === 'function') {
+        await sendHandleVerificationMessage(newMember, client, openai);
+      }
+    }
 
     // Initialize the updatedUser object
     const updatedUser = {
@@ -282,26 +295,17 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 
 client.on('interactionCreate', async (interaction) => {
   if (interaction.isButton()) {
-    // Handle Handle Verification Modal button (user-specific)
-    if (interaction.customId.startsWith('open_handle_verification_modal_')) {
-      await showHandleVerificationModal(interaction);
-      return;
-    }
-
-    // Modal submit handler
-    if (interaction.isModalSubmit() && interaction.customId === 'handle_verification_modal') {
-      await handleVerificationModalSubmit(interaction, client, openai);
-      return;
-    }
-
-    // Handle Join as Member/Guest buttons
+    // Handle DM verification buttons for join_member and join_guest
     if (interaction.customId === 'join_member' || interaction.customId === 'join_guest') {
-      await handleJoinButtonInteraction(interaction, client, openai);
+      try {
+        await handleMemberOrGuestJoin(interaction, client, openai);
+      } catch (err) {
+        console.error('Error handling member/guest join:', err);
+        await interaction.reply({ content: 'There was an error processing your request.', ephemeral: true });
+      }
       return;
     }
   }
-
-  
 
   // Only allow in specific event channels for RSVP buttons
   const allowedChannels = [
