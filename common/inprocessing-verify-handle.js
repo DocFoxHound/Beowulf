@@ -44,30 +44,25 @@ async function sendHandleVerificationMessage(newMember, client, openai) {
 
 async function handleDMVerificationResponse(message, client, openai, dbUser) {
     // Debug: entry log
-    console.log('[handleDMVerificationResponse] Called with:', { message, dbUserId: dbUser.id, verificationBlocked: blockedVerificationUsers[dbUser.id] });
     // Block further attempts if user is blocked
     if (blockedVerificationUsers[dbUser.id]) {
-        console.log('[handleDMVerificationResponse] User is blocked:', dbUser.id);
         // Optionally reply, or just ignore
         return;
     }
     let handle;
     const guild = getGuild(client);
-    // Check if message is a URL
-    if (typeof message === 'string' && message.startsWith('http')) {
-        // Extract last part of URL as handle
+    let msgContent = typeof message === 'string' ? message : message.content;
+    // Check if msgContent is a URL
+    if (msgContent.startsWith('http')) {
         try {
-            const urlParts = message.split('/');
+            const urlParts = msgContent.split('/');
             handle = urlParts[urlParts.length - 1] || urlParts[urlParts.length - 2];
-            console.log('[handleDMVerificationResponse] Extracted handle from URL:', handle);
         } catch (e) {
             console.error('Error extracting handle from URL:', e);
-            handle = message;
+            handle = msgContent;
         }
     } else {
-        // Message is just the handle
-        handle = message;
-        console.log('[handleDMVerificationResponse] Using message as handle:', handle);
+        handle = msgContent;
     }
 
     // Track attempts
@@ -75,17 +70,14 @@ async function handleDMVerificationResponse(message, client, openai, dbUser) {
         verificationAttempts[dbUser.id] = 0;
     }
     verificationAttempts[dbUser.id]++;
-    console.log('[handleDMVerificationResponse] Attempt number:', verificationAttempts[dbUser.id]);
 
     // Fetch RSI profile HTML
     const profileUrl = `https://robertsspaceindustries.com/en/citizens/${handle}`;
     let html = '';
     try {
         const fetch = require('node-fetch');
-        console.log('[handleDMVerificationResponse] Fetching profile URL:', profileUrl);
         const response = await fetch(profileUrl);
         html = await response.text();
-        console.log('[handleDMVerificationResponse] Fetched HTML length:', html.length);
     } catch (err) {
         console.error('Failed to fetch RSI profile:', err);
         await message.reply('Failed to fetch RSI profile. Please check your handle and try again.');
@@ -94,7 +86,6 @@ async function handleDMVerificationResponse(message, client, openai, dbUser) {
 
     // Check for verification code in HTML
     const codeFound = html.includes(dbUser.verification_code);
-    console.log('[handleDMVerificationResponse] Verification code found:', codeFound);
 
     if (codeFound) {
         // 1. Extract orgSID from HTML
@@ -105,9 +96,7 @@ async function handleDMVerificationResponse(message, client, openai, dbUser) {
             const sidMatch = html.match(sidLabelRegex);
             if (sidMatch && sidMatch[1]) {
                 orgSID = sidMatch[1].trim();
-                console.log('[handleDMVerificationResponse] Extracted orgSID:', orgSID);
             } else {
-                console.log('[handleDMVerificationResponse] orgSID not found in HTML');
             }
         } catch (e) {
             console.error('Error extracting orgSID:', e);
@@ -120,7 +109,6 @@ async function handleDMVerificationResponse(message, client, openai, dbUser) {
             if (orgSID) {
                 newNick = `[${orgSID}] ${handle}`;
             }
-            console.log('[handleDMVerificationResponse] Setting nickname:', newNick);
             await member.setNickname(newNick).catch(e => console.error('Error setting nickname:', e));
         } catch (e) {
             console.error('Error setting nickname after verification:', e);
@@ -142,14 +130,11 @@ async function handleDMVerificationResponse(message, client, openai, dbUser) {
             components: [row]
         });
         verificationAttempts[dbUser.id] = 0; // Reset attempts on success
-        console.log('[handleDMVerificationResponse] Verification success, attempts reset.');
     } else {
         // Failure: check attempts
-        console.log('[handleDMVerificationResponse] Verification failed, attempt:', verificationAttempts[dbUser.id]);
         if (verificationAttempts[dbUser.id] >= 3) {
             await message.reply('Verification failed 3 times. Please contact DocHound for assistance.');
             blockedVerificationUsers[dbUser.id] = true;
-            console.log('[handleDMVerificationResponse] User blocked after 3 failed attempts:', dbUser.id);
         } else {
             await message.reply('Verification check failed. Please re-check your RSI handle and verification code, then try again.');
         }
@@ -179,7 +164,7 @@ async function handleMemberOrGuestJoin(interaction, client, openai) {
         if(interaction.customId === 'join_member'){
             try{
                 await member.roles.add(memberPendingRole);
-                notifyJoinMemberWelcome(dbUser, openai, client);
+                notifyJoinMemberWelcome(dbUser, openai, client, guild);
             } catch (error) {
                 console.error('Error adding member role:', error);
             }
@@ -187,7 +172,7 @@ async function handleMemberOrGuestJoin(interaction, client, openai) {
         if(interaction.customId === 'join_guest'){
             try{
                 await member.roles.add(friendlyPendingRole);
-                notifyJoinGuestWelcome(dbUser, openai, client);
+                notifyJoinGuestWelcome(dbUser, openai, client, guild);
             } catch (error) {
                 console.error('Error adding guest role:', error);
             }

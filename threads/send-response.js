@@ -33,16 +33,25 @@ async function sendMessage(channelId, message, client) {
     }
 }
 
-async function sendMessageNotifySubject(channelId, userId, message, client) {
+async function sendMessageNotifySubject(channelId, userId, message, client, guild) {
     console.log("Sending message with user mention")
-    const channel = client.channels.cache.get(channelId);
+    let channel;
     const userMention = `<@${userId}>`;
     const messageWithMention = `${userMention} ${message}`;
-    try{
+    try {
+        channel = client.channels.cache.get(channelId);
         await channel.send(messageWithMention);
-    }catch(error){
-        console.error("Error running the thread: ", error);
-        await channel.send("Sorry, there was an error processing your request.");
+    } catch (error) {
+        console.error("Error sending message with client.channels.cache: ", error);
+        try {
+            channel = guild.channels.cache.get(channelId);
+            await channel.send(messageWithMention);
+        } catch (guildError) {
+            console.error("Error sending message with guild.channels.cache: ", guildError);
+            if (channel) {
+                await channel.send("Sorry, there was an error processing your request.");
+            }
+        }
     }
 }
 
