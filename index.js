@@ -40,7 +40,7 @@ const { processOrgLeaderboards } = require('./functions/process-leaderboards.js'
 const { verifyUser } = require('./functions/verify-user.js');
 const { handleNewGuildMember } = require('./common/new-user.js');
 const { messageUserForHandle, showHandleVerificationModal, handleVerificationModalSubmit } = require("./common/inprocessing-verify-handle.js")
-
+const { channelMessagesCheck } = require('./common/default-messages.js');
 // const { getPrestiges, getRaptorRank, getCorsairRank, getRaiderRank } = require("./userlist-functions/userlist-controller");
 
 // Initialize dotenv config file
@@ -146,6 +146,7 @@ client.on("ready", async () => {
 
   preloadedDbTables = await preloadFromDb(); //leave on
   await refreshUserlist(client, openai) //actually leave this here
+  await channelMessagesCheck(client, openai)
   // await processPlayerLeaderboards(client, openai)
 
 

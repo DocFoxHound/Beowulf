@@ -14,10 +14,22 @@ function getGuild(client) {
 
 async function messageUserForHandle(client, openai, member) {
     const joinIronPointChannel = process.env.LIVE_ENVIRONMENT === "true" ? process.env.JOIN_IRONPOINT_CHANNEL : process.env.TEST_GENERAL_CHANNEL;
+    const newUserRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.NEW_USER_ROLE : process.env.TEST_NEW_USER_ROLE;
     const channel = await client.channels.fetch(joinIronPointChannel);
     if (!channel) {
         console.error('Could not find joinIronPointChannel:', joinIronPointChannel);
         return;
+    }
+
+    // Remove newUserRole from the user
+    try {
+        const guild = getGuild(client);
+        const memberObj = guild.members.cache.get(member.id);
+        if (memberObj && memberObj.roles.cache.has(newUserRole)) {
+            await memberObj.roles.remove(newUserRole);
+        }
+    } catch (err) {
+        console.error('Error removing newUserRole:', err);
     }
 
     // Create button to open modal, customId includes user ID
