@@ -38,19 +38,34 @@ async function sendMessageNotifySubject(channelId, userId, message, client, guil
     let channel;
     const userMention = `<@${userId}>`;
     const messageWithMention = `${userMention} ${message}`;
-    try {
-        channel = client.channels.cache.get(channelId);
-        await channel.send(messageWithMention);
-    } catch (error) {
-        console.error("Error sending message with client.channels.cache: ", error);
+    channel = client.channels.cache.get(channelId);
+    if (channel) {
         try {
-            channel = guild.channels.cache.get(channelId);
             await channel.send(messageWithMention);
-        } catch (guildError) {
-            console.error("Error sending message with guild.channels.cache: ", guildError);
-            if (channel) {
-                await channel.send("Sorry, there was an error processing your request.");
+        } catch (error) {
+            console.error("Error sending message with client.channels.cache: ", error);
+            try {
+                channel = guild.channels.cache.get(channelId);
+                if (channel) {
+                    await channel.send(messageWithMention);
+                } else {
+                    console.error(`Channel with ID ${channelId} not found in guild.channels.cache.`);
+                }
+            } catch (guildError) {
+                console.error("Error sending message with guild.channels.cache: ", guildError);
             }
+        }
+    } else {
+        console.error(`Channel with ID ${channelId} not found in client.channels.cache.`);
+        channel = guild.channels.cache.get(channelId);
+        if (channel) {
+            try {
+                await channel.send(messageWithMention);
+            } catch (guildError) {
+                console.error("Error sending message with guild.channels.cache: ", guildError);
+            }
+        } else {
+            console.error(`Channel with ID ${channelId} not found in guild.channels.cache.`);
         }
     }
 }
