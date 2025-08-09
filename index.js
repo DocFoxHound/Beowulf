@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, Collection, Events } = require("discord.js");
+const { Client, GatewayIntentBits, Collection, Events, ChannelType } = require("discord.js");
 const dotenv = require("dotenv");
 const { OpenAI } = require("openai");
 const fs = require('node:fs');
@@ -65,6 +65,7 @@ const client = new Client({
     GatewayIntentBits.GuildPresences,
     GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.GuildEmojisAndStickers,
+    GatewayIntentBits.DirectMessages, // Added intent for DMs
   ],
 });
 
@@ -188,8 +189,10 @@ client.on("ready", async () => {
 }),
 
 client.on("messageCreate", async (message) => {
+  // Debug: log channel type for every message
+  console.log("message.channel.type:", message.channel.type);
   // Listen for DMs for verification
-  if (message.channel.type === 1) { // ChannelType.DM
+  if (message.channel.type === ChannelType.DM) {
     console.log("DM Detected")
     const dbUser = await getUserById(message.author.id);
     const newUserRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.NEW_USER_ROLE : process.env.TEST_NEW_USER_ROLE;
