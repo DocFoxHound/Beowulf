@@ -40,7 +40,6 @@ const { processOrgLeaderboards } = require('./functions/process-leaderboards.js'
 const { verifyUser } = require('./functions/verify-user.js');
 const { handleNewGuildMember } = require('./common/new-user.js');
 const { sendHandleVerificationMessage, handleDMVerificationResponse, handleMemberOrGuestJoin } = require("./common/inprocessing-verify-handle.js");
-const { channelMessagesCheck } = require('./common/default-messages.js');
 // const { getPrestiges, getRaptorRank, getCorsairRank, getRaiderRank } = require("./userlist-functions/userlist-controller");
 
 // Initialize dotenv config file
