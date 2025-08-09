@@ -249,6 +249,7 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 
     // Detect if VERIFIED_ROLE was added
     if (!oldRoles.includes(VERIFIED_ROLE) && newRoles.includes(VERIFIED_ROLE)) {
+      console.log("Verified")
       await verifyHandle(client, openai);
     }
 

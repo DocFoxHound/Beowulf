@@ -12,6 +12,7 @@ function getGuild(client) {
 }
 
 async function verifyHandle(client, openai){
+    console.log("Getting Handle")
      // Send DM with Verify button
     const verifyButton = new ButtonBuilder()
         .setCustomId('verify_rsi')
