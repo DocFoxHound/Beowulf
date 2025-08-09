@@ -18,7 +18,6 @@ const { loadChatlogs } = require("./vector-handling/vector-handler.js");
 const { trimChatLogs } = require("./vector-handling/vector-handler.js");
 const { checkRecentGatherings } = require("./common/recent-gatherings.js");
 const bodyParser = require('body-parser');
-
 const { handleHitPost } = require('./functions/post-new-hit.js');
 const { handleHitPostDelete } = require('./functions/post-delete-hit.js');
 const { handleFleetLogPost } = require('./functions/post-new-fleet-log.js');
@@ -43,12 +42,6 @@ const { handleNewGuildMember } = require('./common/new-user.js');
 const { messageUserForHandle, showHandleVerificationModal, handleVerificationModalSubmit } = require("./common/inprocessing-verify-handle.js")
 const { channelMessagesCheck } = require('./common/default-messages.js');
 // const { getPrestiges, getRaptorRank, getCorsairRank, getRaiderRank } = require("./userlist-functions/userlist-controller");
-
-
-const express = require('express');
-const app = express();
-app.use(bodyParser.json());
-app.use(express.json());
 
 // Initialize dotenv config file
 const args = process.argv.slice(2);
@@ -362,105 +355,113 @@ client.on("error", (e) => {
 });
 
 // Attempt to auto-reconnect on disconnection
+client.on("disconnect", () => {
+  console.log("Disconnected! Trying to reconnect...");
+  client.login(process.env.LIVE_ENVIRONMENT === "true" ? process.env.CLIENT_TOKEN : process.env.TEST_CLIENT_TOKEN);
+});
 
-client.on('interactionCreate', async (interaction) => {
-  // Handle chat input commands
-  if (interaction.isChatInputCommand()) {
-    const command = interaction.client.commands.get(interaction.commandName);
-    if (!command) {
-      console.error(`No command matching ${interaction.commandName} was found.`);
-      return;
-    }
-    try {
-      await command.execute(interaction, client, openai);
-    } catch (error) {
-      console.error(error);
-    }
-    return;
+//logs the bot in
+client.login(process.env.LIVE_ENVIRONMENT === "true" ? process.env.CLIENT_TOKEN : process.env.TEST_CLIENT_TOKEN);
+
+const express = require('express');
+const app = express();
+app.use(bodyParser.json());
+app.use(express.json());
+// Expose /hittrack endpoint for API to POST new HitTrack objects
+app.post('/hittrackcreate', async (req, res) => {
+  try {
+    const hitTrack = req.body;
+    // You can add validation here if needed
+    await handleHitPost(client, openai, hitTrack);
+
+    res.status(200).json({ message: 'HitTrack received by Discord bot.' });
+  } catch (error) {
+    console.error('Error handling /hittrack:', error);
+    res.status(500).json({ error: 'Failed to process HitTrack.' });
   }
+});
 
-  // Handle autocomplete
-  if (interaction.isAutocomplete()) {
-    const command = interaction.client.commands.get(interaction.commandName);
-    if (!command) {
-      console.error(`No command matching ${interaction.commandName} was found.`);
-      return;
-    }
-    try {
-      await command.autocomplete(interaction, client, openai);
-    } catch (error) {
-      console.error(error);
-    }
-    return;
+// Expose /hittrack endpoint for API to POST new HitTrack objects
+app.post('/hittrackdelete', async (req, res) => {
+  try {
+    const hitTrack = req.body;
+    // You can add validation here if needed
+    await handleHitPostDelete(client, openai, hitTrack);
+
+    res.status(200).json({ message: 'HitTrackdelete received by Discord bot.' });
+  } catch (error) {
+    console.error('Error handling /hittrackdelete:', error);
+    res.status(500).json({ error: 'Failed to process HitTrackdelete.' });
   }
+});
 
-  // Handle buttons and modals
-  if (interaction.isButton()) {
-    // Handle Handle Verification Modal button (user-specific)
-    if (interaction.customId.startsWith('open_handle_verification_modal_')) {
-      // Only call showModal, do not reply/defer before this
-      await showHandleVerificationModal(interaction);
-      return;
-    }
-    // Handle Join as Member/Guest buttons
-    if (interaction.customId === 'join_member' || interaction.customId === 'join_guest') {
-      await handleJoinButtonInteraction(interaction, client, openai);
-      return;
-    }
+// Expose /fleetlog endpoint for API to POST new ShipLog objects
+app.post('/fleetlog', async (req, res) => {
+  try {
+    const shipLog = req.body;
+    // You can add validation here if needed
+    await handleFleetLogPost(client, openai, shipLog);
+
+    res.status(200).json({ message: 'FleetLog received by Discord bot.' });
+  } catch (error) {
+    console.error('Error handling /fleetlog:', error);
+    res.status(500).json({ error: 'Failed to process FleetLog.' });
   }
+});
 
-  // Handle modal submit
-  if (interaction.isModalSubmit() && interaction.customId === 'handle_verification_modal') {
-    await handleVerificationModalSubmit(interaction, client, openai);
-    return;
+// Expose /fleetcreated endpoint for API to POST new Fleet objects
+app.post('/fleetcreated', async (req, res) => {
+  try {
+    const fleet = req.body;
+    // You can add Discord notification logic here if needed, e.g. send to a channel
+    await handleFleetCreatePost(client, openai, fleet);
+
+    res.status(200).json({ message: 'Fleet creation received by Discord bot.' });
+  } catch (error) {
+    console.error('Error handling /fleetcreated:', error);
+    res.status(500).json({ error: 'Failed to process fleet creation.' });
   }
+});
 
-  // Only allow in specific event channels for RSVP buttons
-  if (interaction.isButton() && interaction.customId.startsWith('rsvp_')) {
-    const allowedChannels = [
-      process.env.LIVE_ENVIRONMENT === "true" ? process.env.EVENTS_PUBLIC_CHANNEL : process.env.TEST_EVENTS_PUBLIC_CHANNEL,
-      process.env.LIVE_ENVIRONMENT === "true" ? process.env.EVENTS_PROSPECT_CHANNEL : process.env.TEST_EVENTS_PROSPECT_CHANNEL,
-      process.env.LIVE_ENVIRONMENT === "true" ? process.env.EVENTS_CREW_CHANNEL : process.env.TEST_EVENTS_CREW_CHANNEL,
-      process.env.LIVE_ENVIRONMENT === "true" ? process.env.EVENTS_MARAUDER_CHANNEL : process.env.TEST_EVENTS_MARAUDER_CHANNEL,
-    ];
-    if (!allowedChannels.includes(interaction.channelId)) return;
-    // Parse customId in the format: type_scheduleId_buttonId_optName (e.g., rsvp_5267609524_11758094_Yes)
-    const match = interaction.customId.match(/^([^_]+)_([^_]+)_(.+)$/);
-    if (!match) return;
+// Expose /createschedule endpoint for API to POST new Fleet objects
+app.post('/createschedule', async (req, res) => {
+  try {
+    const schedule = req.body;
+    // You can add Discord notification logic here if needed, e.g. send to a channel
+    await handleScheduleCreate(client, openai, schedule);
 
-    const type = match[1];
-    const scheduleId = match[2];
-    const optName = match[3];
-    const userId = interaction.user.id;
+    res.status(200).json({ message: 'Schedule creation received by Discord bot.' });
+  } catch (error) {
+    console.error('Error handling /createschedule:', error);
+    res.status(500).json({ error: 'Failed to process schedule creation.' });
+  }
+});
 
-    // Fetch the schedule
-    let schedule;
-    try {
-      schedule = await require('./api/scheduleApi').getScheduleById(scheduleId);
-    } catch (e) {
-      await interaction.reply({ content: 'Could not fetch event.', ephemeral: true });
-      return;
-    }
-    if (!schedule) {
-      await interaction.reply({ content: 'Event not found.', ephemeral: true });
-      return;
-    }
+// Expose /createschedule endpoint for API to POST new Fleet objects
+app.post('/updateschedule', async (req, res) => {
+  try {
+    const schedule = req.body;
+    // You can add Discord notification logic here if needed, e.g. send to a channel
+    await handleScheduleUpdate(client, openai, schedule);
 
-    // Call handleScheduleUpdate to update the embed/message and DB
-    try {
-      await require('./functions/update-schedule.js').handleScheduleUpdate(
-        client,
-        openai,
-        schedule,
-        userId,
-        optName
-      );
-      await interaction.reply({ content: `You have RSVP'd as "${optName}".`, ephemeral: true });
-    } catch (err) {
-      console.error('Failed to update RSVP:', err);
-      await interaction.reply({ content: 'Failed to update RSVP.', ephemeral: true });
-    }
-    return;
+    res.status(200).json({ message: 'Schedule update received by Discord bot.' });
+  } catch (error) {
+    console.error('Error handling /updateschedule:', error);
+    res.status(500).json({ error: 'Failed to process schedule update.' });
+  }
+});
+
+// Expose /createschedule endpoint for API to POST new Fleet objects
+app.post('/fleetcommanderchange', async (req, res) => {
+  try {
+    const fleet = req.body;
+    // You can add Discord notification logic here if needed, e.g. send to a channel
+    await handleFleetCommanderChange(client, openai, fleet);
+
+    res.status(200).json({ message: 'Commander update received by Discord bot.' });
+  } catch (error) {
+    console.error('Error handling /fleetcommanderchange:', error);
+    res.status(500).json({ error: 'Failed to process fleet command updates.' });
   }
 });
 
