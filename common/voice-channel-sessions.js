@@ -14,7 +14,7 @@ async function voiceChannelSessions(client, openai) {
             return [];
         }
         await guild.channels.fetch();
-        await guild.members.fetch();
+        // await guild.members.fetch();
 
         // Use voiceStates for accurate membership
         const voiceStates = guild.voiceStates.cache;
