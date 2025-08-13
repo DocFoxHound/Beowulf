@@ -230,15 +230,15 @@ async function handleSimpleJoin(interaction, client, openai){
     // Create embed with avatar, title, and welcome message
     const avatarUrl = interaction.user.displayAvatarURL();
     const embed = new EmbedBuilder()
-        .setTitle(`<@${userId}>, welcome to IronPoint!`)
+        .setTitle(`${dbUser.username}, welcome to IronPoint!`)
         .setDescription(returnedMessage)
         .setThumbnail(avatarUrl)
         .setColor(0x3498db);
     // Send embed to channel, ping bloodedToNotify role in message content
     const channel = guild.channels.cache.get(channelToNotify);
-    const pingBlooded = `<@&${bloodedToNotify}>`;
+    const ping = `<@&${bloodedToNotify}> <@${userId}>`;
     if (channel) {
-        await channel.send({ content: pingBlooded, embeds: [embed] });
+        await channel.send({ content: ping, embeds: [embed] });
     } else {
         console.error('Welcome channel not found:', channelToNotify);
     }
@@ -276,7 +276,7 @@ async function handleSimpleWelcomeProspect(interaction, client, openai){
     // Create embed with avatar, title, and welcome message
     const avatarUrl = interaction.user.displayAvatarURL();
     const embed = new EmbedBuilder()
-        .setTitle(`Welcome, <@${userId}>, our newest PROSPECT!`)
+        .setTitle(`Welcome, ${dbUser.username}, our newest PROSPECT!`)
         .setDescription(returnedMessage)
         .setThumbnail(avatarUrl)
         .setColor(0x3498db)
@@ -289,7 +289,7 @@ async function handleSimpleWelcomeProspect(interaction, client, openai){
     // Send embed to channel
     const channel = guild.channels.cache.get(channelToNotify);
     if (channel) {
-        await channel.send({ embeds: [embed] });
+        await channel.send({ content: `<@${userId}>`, embeds: [embed] });
     } else {
         console.error('Welcome channel not found:', channelToNotify);
     }
@@ -327,7 +327,7 @@ async function handleSimpleWelcomeGuest(interaction, client, openai){
     // Create embed with avatar, title, and welcome message
     const avatarUrl = interaction.user.displayAvatarURL();
     const embed = new EmbedBuilder()
-        .setTitle(`Welcome, <@${userId}>, our newest Guest!`)
+        .setTitle(`Welcome, ${dbUser.username}, our newest Guest!`)
         .setDescription(returnedMessage)
         .setThumbnail(avatarUrl)
         .setColor(0x3498db)
@@ -339,7 +339,7 @@ async function handleSimpleWelcomeGuest(interaction, client, openai){
     // Send embed to channel
     const channel = guild.channels.cache.get(channelToNotify);
     if (channel) {
-        await channel.send({ embeds: [embed] });
+        await channel.send({ content: `<@${userId}>`, embeds: [embed] });
     } else {
         console.error('Welcome channel not found:', channelToNotify);
     }
