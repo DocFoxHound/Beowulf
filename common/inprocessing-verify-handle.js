@@ -219,7 +219,7 @@ async function handleSimpleJoin(interaction, client, openai){
     }
 
     // Create welcome message
-    const messageToBot = `Welcome ${userData.username} to IronPoint, the best Pirate crew in Star Citizen. Explain that we expect skill and creativity, as they're both needed to dominate. Ask if ${userData.username} is here to join as a member or as a guest, and what organization they belong to.`;
+    const messageToBot = `Welcome ${dbUser.username} to IronPoint, the best Pirate crew in Star Citizen. Explain that we expect skill and creativity, as they're both needed to dominate. Ask if ${dbUser.username} is here to join as a member or as a guest, and what organization they belong to.`;
     let returnedMessage = "";
     try{
         returnedMessage = await notifyWelcomeForEmbed(dbUser, openai, client, messageToBot);
@@ -265,7 +265,7 @@ async function handleSimpleWelcomeProspect(interaction, client, openai){
         console.error('Error removing newUserRole:', error);
     }
     // Create welcome message
-    const messageToBot = `Congratulate ${userData.username} on joining as a PROSPECT. Let them know they need to now prove themselves to become part of the Crew. Explain that they'll have to learn pirate skills and dogfighting to excel, but most importantly they need to learn how to work as a team member. Explain that Piracy is the most challenging and rewarding activity in StarCitizen, and that they're contributions to the crew's success will be crucial.`;
+    const messageToBot = `Congratulate ${dbUser.username} on joining as a PROSPECT. Let them know they need to now prove themselves to become part of the Crew. Explain that they'll have to learn pirate skills and dogfighting to excel, but most importantly they need to learn how to work as a team member. Explain that Piracy is the most challenging and rewarding activity in StarCitizen, and that they're contributions to the crew's success will be crucial.`;
     let returnedMessage = "";
     try{
         returnedMessage = await notifyWelcomeForEmbed(dbUser, openai, client, messageToBot);
@@ -316,7 +316,7 @@ async function handleSimpleWelcomeGuest(interaction, client, openai){
         console.error('Error removing newUserRole:', error);
     }
     // Create welcome message
-    const messageToBot = `Welcome ${userData.username} as a Guest of IronPoint. Let them know that they're free to join in on the action whenever they feel like it, but to respect our rules. Tell them if they'd like to join, to please let DocHound or any of the Blooded members know.`;
+    const messageToBot = `Welcome ${dbUser.username} as a Guest of IronPoint. Let them know that they're free to join in on the action whenever they feel like it, but to respect our rules. Tell them if they'd like to join, to please let DocHound or any of the Blooded members know.`;
     let returnedMessage = "";
     try{
         returnedMessage = await notifyWelcomeForEmbed(dbUser, openai, client, messageToBot);

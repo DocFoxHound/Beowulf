@@ -159,8 +159,8 @@ async function voiceChannelSessions(client, openai) {
                 //     };
                 //     checkRecentGatherings(client, openai, session, users);
                 // }
-                // If 1 or more users, call checkRecentGatherings
-                if (users.length >= 1) {
+                // If 3 or more users, call checkRecentGatherings
+                if (users.length >= 3) {
                     const session = {
                         channelId: channel.id,
                         channelName: channel.name,
