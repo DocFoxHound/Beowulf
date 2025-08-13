@@ -143,6 +143,24 @@ async function editBlackBox(BlackBoxId, updatedBlackBoxData) {
     }
 }
 
+// Retrieve a user's blackboxes between two timestamps
+async function getUserBlackBoxesBetweenTimestamps({ user_id, start_timestamp, end_timestamp }) {
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_BLACKBOX}/userkillsbetween`;
+    try {
+        const response = await axios.get(apiUrl, {
+            params: {
+                user_id,
+                start_timestamp,
+                end_timestamp
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching user blackboxes between timestamps:', error.response ? error.response.data : error.message);
+        return null;
+    }
+}
+
 async function deleteBlackBox(id) {
     console.log("Deleting BlackBox")
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_BLACKBOX}/${id}`; 
@@ -169,5 +187,6 @@ module.exports = {
     getBlackBoxesByUserAndPatch,
     getAssistantBlackBoxes,
     getAssistantBlackBoxesByUserAndPatch,
-    getBlackBoxByEntryId
+    getBlackBoxByEntryId,
+    getUserBlackBoxesBetweenTimestamps
 };

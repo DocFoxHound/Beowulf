@@ -126,6 +126,17 @@ async function notifyJoinGuestWelcome(userData, openai, client) {
     }
 }
 
+//this doesn't ping a channel but returns a statement to use in an embed.
+async function notifyWelcomeForEmbed(userData, openai, client, messageToBot){
+    const thread = await createNewThread(openai);
+    await addMessageToThread(thread, openai, messageToBot, false);
+    let run = await runThreadForQueueNotify(thread, openai, true);
+    if (run.status === "completed") {
+        const formattedResponse = await formatResponseForQueueCheck(run.thread_id, openai);
+        return formattedResponse;
+    }
+}
+
 module.exports = {
     notifyRemovalFromQueue,
     notifyPrestigePromotion,
@@ -133,5 +144,6 @@ module.exports = {
     notifyForAward,
     notifyRejoinWelcome,
     notifyJoinMemberWelcome,
-    notifyJoinGuestWelcome
+    notifyJoinGuestWelcome,
+    notifyWelcomeForEmbed
 }

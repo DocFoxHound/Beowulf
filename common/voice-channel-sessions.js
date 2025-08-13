@@ -3,6 +3,7 @@ const fs = require("node:fs");
 const { updateVoiceSession, createVoiceSession, getAllActiveVoiceSessions } = require("../api/voiceChannelSessionsApi");
 const { ChannelType } = require("discord.js");
 const { checkRecentGatherings } = require("./recent-gatherings.js");
+const { checkRecentFleets } = require("./recent-fleets.js")
 
 
 async function voiceChannelSessions(client, openai) {
@@ -150,13 +151,23 @@ async function voiceChannelSessions(client, openai) {
         guild.channels.cache.filter(c => c.type === ChannelType.GuildVoice).forEach(channel => {
             const users = channelUserMap[channel.id] || [];
                 // If 3 or more users, call checkRecentGatherings
-                if (users.length >= 3) {
+                // if (users.length >= 3) {
+                //     const session = {
+                //         channelId: channel.id,
+                //         channelName: channel.name,
+                //         userIds: users
+                //     };
+                //     checkRecentGatherings(client, openai, session, users);
+                // }
+                // If 1 or more users, call checkRecentGatherings
+                if (users.length >= 1) {
                     const session = {
                         channelId: channel.id,
                         channelName: channel.name,
                         userIds: users
                     };
-                    checkRecentGatherings(client, openai, session, users);
+                    // checkRecentGatherings(client, openai, session, users);
+                    checkRecentFleets(client, openai, session, users);
                 }
         });
     } catch (error) {

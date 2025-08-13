@@ -39,7 +39,8 @@ const { processLeaderboardLogs } = require('./functions/process-leaderboard-logs
 const { processOrgLeaderboards } = require('./functions/process-leaderboards.js');
 const { verifyUser } = require('./functions/verify-user.js');
 const { handleNewGuildMember } = require('./common/new-user.js');
-const { sendHandleVerificationMessage, handleDMVerificationResponse, handleMemberOrGuestJoin } = require("./common/inprocessing-verify-handle.js");
+const { handleSimpleWelcomeProspect, handleSimpleWelcomeGuest, handleSimpleJoin } = require("./common/inprocessing-verify-handle.js");
+const { checkRecentFleets, manageRecentFleets } = require('./common/recent-fleets.js');
 // const { getPrestiges, getRaptorRank, getCorsairRank, getRaiderRank } = require("./userlist-functions/userlist-controller");
 
 // Initialize dotenv config file
@@ -170,12 +171,13 @@ client.on("ready", async () => {
     setInterval(() => voiceChannelSessions(client, openai),
     60000 //every 1 minute
   );
+  //   setInterval(() => manageRecentFleets(client, openai),
+  //   60000 //every 1 minute
+  //   // 300000 //every 5 minutes
+  // );
   setInterval(() => trimChatLogs(),
     43200000 //every 12 hours
   );
-  // setInterval(() => checkRecentGatherings(client, openai),
-  //   300000 //every 5 minutes
-  // );
   setInterval(() => manageEvents(client, openai),
     300000 // every 5 minutes
   );
@@ -190,14 +192,14 @@ client.on("ready", async () => {
 
 client.on("messageCreate", async (message) => {
   // Listen for DMs for verification
-  if (message.channel.type === ChannelType.DM) {
-    const dbUser = await getUserById(message.author.id);
-    const newUserRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.NEW_USER_ROLE : process.env.TEST_NEW_USER_ROLE;
-    if(dbUser.roles && dbUser.roles.includes(newUserRole)){
-      await handleDMVerificationResponse(message, client, openai, dbUser);
-    }
-    return;
-  }
+  // if (message.channel.type === ChannelType.DM) {
+  //   const dbUser = await getUserById(message.author.id);
+  //   const newUserRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.NEW_USER_ROLE : process.env.TEST_NEW_USER_ROLE;
+  //   if(dbUser.roles && dbUser.roles.includes(newUserRole)){
+  //     await handleDMVerificationResponse(message, client, openai, dbUser);
+  //   }
+  //   return;
+  // }
   if (!channelIds.includes(message.channelId) || !message.guild || message.system) {
     return;
   }
@@ -259,6 +261,8 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 
     // Get the member's rank and prestige levels
     const memberRoles = newMember.roles.cache.map(role => role.id);
+    const prospectRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.PROSPECT_ROLE : process.env.TEST_PROSPECT_ROLE;
+    const friendlyRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.FRIENDLY_ROLE : process.env.TEST_FRIENDLY_ROLE;
     const verifiedRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.VERIFIED_ROLE : process.env.TEST_VERIFIED_ROLE;
     const newUserRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.NEW_USER_ROLE : process.env.TEST_NEW_USER_ROLE;
     const userRank = await getUserRank(memberRoles);
@@ -270,9 +274,15 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
     const oldRoles = oldMember.roles.cache.map(role => role.id);
     if (!oldRoles.includes(verifiedRole) && memberRoles.includes(verifiedRole) && memberRoles.includes(newUserRole)) {
       // User just gained the verifiedRole
-      if (typeof sendHandleVerificationMessage === 'function') {
-        await sendHandleVerificationMessage(newMember, client, openai);
-      }
+      await handleSimpleJoin(newMember, client, openai);
+    }
+    if (!oldRoles.includes(prospectRole) && memberRoles.includes(prospectRole) && memberRoles.includes(newUserRole)) {
+      // User just gained the prospectRole
+      await handleSimpleWelcomeProspect(newMember, client, openai);
+    }
+    if (!oldRoles.includes(friendlyRole) && memberRoles.includes(friendlyRole) && memberRoles.includes(newUserRole)) {
+      // User just gained the prospectRole
+      await handleSimpleWelcomeGuest(newMember, client, openai);
     }
 
     // Initialize the updatedUser object
@@ -298,15 +308,15 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 client.on('interactionCreate', async (interaction) => {
   if (interaction.isButton()) {
     // Handle DM verification buttons for join_member and join_guest
-    if (interaction.customId === 'join_member' || interaction.customId === 'join_guest') {
-      try {
-        await handleMemberOrGuestJoin(interaction, client, openai);
-      } catch (err) {
-        console.error('Error handling member/guest join:', err);
-        await interaction.reply({ content: 'There was an error processing your request.', ephemeral: true });
-      }
-      return;
-    }
+    // if (interaction.customId === 'join_member' || interaction.customId === 'join_guest') {
+    //   try {
+    //     await handleMemberOrGuestJoin(interaction, client, openai);
+    //   } catch (err) {
+    //     console.error('Error handling member/guest join:', err);
+    //     await interaction.reply({ content: 'There was an error processing your request.', ephemeral: true });
+    //   }
+    //   return;
+    // }
   }
 
   // Only allow in specific event channels for RSVP buttons

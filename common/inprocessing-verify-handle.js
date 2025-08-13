@@ -1,6 +1,6 @@
 const { ButtonBuilder, ActionRowBuilder } = require('discord.js');
 const { verifyUser } = require('../functions/verify-user');
-const { notifyJoinMemberWelcome, notifyJoinGuestWelcome } = require('./bot-notify');
+const { notifyJoinMemberWelcome, notifyJoinGuestWelcome, notifyWelcomeForEmbed } = require('./bot-notify');
 const { getUserById, editUser } = require('../api/userlistApi');
 const { get } = require('lodash');
 
@@ -201,9 +201,155 @@ async function handleMemberOrGuestJoin(interaction, client, openai) {
     }
 }
 
+//this skips the verification process and just goes straight to the welcome message
+async function handleSimpleJoin(interaction, client, openai){
+    const { EmbedBuilder } = require('discord.js');
+    const friendlyPendingRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.FRIENDLY_PENDING_ROLE : process.env.FRIENDLY_ROLE;
+    const bloodedToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.BLOODED_ROLE : process.env.TEST_BLOODED_ROLE;
+    const channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.WELCOME_CHANNEL : process.env.TEST_GENERAL_CHANNEL;
+    const userId = interaction.user.id;
+    const dbUser = await getUserById(userId);
+    const guild = getGuild(client);
+    const member = await guild.members.fetch(userId);
+    // Add friendlyPendingRole, remove newUserRole
+    try {
+        await member.roles.add(friendlyPendingRole);
+    } catch (error) {
+        console.error('Error adding friendlyPendingRole:', error);
+    }
+
+    // Create welcome message
+    const messageToBot = `Welcome ${userData.username} to IronPoint, the best Pirate crew in Star Citizen. Explain that we expect skill and creativity, as they're both needed to dominate. Ask if ${userData.username} is here to join as a member or as a guest, and what organization they belong to.`;
+    let returnedMessage = "";
+    try{
+        returnedMessage = await notifyWelcomeForEmbed(dbUser, openai, client, messageToBot);
+    }catch(error){
+        returnedMessage = "Welcome to IronPoint! Please take a moment to read the rules and let us know if you're here as a Guest or here as a potential Join!";
+        console.error("Error notifying welcome for embed:", error);
+    }
+    // Create embed with avatar, title, and welcome message
+    const avatarUrl = interaction.user.displayAvatarURL();
+    const embed = new EmbedBuilder()
+        .setTitle(`<@${userId}>, welcome to IronPoint!`)
+        .setDescription(returnedMessage)
+        .setThumbnail(avatarUrl)
+        .setColor(0x3498db);
+    // Send embed to channel, ping bloodedToNotify role in message content
+    const channel = guild.channels.cache.get(channelToNotify);
+    const pingBlooded = `<@&${bloodedToNotify}>`;
+    if (channel) {
+        await channel.send({ content: pingBlooded, embeds: [embed] });
+    } else {
+        console.error('Welcome channel not found:', channelToNotify);
+    }
+}
+
+async function handleSimpleWelcomeProspect(interaction, client, openai){
+    const { EmbedBuilder } = require('discord.js');
+    const friendlyPendingRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.FRIENDLY_PENDING_ROLE : process.env.FRIENDLY_ROLE;
+    const newUserRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.NEW_USER_ROLE : process.env.TEST_NEW_USER_ROLE;
+    const channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.GENERAL_CHANNEL : process.env.TEST_GENERAL_CHANNEL;
+    const userId = interaction.user.id;
+    const dbUser = await getUserById(userId);
+    const guild = getGuild(client);
+    const member = await guild.members.fetch(userId);
+    // Add friendlyPendingRole, remove newUserRole
+    try {
+        await member.roles.add(friendlyPendingRole);
+    } catch (error) {
+        console.error('Error adding friendlyPendingRole:', error);
+    }
+    try {
+        await member.roles.remove(newUserRole);
+    } catch (error) {
+        console.error('Error removing newUserRole:', error);
+    }
+    // Create welcome message
+    const messageToBot = `Congratulate ${userData.username} on joining as a PROSPECT. Let them know they need to now prove themselves to become part of the Crew. Explain that they'll have to learn pirate skills and dogfighting to excel, but most importantly they need to learn how to work as a team member. Explain that Piracy is the most challenging and rewarding activity in StarCitizen, and that they're contributions to the crew's success will be crucial.`;
+    let returnedMessage = "";
+    try{
+        returnedMessage = await notifyWelcomeForEmbed(dbUser, openai, client, messageToBot);
+    }catch(error){
+        returnedMessage = "Congratulations on joining IronPoint as a PROSPECT! We value teamwork, creative problem solving, and of course dogfighting skills. You'll be expected to learn how to function on the Pirate Team, and how to hold your own against some of the best. You're contributions to our successes will be crucial to keeping us on top!";
+        console.error("Error notifying welcome for embed:", error);
+    }
+    // Create embed with avatar, title, and welcome message
+    const avatarUrl = interaction.user.displayAvatarURL();
+    const embed = new EmbedBuilder()
+        .setTitle(`Welcome, <@${userId}>, our newest PROSPECT!`)
+        .setDescription(returnedMessage)
+        .setThumbnail(avatarUrl)
+        .setColor(0x3498db)
+        .addFields(
+            { name: 'Website', value: '[ironpoint.org](https://www.ironpoint.org/)', inline: false },
+            { name: 'Kill Tracker', value: '[BeowulfHunter](https://github.com/DocFoxHound/BeowulfHunterPy/releases/latest)', inline: false },
+            { name: 'Dogfighting 101 Videos', value: `[Kozuka's Raptor 101](https://www.youtube.com/playlist?list=PL3P2dFMRGUtYJa4NauDruO76hSdNCDBOQ)`, inline: false },
+            { name: 'Standard Pirate Team', value: `[Be Prepared!](https://discord.com/channels/692428312840110090/1195385211358285915)`, inline: false }
+        );
+    // Send embed to channel
+    const channel = guild.channels.cache.get(channelToNotify);
+    if (channel) {
+        await channel.send({ embeds: [embed] });
+    } else {
+        console.error('Welcome channel not found:', channelToNotify);
+    }
+}
+
+async function handleSimpleWelcomeGuest(interaction, client, openai){
+    const { EmbedBuilder } = require('discord.js');
+    const friendlyPendingRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.FRIENDLY_PENDING_ROLE : process.env.FRIENDLY_ROLE;
+    const newUserRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.NEW_USER_ROLE : process.env.TEST_NEW_USER_ROLE;
+    const channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.STARCITIZEN_CHANNEL : process.env.TEST_GENERAL_CHANNEL;
+    const userId = interaction.user.id;
+    const dbUser = await getUserById(userId);
+    const guild = getGuild(client);
+    const member = await guild.members.fetch(userId);
+    // Add friendlyPendingRole, remove newUserRole
+    try {
+        await member.roles.add(friendlyPendingRole);
+    } catch (error) {
+        console.error('Error adding friendlyPendingRole:', error);
+    }
+    try {
+        await member.roles.remove(newUserRole);
+    } catch (error) {
+        console.error('Error removing newUserRole:', error);
+    }
+    // Create welcome message
+    const messageToBot = `Welcome ${userData.username} as a Guest of IronPoint. Let them know that they're free to join in on the action whenever they feel like it, but to respect our rules. Tell them if they'd like to join, to please let DocHound or any of the Blooded members know.`;
+    let returnedMessage = "";
+    try{
+        returnedMessage = await notifyWelcomeForEmbed(dbUser, openai, client, messageToBot);
+    }catch(error){
+        returnedMessage = "Welcome to IronPoint! We're glad to have you as a guest. Please feel free to join in on the action whenever you feel, and if you're interested in joining up just let DocHound or any of the Blooded members know!";
+        console.error("Error notifying welcome for embed:", error);
+    }
+    // Create embed with avatar, title, and welcome message
+    const avatarUrl = interaction.user.displayAvatarURL();
+    const embed = new EmbedBuilder()
+        .setTitle(`Welcome, <@${userId}>, our newest Guest!`)
+        .setDescription(returnedMessage)
+        .setThumbnail(avatarUrl)
+        .setColor(0x3498db)
+        .addFields(
+            { name: 'Website', value: '[ironpoint.org](https://www.ironpoint.org/)', inline: false },
+            { name: 'Kill Tracker', value: '[BeowulfHunter](https://github.com/DocFoxHound/BeowulfHunterPy/releases/latest)', inline: false },
+            { name: 'Dogfighting 101 Videos', value: `[Kozuka's Raptor 101](https://www.youtube.com/playlist?list=PL3P2dFMRGUtYJa4NauDruO76hSdNCDBOQ)`, inline: false },
+        );
+    // Send embed to channel
+    const channel = guild.channels.cache.get(channelToNotify);
+    if (channel) {
+        await channel.send({ embeds: [embed] });
+    } else {
+        console.error('Welcome channel not found:', channelToNotify);
+    }
+}
 
 module.exports = {
     sendHandleVerificationMessage,
     handleDMVerificationResponse,
-    handleMemberOrGuestJoin
+    handleMemberOrGuestJoin,
+    handleSimpleJoin,
+    handleSimpleWelcomeProspect,
+    handleSimpleWelcomeGuest
 };
