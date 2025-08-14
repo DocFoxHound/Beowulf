@@ -41,7 +41,8 @@ const { verifyUser } = require('./functions/verify-user.js');
 const { handleNewGuildMember } = require('./common/new-user.js');
 const { handleSimpleWelcomeProspect, handleSimpleWelcomeGuest, handleSimpleJoin } = require("./common/inprocessing-verify-handle.js");
 const { checkRecentFleets, manageRecentFleets } = require('./common/recent-fleets.js');
-// const { getPrestiges, getRaptorRank, getCorsairRank, getRaiderRank } = require("./userlist-functions/userlist-controller");
+const { refreshPlayerStatsView } = require('./api/playerStatsApi.js');
+
 
 // Initialize dotenv config file
 const args = process.argv.slice(2);
@@ -179,6 +180,9 @@ client.on("ready", async () => {
     43200000 //every 12 hours
   );
   setInterval(() => manageEvents(client, openai),
+    300000 // every 5 minutes
+  );
+  setInterval(() => refreshPlayerStatsView(client, openai),
     300000 // every 5 minutes
   );
   setInterval(() => processPlayerLeaderboards(client, openai),
