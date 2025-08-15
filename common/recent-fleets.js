@@ -30,7 +30,10 @@ async function checkRecentGangs(client, openai, session, users) {
                 pu_shipkills: 0,
                 pu_fpskills: 0,
                 ac_shipkills: 0,
-                ac_fpskills: 0
+                ac_fpskills: 0,
+                stolen_cargo: 0,
+                stolen_value: 0,
+                damages: 0
             }));
         } else if (session.userIds && session.userIds.length > 0) {
             for (const userId of session.userIds) {
@@ -124,12 +127,21 @@ async function checkRecentGangs(client, openai, session, users) {
                             }) || [];
                             let pu_shipkills = 0, pu_fpskills = 0, ac_shipkills = 0, ac_fpskills = 0, damages = 0;
                             for (const box of blackboxes) {
+                                const val = Number(box?.value) || 0;
                                 if (box.game_mode === "PU") {
-                                    if (box.ship_killed === "FPS") pu_fpskills++;
-                                    else pu_shipkills++ && (damages += box.value);
+                                    if (box.ship_killed === "FPS") {
+                                        pu_fpskills++;
+                                    } else {
+                                        pu_shipkills++;
+                                        damages += val;
+                                    }
                                 } else if (box.game_mode === "AC") {
-                                    if (box.ship_killed === "FPS") ac_fpskills++;
-                                    else ac_shipkills++ && (damages += box.value);
+                                    if (box.ship_killed === "FPS") {
+                                        ac_fpskills++;
+                                    } else {
+                                        ac_shipkills++;
+                                        damages += val;
+                                    }
                                 }
                             }
                             mergedUsers[i] = {
@@ -152,8 +164,9 @@ async function checkRecentGangs(client, openai, session, users) {
                 totals.pu_fpskills += user.pu_fpskills || 0;
                 totals.ac_shipkills += user.ac_shipkills || 0;
                 totals.ac_fpskills += user.ac_fpskills || 0;
+                totals.damages += user.damages || 0;
                 return totals;
-            }, { pu_shipkills: 0, pu_fpskills: 0, ac_shipkills: 0, ac_fpskills: 0 });
+            }, { pu_shipkills: 0, pu_fpskills: 0, ac_shipkills: 0, ac_fpskills: 0, damages: 0 });
 
             const updatedFleet = {
                 ...fleet,
@@ -163,6 +176,7 @@ async function checkRecentGangs(client, openai, session, users) {
                 pu_fpskills: fleetTotals.pu_fpskills,
                 ac_shipkills: fleetTotals.ac_shipkills,
                 ac_fpskills: fleetTotals.ac_fpskills,
+                damages: fleetTotals.damages,
                 // Do not touch created_at
             };
             await updateRecentFleet(fleet.id, updatedFleet);
@@ -258,14 +272,16 @@ async function manageRecentGangs(client, openai){
                     t.pu_fpskills += u.pu_fpskills || 0;
                     t.ac_shipkills += u.ac_shipkills || 0;
                     t.ac_fpskills += u.ac_fpskills || 0;
+                    t.damages += u.damages || 0;
                     return t;
-                }, { pu_shipkills: 0, pu_fpskills: 0, ac_shipkills: 0, ac_fpskills: 0 });
+                }, { pu_shipkills: 0, pu_fpskills: 0, ac_shipkills: 0, ac_fpskills: 0, damages: 0 });
 
                 fleet.users = filteredUsers;
                 fleet.pu_shipkills = totals.pu_shipkills;
                 fleet.pu_fpskills = totals.pu_fpskills;
                 fleet.ac_shipkills = totals.ac_shipkills;
                 fleet.ac_fpskills = totals.ac_fpskills;
+                fleet.damages = totals.damages;
                 fleet.timestamp = now.toISOString();
             }
 
