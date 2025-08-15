@@ -1,11 +1,10 @@
-
 const fs = require("node:fs");
 const { getAllVoiceSessionsLastHour } = require("../api/voiceChannelSessionsApi.js");
 const { createRecentFleet, updateRecentFleet, getRecentFleetsWithinTimeframe } = require("../api/recentFleetsApi.js");
 const { getUserBlackBoxesBetweenTimestamps } = require("../api/blackBoxApi.js");
 const { getAllGameVersions } = require("../api/gameVersionApi.js");
 
-async function checkRecentFleets(client, openai, session, users) {
+async function checkRecentGangs(client, openai, session, users) {
     try {
         // Get current time and one hour ago
         const now = new Date();
@@ -205,13 +204,14 @@ async function checkRecentFleets(client, openai, session, users) {
     }
 }
 
-async function manageRecentFleets(client, openai){
+async function manageRecentGangs(client, openai){
     try {
         const now = new Date();
         const threeMinutesAgo = new Date(now.getTime() - 3 * 60 * 1000);
         const start = threeMinutesAgo.toISOString();
         const end = now.toISOString();
         const recentFleets = await getRecentFleetsWithinTimeframe(start, end) || [];
+
         for (const fleet of recentFleets) {
             const channelId = fleet.channel_id;
             let channel;
@@ -220,27 +220,55 @@ async function manageRecentFleets(client, openai){
             } catch (e) {
                 channel = null;
             }
+
             let presentUserIds = [];
             if (channel && channel.members) {
                 presentUserIds = Array.from(channel.members.keys());
             }
-            // If less than 4 users in channel, update leave_time for users with null
-            if (!channel || presentUserIds.length < 4) {
-                for (let i = 0; i < fleet.users.length; i++) {
-                    const user = fleet.users[i];
-                    if (!user.leave_time) {
-                        fleet.users[i].leave_time = now.toISOString();
-                    }
-                }
-            }
-            // Ensure every user not in channel has leave_time set
+
+            // Ensure anyone not in channel has a leave_time set
             for (let i = 0; i < fleet.users.length; i++) {
                 const user = fleet.users[i];
                 if (user.id && !presentUserIds.includes(user.id) && !user.leave_time) {
                     fleet.users[i].leave_time = now.toISOString();
                 }
             }
-            // Save updated fleet
+
+            // If less than 3 users in channel (or channel missing), close out the log
+            if (!channel || presentUserIds.length < 3) {
+                // Make sure every user has a leave_time
+                for (let i = 0; i < fleet.users.length; i++) {
+                    if (!fleet.users[i].leave_time) {
+                        fleet.users[i].leave_time = now.toISOString();
+                    }
+                }
+
+                // Remove users with less than 10 minutes in channel
+                const TEN_MIN_MS = 10 * 60 * 1000;
+                const filteredUsers = (fleet.users || []).filter(u => {
+                    const join = u.join_time ? new Date(u.join_time) : null;
+                    const leave = u.leave_time ? new Date(u.leave_time) : null;
+                    if (!join || !leave || isNaN(join.getTime()) || isNaN(leave.getTime())) return false;
+                    return (leave.getTime() - join.getTime()) >= TEN_MIN_MS;
+                });
+
+                // Recompute fleet totals after filtering
+                const totals = filteredUsers.reduce((t, u) => {
+                    t.pu_shipkills += u.pu_shipkills || 0;
+                    t.pu_fpskills += u.pu_fpskills || 0;
+                    t.ac_shipkills += u.ac_shipkills || 0;
+                    t.ac_fpskills += u.ac_fpskills || 0;
+                    return t;
+                }, { pu_shipkills: 0, pu_fpskills: 0, ac_shipkills: 0, ac_fpskills: 0 });
+
+                fleet.users = filteredUsers;
+                fleet.pu_shipkills = totals.pu_shipkills;
+                fleet.pu_fpskills = totals.pu_fpskills;
+                fleet.ac_shipkills = totals.ac_shipkills;
+                fleet.ac_fpskills = totals.ac_fpskills;
+                fleet.timestamp = now.toISOString();
+            }
+
             await updateRecentFleet(fleet.id, fleet);
         }
     } catch (err) {
@@ -255,6 +283,6 @@ function toDbTimestamp(dateOrString) {
 }
 
 module.exports = {
-    checkRecentFleets,
-    manageRecentFleets
+    checkRecentGangs,
+    manageRecentGangs
 }

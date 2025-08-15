@@ -3,7 +3,7 @@ const fs = require("node:fs");
 const { updateVoiceSession, createVoiceSession, getAllActiveVoiceSessions } = require("../api/voiceChannelSessionsApi");
 const { ChannelType } = require("discord.js");
 const { checkRecentGatherings } = require("./recent-gatherings.js");
-const { checkRecentFleets } = require("./recent-fleets.js")
+const { checkRecentGangs } = require("./recent-fleets.js")
 
 
 async function voiceChannelSessions(client, openai) {
@@ -167,7 +167,7 @@ async function voiceChannelSessions(client, openai) {
                         userIds: users
                     };
                     // checkRecentGatherings(client, openai, session, users);
-                    checkRecentFleets(client, openai, session, users);
+                    checkRecentGangs(client, openai, session, users);
                 }
         });
     } catch (error) {
