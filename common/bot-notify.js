@@ -14,6 +14,7 @@ async function notifyPrestigePromotion(prestige, prestigeLevel, userData, openai
         case "RAPTOR":
             messageToBot = `Write a short poem on ${userData.nickname || userData.username}'s dogfighting skills and promotion to ${prestige} ${prestigeLevel}.`
             channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.ANNOUNCEMENTS_CHANNEL : process.env.TEST_ANNOUNCEMENTS_CHANNEL;
+            break; // <- prevent fallthrough
         case "RAIDER":
             messageToBot = `Write a short poem on ${userData.nickname || userData.username}'s piracy skills and promotion to ${prestige} ${prestigeLevel}.`
             channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.ANNOUNCEMENTS_CHANNEL : process.env.TEST_ANNOUNCEMENTS_CHANNEL;
@@ -33,8 +34,7 @@ async function notifyPrestigePromotion(prestige, prestigeLevel, userData, openai
         }catch(error){
             console.error("Error sending message with user mention: ", error);
         }
-        
-        raptorResultArray = null;
+        // removed raptorResultArray = null;
     }
 }
 
@@ -51,7 +51,7 @@ async function notifyRankPromotion(rank, userData, openai, client){
     if (run.status === "completed") {
         const formattedResponse = await formatResponseForQueueCheck(run.thread_id, openai);
         await sendMessageNotifySubject(channelToNotify, userData.userId, formattedResponse, client);
-        raptorResultArray = null;
+        // removed raptorResultArray = null;
     }
 }
 
@@ -66,7 +66,7 @@ async function notifyForAward(badgeName, badgeDescription, userName, userId, ope
     if (run.status === "completed") {
         const formattedResponse = await formatResponseForQueueCheck(run.thread_id, openai);
         await sendMessageNotifySubject(channelToNotify, userId, formattedResponse, client);
-        raptorResultArray = null;
+        // removed raptorResultArray = null;
     }
 }
 
@@ -78,7 +78,7 @@ async function notifyRemovalFromQueue(){
 async function notifyRejoinWelcome(userData, openai, client) {
     let bloodedToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.BLOODED_ROLE : process.env.TEST_BLOODED_ROLE;
     let channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.WELCOME_CHANNEL : process.env.TEST_GENERAL_CHANNEL;
-    let messageToBot = `Commoent on ${userData.nickname || userData.username}'s return to IronPoint. Make fun of them for leaving and then returning, and then ask them why they wanted to come back.`;
+    let messageToBot = `Comment on ${userData.nickname || userData.username}'s return to IronPoint. Make fun of them for leaving and then returning, and then ask them why they wanted to come back.`;
     // Add ping for bloodedToNotify
     let pingBlooded = `<@&${bloodedToNotify}>`;
     const thread = await createNewThread(channelToNotify, openai);
@@ -128,7 +128,7 @@ async function notifyJoinGuestWelcome(userData, openai, client) {
 
 //this doesn't ping a channel but returns a statement to use in an embed.
 async function notifyWelcomeForEmbed(userData, openai, client, messageToBot){
-    const thread = await createNewThread(openai);
+    const thread = await createNewThread(openai); // now supported by overloaded function
     await addMessageToThread(thread, openai, messageToBot, false);
     let run = await runThreadForQueueNotify(thread, openai, true);
     if (run.status === "completed") {
