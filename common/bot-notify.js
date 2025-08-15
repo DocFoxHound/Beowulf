@@ -13,15 +13,15 @@ async function notifyPrestigePromotion(prestige, prestigeLevel, userData, openai
     switch (prestige){
         case "RAPTOR":
             messageToBot = `Write a short poem on ${userData.nickname || userData.username}'s dogfighting skills and promotion to ${prestige} ${prestigeLevel}.`
-            channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.ANNOUNCEMENTS_CHANNEL : process.env.TEST_ANNOUNCEMENTS_CHANNEL;
+            channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.GENERAL_CHANNEL : process.env.TEST_GENERAL_CHANNEL;
             break; // <- prevent fallthrough
         case "RAIDER":
             messageToBot = `Write a short poem on ${userData.nickname || userData.username}'s piracy skills and promotion to ${prestige} ${prestigeLevel}.`
-            channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.ANNOUNCEMENTS_CHANNEL : process.env.TEST_ANNOUNCEMENTS_CHANNEL;
+            channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.GENERAL_CHANNEL : process.env.TEST_GENERAL_CHANNEL;
             break;
         case "CORSAIR":
             messageToBot = `Write a short poem on ${userData.nickname || userData.username}'s fleet skills and promotion to ${prestige} ${prestigeLevel}.`
-            channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.ANNOUNCEMENTS_CHANNEL : process.env.TEST_ANNOUNCEMENTS_CHANNEL;
+            channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.GENERAL_CHANNEL : process.env.TEST_GENERAL_CHANNEL;
             break;
     }
     const thread = await createNewThread(channelToNotify, openai);
@@ -43,7 +43,7 @@ async function notifyRankPromotion(rank, userData, openai, client){
     let messageToBot = '';
 
     messageToBot = `Congratulate ${userData.nickname || userData.username} for promoting to ${rank}.`
-    channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.ANNOUNCEMENTS_CHANNEL : process.env.TEST_ANNOUNCEMENTS_CHANNEL;
+    channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.GENERAL_CHANNEL : process.env.TEST_GENERAL_CHANNEL;
 
     const thread = await createNewThread(channelToNotify, openai);
     await addMessageToThread(thread, openai, messageToBot, false); //add the message to the thread
