@@ -14,7 +14,13 @@ async function checkRecentGangs(client, openai, session, users) {
         const end = now.toISOString();
 
         // Retrieve recent fleets within the last hour
-        const recentFleets = await getRecentFleetsWithinTimeframe(start, end) || [];
+        let recentFleets = [];
+        try {
+            recentFleets = await getRecentFleetsWithinTimeframe(start, end) || [];
+        } catch (err) {
+            console.error("checkRecentGangs: getRecentFleetsWithinTimeframe failed", { start, end, error: err?.message || err });
+            recentFleets = [];
+        }
 
         // Find fleet for this channel
         let fleet = recentFleets.find(g => String(g.channel_id) === String(session.channelId));
@@ -54,6 +60,7 @@ async function checkRecentGangs(client, openai, session, users) {
                         damages: 0
                     });
                 } catch (e) {
+                    console.error("checkRecentGangs: failed to fetch user", { userId, error: e?.message || e });
                     usersArray.push({
                         username: "Unknown",
                         nickname: "Unknown",
@@ -153,6 +160,7 @@ async function checkRecentGangs(client, openai, session, users) {
                                 damages
                             };
                         } catch (err) {
+                            console.error("checkRecentGangs: getUserBlackBoxesBetweenTimestamps failed", { userId, joinTime, leaveTime, error: err?.message || err });
                             // If error, keep user unchanged
                         }
                     }
@@ -179,7 +187,11 @@ async function checkRecentGangs(client, openai, session, users) {
                 damages: fleetTotals.damages,
                 // Do not touch created_at
             };
-            await updateRecentFleet(fleet.id, updatedFleet);
+            try {
+                await updateRecentFleet(fleet.id, updatedFleet);
+            } catch (err) {
+                console.error("checkRecentGangs: updateRecentFleet failed", { fleetId: fleet.id, error: err?.message || err });
+            }
         } else {
             // Create new fleet
             const guild = await client.guilds.cache.get(process.env.LIVE_ENVIRONMENT === "true" ? process.env.GUILD_ID : process.env.TEST_GUILD_ID);
@@ -190,9 +202,14 @@ async function checkRecentGangs(client, openai, session, users) {
                 console.error("Error fetching emojis:", error);
             }
             const randomIcon = emojis.length > 0 ? emojis[Math.floor(Math.random() * emojis.length)].url : '';
-            const patches = await getAllGameVersions();
-            const latestPatchesSorted = patches.sort((a, b) => b.id - a.id);
-            const latestPatch = latestPatchesSorted[0].version; // Get the latest patch
+            let latestPatch = 'unknown';
+            try {
+                const patches = await getAllGameVersions();
+                const latestPatchesSorted = patches.sort((a, b) => b.id - a.id);
+                latestPatch = latestPatchesSorted[0]?.version || 'unknown'; // Get the latest patch
+            } catch (err) {
+                console.error("checkRecentGangs: getAllGameVersions failed", err?.message || err);
+            }
             const randomBigInt = Math.floor(Math.random() * 9e17) + 1e17; // Range: 1e17 to 1e18-1
             const newFleet = {
                 id: randomBigInt,
@@ -211,7 +228,11 @@ async function checkRecentGangs(client, openai, session, users) {
                 patch: latestPatch,
                 icon_url: randomIcon
             };
-            await createRecentFleet(newFleet);
+            try {
+                await createRecentFleet(newFleet);
+            } catch (err) {
+                console.error("checkRecentGangs: createRecentFleet failed", { newFleetId: newFleet.id, error: err?.message || err });
+            }
         }
     } catch (error) {
         console.error("Error in checkRecentFleets:", error);
@@ -224,7 +245,13 @@ async function manageRecentGangs(client, openai){
         const threeMinutesAgo = new Date(now.getTime() - 3 * 60 * 1000);
         const start = threeMinutesAgo.toISOString();
         const end = now.toISOString();
-        const recentFleets = await getRecentFleetsWithinTimeframe(start, end) || [];
+        let recentFleets = [];
+        try {
+            recentFleets = await getRecentFleetsWithinTimeframe(start, end) || [];
+        } catch (err) {
+            console.error("manageRecentGangs: getRecentFleetsWithinTimeframe failed", { start, end, error: err?.message || err });
+            recentFleets = [];
+        }
 
         for (const fleet of recentFleets) {
             const channelId = fleet.channel_id;
@@ -232,7 +259,13 @@ async function manageRecentGangs(client, openai){
             try {
                 channel = await client.channels.fetch(channelId);
             } catch (e) {
+                console.error("manageRecentGangs: failed to fetch channel", { channelId, error: e?.message || e });
                 channel = null;
+            }
+
+            // If the channel exists and its name has changed, sync it to the fleet log
+            if (channel && channel.name && fleet.channel_name !== channel.name) {
+                fleet.channel_name = channel.name;
             }
 
             let presentUserIds = [];
@@ -285,7 +318,11 @@ async function manageRecentGangs(client, openai){
                 fleet.timestamp = now.toISOString();
             }
 
-            await updateRecentFleet(fleet.id, fleet);
+            try {
+                await updateRecentFleet(fleet.id, fleet);
+            } catch (err) {
+                console.error("manageRecentGangs: updateRecentFleet failed", { fleetId: fleet.id, error: err?.message || err });
+            }
         }
     } catch (err) {
         console.error("Error in manageRecentFleets:", err);
