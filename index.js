@@ -2,12 +2,14 @@ const { Client, GatewayIntentBits, Collection, Events, ChannelType } = require("
 const dotenv = require("dotenv");
 const { OpenAI } = require("openai");
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 // const threadHandler = require("./thread-handler");
 const { preloadFromDb } = require("./common/preload-from-db.js");
 // const queueReminderCheck = require("./queue-functions/queue-controller.js").queueReminderCheck
 const { processUEXData } = require("./common/process-uex-data.js")
 const { handleMessage } = require('./threads/thread-handler.js');
+const { handleBotConversation } = require('./chatgpt/handler.js');
 const { createUser } = require('./api/userlistApi.js');
 const { getUserById } = require('./api/userlistApi.js');
 const { editUser } = require('./api/userlistApi.js');
@@ -42,6 +44,9 @@ const { handleNewGuildMember } = require('./common/new-user.js');
 const { handleSimpleWelcomeProspect, handleSimpleWelcomeGuest, handleSimpleJoin } = require("./common/inprocessing-verify-handle.js");
 const { checkRecentFleets, manageRecentFleets } = require('./common/recent-fleets.js');
 const { refreshPlayerStatsView } = require('./api/playerStatsApi.js');
+const { ingestDailyChatSummaries } = require('./chatgpt/chat-ingest.js');
+const { ingestHitLogs } = require('./chatgpt/hit-ingest.js');
+const { ingestPlayerStats } = require('./chatgpt/player-stats-ingest.js');
 
 
 // Initialize dotenv config file
@@ -54,8 +59,57 @@ dotenv.config({
   path: envFile,
 });
 
+// Single-instance guard: prevent running multiple bot processes on the same machine
+(() => {
+  try {
+    if ((process.env.BOT_SINGLE_INSTANCE || 'true') !== 'true') return; // allow override
+    const lockName = `beowulf-bot-${process.env.LIVE_ENVIRONMENT === 'true' ? 'live' : 'test'}.lock`;
+    const lockPath = path.join(os.tmpdir(), lockName);
+    const acquire = () => {
+      try {
+        const fd = fs.openSync(lockPath, 'wx');
+        fs.writeFileSync(fd, String(process.pid));
+        fs.closeSync(fd);
+        return true;
+      } catch (e) {
+        // If lock exists, check if the PID is still alive; if not, reclaim.
+        try {
+          const pidTxt = fs.readFileSync(lockPath, 'utf8').trim();
+          const otherPid = Number(pidTxt);
+          if (otherPid && otherPid !== process.pid) {
+            try {
+              process.kill(otherPid, 0); // throws if not running
+              console.error(`[single-instance] Another bot instance detected (pid=${otherPid}). Exiting.`);
+              process.exit(1);
+            } catch {
+              // stale lock; remove and retry
+              fs.unlinkSync(lockPath);
+              return acquire();
+            }
+          }
+        } catch {
+          // Could not read; best effort: remove and retry
+          try { fs.unlinkSync(lockPath); } catch {}
+          return acquire();
+        }
+      }
+    };
+    if (!acquire()) {
+      console.error('[single-instance] Could not acquire lock. Exiting.');
+      process.exit(1);
+    }
+    const cleanup = () => { try { fs.unlinkSync(lockPath); } catch {} };
+    process.on('exit', cleanup);
+    process.on('SIGINT', () => { cleanup(); process.exit(130); });
+    process.on('SIGTERM', () => { cleanup(); process.exit(143); });
+    process.on('uncaughtException', (err) => { console.error(err); cleanup(); process.exit(1); });
+  } catch (e) {
+    console.error('[single-instance] Lock setup error:', e?.message || e);
+  }
+})();
+
 // Setup OpenAI
-const openai = new OpenAI(process.env.OPENAI_API_KEY);
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Create a new discord client instance
 const client = new Client({
@@ -148,6 +202,9 @@ client.on("ready", async () => {
 
   preloadedDbTables = await preloadFromDb(); //leave on
   await refreshUserlist(client, openai) //actually leave this here
+  try { await ingestDailyChatSummaries(client, openai); } catch (e) { console.error('Initial chat ingest failed:', e); }
+  try { await ingestHitLogs(client, openai); } catch (e) { console.error('Initial hit ingest failed:', e); }
+  try { await ingestPlayerStats(client, openai); } catch (e) { console.error('Initial player-stats ingest failed:', e); }
   // await processPlayerLeaderboards(client, openai)
 
 
@@ -166,9 +223,9 @@ client.on("ready", async () => {
   setInterval(() => refreshUserlist(client, openai),
     43201000 //every 12 hours and 1 second
   );
-  setInterval(() => loadChatlogs(client, openai),
-    60000 // every 1 minutes
-  );
+  // setInterval(() => loadChatlogs(client, openai),
+  //   60000 // every 1 minutes
+  // );
     setInterval(() => voiceChannelSessions(client, openai),
     60000 //every 1 minute
   );
@@ -176,9 +233,9 @@ client.on("ready", async () => {
   //   60000 //every 1 minute
   //   // 300000 //every 5 minutes
   // );
-  setInterval(() => trimChatLogs(),
-    43200000 //every 12 hours
-  );
+  // setInterval(() => trimChatLogs(),
+  //   43200000 //every 12 hours
+  // );
   setInterval(() => manageEvents(client, openai),
     300000 // every 5 minutes
   );
@@ -191,6 +248,19 @@ client.on("ready", async () => {
   setInterval(() => automatedAwards(client, openai),
     // 60000 //every 1 minute
     3600000 //every 1 hour
+  );
+  // Ingest daily chat summaries into knowledge base (every 6 hours)
+  setInterval(() => ingestDailyChatSummaries(client, openai),
+    21600000 // every 6 hours
+  );
+  // Ingest hit logs into knowledge base (every 6 hours)
+  setInterval(() => ingestHitLogs(client, openai),
+    21600000 // every 6 hours
+  );
+  // Ingest player stats into knowledge base (every 6 hours)
+  setInterval(() => ingestPlayerStats(client, openai),
+    3600000 //every 1 hour  
+    // 21600000 // every 6 hours
   );
 }),
 
@@ -207,8 +277,29 @@ client.on("messageCreate", async (message) => {
   if (!channelIds.includes(message.channelId) || !message.guild || message.system) {
     return;
   }
-  saveMessage(message, client);
-  handleMessage(message, openai, client, preloadedDbTables);
+  // saveMessage(message, client);
+
+  // Detect if this message is directed at the bot: mention or reply to bot
+  const isMentioningBot = message.mentions?.users?.has?.(client.user.id);
+  const isReplyToBot = Boolean(
+    message.reference?.messageId &&
+    message.mentions?.repliedUser &&
+    message.mentions.repliedUser.id === client.user.id
+  );
+
+  if (isMentioningBot || isReplyToBot) {
+    // Route to the new chatgpt handler (delegates to legacy for now)
+    try {
+      await handleBotConversation(message, client, openai, preloadedDbTables);
+    } catch (e) {
+      console.error('chatgpt handler failed, falling back to legacy handler:', e);
+      handleMessage(message, openai, client, preloadedDbTables);
+    }
+    return;
+  }
+
+  // Otherwise keep legacy behavior
+  // handleMessage(message, openai, client, preloadedDbTables);
 
 });
 

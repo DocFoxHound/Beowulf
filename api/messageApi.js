@@ -60,7 +60,6 @@ async function deleteMessagesByCount(channel, number) {
         console.error('Error deleting threads: ', error.response ? error.response.data : error.message);
         return false;
     }
-
 }
 
 module.exports = {
