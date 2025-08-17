@@ -1,4 +1,4 @@
-const { listKnowledge, createKnowledge, updateKnowledge, deleteKnowledge } = require('../api/knowledgeApi');
+const { listKnowledge, createKnowledge, updateKnowledge, deleteKnowledge, updateKnowledgeEmbedding } = require('../api/knowledgeApi');
 const { getAllHitLogs } = require('../api/hitTrackerApi');
 
 function utcDayKey(d = new Date()) {
@@ -132,12 +132,16 @@ async function upsertHitKnowledge(openai, hit) {
 
   // Try create, else attempt a targeted update by looking up existing by URL
   const created = await createKnowledge(doc);
-  if (created && created.id) return created.id;
+  if (created && created.id) {
+    await maybeUpdateEmbedding(openai, created.id, doc.content);
+    return created.id;
+  }
   try {
     const rows = await listKnowledge({ category: 'piracy', section: 'hit-log', limit: 200, order: 'created_at.desc' }) || [];
     const existing = rows.find(r => r.url === url);
     if (existing?.id) {
       await updateKnowledge(existing.id, doc);
+      await maybeUpdateEmbedding(openai, existing.id, doc.content);
       return existing.id;
     }
   } catch (e) {
@@ -209,6 +213,23 @@ async function ingestHitLogs(client, openai) {
   } finally {
     const endIso = new Date().toISOString();
     console.log(`[hit-ingest] DONE ${endIso} processed=${seen} upserts=${created} skipped_existing=${skippedExisting}`);
+  }
+}
+
+// Optionally compute and store an embedding for a knowledge row to enable vector search
+async function maybeUpdateEmbedding(openai, id, text) {
+  try {
+    if ((process.env.KNOWLEDGE_EMBED_ON_INGEST || 'false') !== 'true') return;
+    if (!openai || !id || !text) return;
+    const model = process.env.EMBEDDING_MODEL || 'text-embedding-3-small';
+    const input = String(text).slice(0, 8000);
+    const resp = await openai.embeddings.create({ model, input });
+    const embedding = resp?.data?.[0]?.embedding;
+    if (Array.isArray(embedding) && embedding.length) {
+      await updateKnowledgeEmbedding(id, embedding);
+    }
+  } catch (e) {
+    console.error('[hit-ingest] maybeUpdateEmbedding error:', e?.response?.data || e?.message || e);
   }
 }
 

@@ -1,4 +1,4 @@
-const { listKnowledge, createKnowledge, updateKnowledge, deleteKnowledge } = require('../api/knowledgeApi');
+const { listKnowledge, createKnowledge, updateKnowledge, deleteKnowledge, updateKnowledgeEmbedding } = require('../api/knowledgeApi');
 
 // Channels to ingest from env
 function getIngestChannelIds() {
@@ -220,7 +220,7 @@ function buildUserHeuristicSummary({ dateKey, channelName, username, userId, own
   return lines.join('\n');
 }
 
-async function upsertUserDailySummary({ guildId, channel, dateKey, userId, username, content }) {
+async function upsertUserDailySummary({ guildId, channel, dateKey, userId, username, content, openai }) {
   const channelId = channel.id;
   const channelName = channel.name || channelId;
   const title = `@${username || userId} (${userId}) — ${dateKey}`;
@@ -251,10 +251,14 @@ async function upsertUserDailySummary({ guildId, channel, dateKey, userId, usern
     const existing = list.find(r => r.section === 'user-daily-summary' && Array.isArray(r.tags) && r.tags.includes(`user:${userId}`));
     if (existing) {
       await updateKnowledge(existing.id, base);
+      // Optionally update embedding for vector search
+      await maybeUpdateEmbedding(openai, existing.id, base.content);
       return existing.id;
     }
     const created = await createKnowledge(base);
-    return created?.id || null;
+    const id = created?.id || null;
+    if (id) await maybeUpdateEmbedding(openai, id, base.content);
+    return id;
   } catch (e) {
     console.error('upsertUserDailySummary error:', {
       title,
@@ -291,7 +295,7 @@ async function generateUserDailySummaries({ client, openai, channel, dateKey, ms
     } catch (e) {
       console.error('AI user summarization failed, using heuristic:', e?.response?.data || e?.message || e);
     }
-    await upsertUserDailySummary({ guildId, channel, dateKey, userId, username, content });
+  await upsertUserDailySummary({ guildId, channel, dateKey, userId, username, content, openai });
   }
 }
 
@@ -358,7 +362,7 @@ function groupMessagesByDayUTC(msgs) {
   return bucket;
 }
 
-async function upsertDailySummary({ guildId, channel, dateKey, content }) {
+async function upsertDailySummary({ guildId, channel, dateKey, content, openai }) {
   const channelId = channel.id;
   const channelName = channel.name || channelId;
   const title = `#${channelName} — ${dateKey}`;
@@ -389,11 +393,14 @@ async function upsertDailySummary({ guildId, channel, dateKey, content }) {
       const row = rows.find(r => r.section === 'daily-summary') || rows[0];
       if (row?.id) {
         await updateKnowledge(row.id, base);
+        await maybeUpdateEmbedding(openai, row.id, base.content);
         return row.id;
       }
     }
     const created = await createKnowledge(base);
-    return created?.id || null;
+    const id = created?.id || null;
+    if (id) await maybeUpdateEmbedding(openai, id, base.content);
+    return id;
   } catch (e) {
     console.error('upsertDailySummary error:', {
       title,
@@ -403,6 +410,23 @@ async function upsertDailySummary({ guildId, channel, dateKey, content }) {
       err: e?.response?.data || e?.message || String(e),
     });
     return null;
+  }
+}
+
+// Optionally compute and store an embedding for a knowledge row to enable vector search
+async function maybeUpdateEmbedding(openai, id, text) {
+  try {
+    if ((process.env.KNOWLEDGE_EMBED_ON_INGEST || 'false') !== 'true') return;
+    if (!openai || !id || !text) return;
+    const model = process.env.EMBEDDING_MODEL || 'text-embedding-3-small';
+    const input = String(text).slice(0, 8000);
+    const resp = await openai.embeddings.create({ model, input });
+    const embedding = resp?.data?.[0]?.embedding;
+    if (Array.isArray(embedding) && embedding.length) {
+      await updateKnowledgeEmbedding(id, embedding);
+    }
+  } catch (e) {
+    console.error('maybeUpdateEmbedding error:', e?.response?.data || e?.message || e);
   }
 }
 
@@ -458,7 +482,7 @@ async function processChannel(client, openai, channelId) {
       console.error('AI summarization failed, falling back to heuristic summary:', aiErr?.response?.data || aiErr?.message || aiErr);
       // content remains baseHeader
     }
-  await upsertDailySummary({ guildId, channel, dateKey: today, content });
+  await upsertDailySummary({ guildId, channel, dateKey: today, content, openai });
   // Per-user summaries for today
   await generateUserDailySummaries({ client, openai, channel, dateKey: today, msgs });
     await cleanupOldSummaries({ guildId, channel });
@@ -544,7 +568,7 @@ async function maybeBackfillChannel(client, openai, channelId) {
       } catch (aiErr) {
         console.error('AI summarization (backfill) failed, using heuristic:', aiErr?.response?.data || aiErr?.message || aiErr);
       }
-      await upsertDailySummary({ guildId, channel, dateKey, content });
+  await upsertDailySummary({ guildId, channel, dateKey, content, openai });
       await generateUserDailySummaries({ client, openai, channel, dateKey, msgs: dayMsgs });
       createdCount++;
     }

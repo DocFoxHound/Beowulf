@@ -1,4 +1,4 @@
-const { listKnowledge, createKnowledge, updateKnowledge, deleteKnowledge } = require('../api/knowledgeApi');
+const { listKnowledge, createKnowledge, updateKnowledge, deleteKnowledge, updateKnowledgeEmbedding } = require('../api/knowledgeApi');
 const { getAllPlayerStats } = require('../api/playerStatsApi');
 const { getUsers } = require('../api/userlistApi');
 
@@ -79,7 +79,7 @@ function buildContent(ps, username) {
   return lines.join('\n');
 }
 
-async function upsertPlayerStatsKnowledge(ps, username) {
+async function upsertPlayerStatsKnowledge(openai, ps, username) {
   const url = `player://${ps.user_id}/stats`;
   const version = 'v1';
   const source = 'player-stats';
@@ -107,13 +107,17 @@ async function upsertPlayerStatsKnowledge(ps, username) {
   };
 
   const created = await createKnowledge(doc);
-  if (created && created.id) return created.id;
+  if (created && created.id) {
+    await maybeUpdateEmbedding(openai, created.id, doc.content);
+    return created.id;
+  }
   // Fallback: lookup existing by URL and update
   try {
     const rows = await listKnowledge({ category, section, limit: 2000, order: 'created_at.desc' }) || [];
     const existing = rows.find(r => r.url === url);
     if (existing?.id) {
       await updateKnowledge(existing.id, doc);
+      await maybeUpdateEmbedding(openai, existing.id, doc.content);
       return existing.id;
     }
   } catch (e) {
@@ -173,7 +177,7 @@ async function ingestPlayerStats(client, openai) {
       validIds.add(uid);
       processed++;
       const username = userMap.get(uid) || null;
-      const id = await upsertPlayerStatsKnowledge(ps, username);
+  const id = await upsertPlayerStatsKnowledge(openai, ps, username);
       if (id) upserts++;
     }
     // Cleanup knowledge entries for users no longer present
@@ -183,6 +187,23 @@ async function ingestPlayerStats(client, openai) {
   } finally {
     const endIso = new Date().toISOString();
     console.log(`[player-stats-ingest] DONE ${endIso} processed=${processed} upserts=${upserts}`);
+  }
+}
+
+// Optionally compute and store an embedding for a knowledge row to enable vector search
+async function maybeUpdateEmbedding(openai, id, text) {
+  try {
+    if ((process.env.KNOWLEDGE_EMBED_ON_INGEST || 'false') !== 'true') return;
+    if (!openai || !id || !text) return;
+    const model = process.env.EMBEDDING_MODEL || 'text-embedding-3-small';
+    const input = String(text).slice(0, 8000);
+    const resp = await openai.embeddings.create({ model, input });
+    const embedding = resp?.data?.[0]?.embedding;
+    if (Array.isArray(embedding) && embedding.length) {
+      await updateKnowledgeEmbedding(id, embedding);
+    }
+  } catch (e) {
+    console.error('[player-stats-ingest] maybeUpdateEmbedding error:', e?.response?.data || e?.message || e);
   }
 }
 
