@@ -1,4 +1,4 @@
-const { listKnowledge, createKnowledge, updateKnowledge, deleteKnowledge, updateKnowledgeEmbedding } = require('../api/knowledgeApi');
+const { listKnowledge, createKnowledge, updateKnowledge, deleteKnowledge } = require('../api/knowledgeApi');
 const { getAllPlayerStats } = require('../api/playerStatsApi');
 const { getUsers } = require('../api/userlistApi');
 
@@ -79,13 +79,13 @@ function buildContent(ps, username) {
   return lines.join('\n');
 }
 
-async function upsertPlayerStatsKnowledge(openai, ps, username) {
+async function upsertPlayerStatsKnowledge(ps, username, existingRow) {
   const url = `player://${ps.user_id}/stats`;
   const version = 'v1';
   const source = 'player-stats';
   const section = 'player-stats';
   const category = 'user';
-  const title = `Player Stats — ${username || ps.user_id}${ps.rank_name ? ` (${ps.rank_name})` : ''}`;
+  const title = `Player Stats \u2014 ${username || ps.user_id}${ps.rank_name ? ` (${ps.rank_name})` : ''}`;
   const tags = [
     'user-stats',
     `user:${ps.user_id}`,
@@ -106,19 +106,23 @@ async function upsertPlayerStatsKnowledge(openai, ps, username) {
     guild_id: process.env.GUILD_ID,
   };
 
-  const created = await createKnowledge(doc);
-  if (created && created.id) {
-    await maybeUpdateEmbedding(openai, created.id, doc.content);
-    return created.id;
+  // If we already know it exists, just update
+  if (existingRow && existingRow.id) {
+    await updateKnowledge(existingRow.id, doc);
+    return existingRow.id;
   }
-  // Fallback: lookup existing by URL and update
+
+  // Attempt create (likely path for new users)
+  const created = await createKnowledge(doc);
+  if (created && created.id) return created.id;
+
+  // As a final fallback (race condition or create failed but row exists) list & update
   try {
     const rows = await listKnowledge({ category, section, limit: 2000, order: 'created_at.desc' }) || [];
-    const existing = rows.find(r => r.url === url);
+    const existing = rows.find(r => r.url === url && r.source === source && r.version === version);
     if (existing?.id) {
-      await updateKnowledge(existing.id, doc);
-      await maybeUpdateEmbedding(openai, existing.id, doc.content);
-      return existing.id;
+  await updateKnowledge(existing.id, doc);
+  return existing.id;
     }
   } catch (e) {
     console.error('[player-stats-ingest] lookup/update failed:', e?.response?.data || e?.message || e);
@@ -147,7 +151,7 @@ async function cleanupOrphanedPlayerStats(validUserIds) {
   }
 }
 
-async function ingestPlayerStats(client, openai) {
+async function ingestPlayerStats(client) {
   const startIso = new Date().toISOString();
   if ((process.env.KNOWLEDGE_RETRIEVAL || 'true').toLowerCase() === 'false') {
     console.log(`[player-stats-ingest] SKIP ${startIso} (KNOWLEDGE_RETRIEVAL=false)`);
@@ -156,9 +160,11 @@ async function ingestPlayerStats(client, openai) {
   console.log(`[player-stats-ingest] START ${startIso}`);
   let upserts = 0, processed = 0;
   try {
-    const [stats, users] = await Promise.all([
+    const [stats, users, existing] = await Promise.all([
       getAllPlayerStats(),
       getUsers().catch(() => null),
+      // Preload existing knowledge rows once to avoid N duplicate create attempts
+      listKnowledge({ category: 'user', section: 'player-stats', limit: 2000, order: 'created_at.desc' }).catch(() => null),
     ]);
     if (!Array.isArray(stats) || !stats.length) {
       console.log('[player-stats-ingest] No player stats returned');
@@ -170,6 +176,15 @@ async function ingestPlayerStats(client, openai) {
         if (u && (u.id || u.user_id)) userMap.set(String(u.id || u.user_id), u.username || u.nickname || u.display_name || null);
       }
     }
+    // Build quick lookup of existing knowledge rows by user id parsed from url
+    const existingMap = new Map();
+    if (Array.isArray(existing)) {
+      for (const row of existing) {
+        const m = row.url && String(row.url).match(/^player:\/\/(\d+)\/stats$/);
+        if (m) existingMap.set(m[1], row);
+      }
+    }
+
     const validIds = new Set();
     for (const ps of stats) {
       if (!ps || ps.user_id == null) continue;
@@ -177,7 +192,8 @@ async function ingestPlayerStats(client, openai) {
       validIds.add(uid);
       processed++;
       const username = userMap.get(uid) || null;
-  const id = await upsertPlayerStatsKnowledge(openai, ps, username);
+      const existingRow = existingMap.get(uid);
+  const id = await upsertPlayerStatsKnowledge(ps, username, existingRow);
       if (id) upserts++;
     }
     // Cleanup knowledge entries for users no longer present
@@ -186,25 +202,7 @@ async function ingestPlayerStats(client, openai) {
     console.error('[player-stats-ingest] failure:', e?.response?.data || e?.message || e);
   } finally {
     const endIso = new Date().toISOString();
-    console.log(`[player-stats-ingest] DONE ${endIso} processed=${processed} upserts=${upserts}`);
+  console.log(`[player-stats-ingest] DONE ${endIso} processed=${processed} upserts=${upserts}`);
   }
 }
-
-// Optionally compute and store an embedding for a knowledge row to enable vector search
-async function maybeUpdateEmbedding(openai, id, text) {
-  try {
-    if ((process.env.KNOWLEDGE_EMBED_ON_INGEST || 'false') !== 'true') return;
-    if (!openai || !id || !text) return;
-    const model = process.env.EMBEDDING_MODEL || 'text-embedding-3-small';
-    const input = String(text).slice(0, 8000);
-    const resp = await openai.embeddings.create({ model, input });
-    const embedding = resp?.data?.[0]?.embedding;
-    if (Array.isArray(embedding) && embedding.length) {
-      await updateKnowledgeEmbedding(id, embedding);
-    }
-  } catch (e) {
-    console.error('[player-stats-ingest] maybeUpdateEmbedding error:', e?.response?.data || e?.message || e);
-  }
-}
-
 module.exports = { ingestPlayerStats };

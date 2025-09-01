@@ -204,9 +204,9 @@ client.on("ready", async () => {
   await refreshUserlist(client, openai) //actually leave this here
   try { await ingestDailyChatSummaries(client, openai); } catch (e) { console.error('Initial chat ingest failed:', e); }
   try { await ingestHitLogs(client, openai); } catch (e) { console.error('Initial hit ingest failed:', e); }
-  try { await ingestPlayerStats(client, openai); } catch (e) { console.error('Initial player-stats ingest failed:', e); }
+  try { await ingestPlayerStats(client); } catch (e) { console.error('Initial player-stats ingest failed:', e); }
   // await processPlayerLeaderboards(client, openai)
-
+  console.log("Ready")
 
   setInterval(() => processUEXData("terminal_prices"), 
     86400000 //every 24 hours
@@ -250,15 +250,18 @@ client.on("ready", async () => {
     3600000 //every 1 hour
   );
   // Ingest daily chat summaries into knowledge base (every 6 hours)
-  setInterval(() => ingestDailyChatSummaries(client, openai),
-    21600000 // every 6 hours
-  );
-  // Ingest hit logs into knowledge base (every 6 hours)
-  setInterval(() => ingestHitLogs(client, openai),
-    21600000 // every 6 hours
-  );
+  // Combined sequential ingest cycle (every 6 hours): chat summaries then hit logs
+  const SIX_HOURS = 21600000;
+  setInterval(async () => {
+    try {
+      await ingestDailyChatSummaries(client, openai);
+      await ingestHitLogs(client, openai);
+    } catch (e) {
+      console.error('Chat/Hit ingest cycle failed:', e);
+    }
+  }, SIX_HOURS);
   // Ingest player stats into knowledge base (every 6 hours)
-  setInterval(() => ingestPlayerStats(client, openai),
+  setInterval(() => ingestPlayerStats(client),
     3600000 //every 1 hour  
     // 21600000 // every 6 hours
   );

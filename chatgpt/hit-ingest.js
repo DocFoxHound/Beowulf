@@ -137,13 +137,27 @@ async function upsertHitKnowledge(openai, hit) {
     return created.id;
   }
   try {
-    const rows = await listKnowledge({ category: 'piracy', section: 'hit-log', limit: 200, order: 'created_at.desc' }) || [];
-    const existing = rows.find(r => r.url === url);
+    // Fallback path (likely a duplicate / unique constraint): attempt to locate existing by URL.
+    // We page through results to avoid missing older rows beyond the initial limit.
+    const pageSize = 1000;
+    let offset = 0;
+    let existing = null;
+    while (!existing) {
+      const rows = await listKnowledge({ category: 'piracy', section: 'hit-log', limit: pageSize, offset, order: 'created_at.desc' }) || [];
+      if (!rows.length) break;
+      existing = rows.find(r => r.url === url);
+      if (existing) break;
+      if (rows.length < pageSize) break; // no more pages
+      offset += pageSize;
+      if (offset > 20000) break; // safety cap
+    }
     if (existing?.id) {
-      await updateKnowledge(existing.id, doc);
-      await maybeUpdateEmbedding(openai, existing.id, doc.content);
+      const ok = await updateKnowledge(existing.id, doc);
+      if (ok) await maybeUpdateEmbedding(openai, existing.id, doc.content);
       return existing.id;
     }
+    // If still not found, log a concise notice for debugging
+    console.error('[hit-ingest] upsertHitKnowledge: create failed & existing not found for URL', url);
   } catch (e) {
     console.error('lookup/update hit knowledge failed:', e?.response?.data || e?.message || e);
   }
@@ -153,7 +167,7 @@ async function upsertHitKnowledge(openai, hit) {
 async function fetchExistingHitUrls() {
   try {
     // Fetch a reasonably large recent set to build a URL index
-    const rows = await listKnowledge({ category: 'piracy', section: 'hit-log', limit: 2000, order: 'created_at.desc' }) || [];
+    const rows = await listKnowledge({ category: 'piracy', section: 'hit-log', limit: 200000, order: 'created_at.desc' }) || [];
     const set = new Set();
     for (const r of rows) if (r?.url) set.add(r.url);
     return set;
@@ -179,14 +193,17 @@ async function cleanupOldHitLogs(days = 90) {
 
 async function ingestHitLogs(client, openai) {
   const startIso = new Date().toISOString();
-  const days = Number(process.env.KNOWLEDGE_HITLOG_BACKFILL_DAYS || 90);
-  const cutoff = Date.now() - days * 86400000;
+  const days = Number(process.env.KNOWLEDGE_HITLOG_BACKFILL_DAYS || 0); // if >0 we do a days backfill; else use hour lookback
+  const lookbackHours = Number(process.env.KNOWLEDGE_HITLOG_LOOKBACK_HOURS || 7);
+  const force = (process.env.KNOWLEDGE_HITLOG_FORCE || 'false') === 'true';
+  const cutoffDays = Date.now() - (days > 0 ? days : 90) * 86400000; // still used for retention cleanup
+  const cutoffHours = Date.now() - lookbackHours * 3600000;
   if ((process.env.KNOWLEDGE_RETRIEVAL || 'true').toLowerCase() === 'false') {
     console.log(`[hit-ingest] SKIP ${startIso} (KNOWLEDGE_RETRIEVAL=false)`);
     return;
   }
-  console.log(`[hit-ingest] START ${startIso} window_days=${days}`);
-  let created = 0, seen = 0, skippedExisting = 0;
+  console.log(`[hit-ingest] START ${startIso} mode=${force?'FORCE':(days>0?`backfill_days=${days}`:`lookback_hours=${lookbackHours}`)}`);
+  let created = 0, seen = 0, skippedExisting = 0, filteredOld = 0;
   try {
     const exists = await fetchExistingHitUrls();
     const hits = await getAllHitLogs();
@@ -198,21 +215,32 @@ async function ingestHitLogs(client, openai) {
     hits.sort((a,b)=> new Date(b.created_at||b.createdAt||0) - new Date(a.created_at||a.createdAt||0));
     for (const h of hits) {
       const dt = getHitDate(h);
-      if (dt.getTime && dt.getTime() < cutoff) continue;
+      if (!force && days === 0) { // hour lookback mode
+        if (dt && dt.getTime && dt.getTime() < cutoffHours) { filteredOld++; continue; }
+      } else { // days backfill or force mode
+        const cutoff = Date.now() - (days || 90) * 86400000;
+        if (dt.getTime && dt.getTime() < cutoff) continue;
+      }
       const url = `hit://${h.id}`;
-      const force = (process.env.KNOWLEDGE_HITLOG_FORCE || 'false') === 'true';
       if (!force && exists.has(url)) { skippedExisting++; continue; }
       seen++;
       const id = await upsertHitKnowledge(openai, h);
-      if (id) created++;
+      if (id) {
+        created++;
+        // Add the URL to local exists set so duplicates in the same batch are skipped.
+        exists.add(url);
+      } else {
+        // Even on failure (likely duplicate), mark as seen to avoid hammering the API repeatedly.
+        exists.add(url);
+      }
     }
     // cleanup old entries beyond retention
-    await cleanupOldHitLogs(days);
+    await cleanupOldHitLogs(days || 90);
   } catch (e) {
     console.error('[hit-ingest] failure:', e?.response?.data || e?.message || e);
   } finally {
     const endIso = new Date().toISOString();
-    console.log(`[hit-ingest] DONE ${endIso} processed=${seen} upserts=${created} skipped_existing=${skippedExisting}`);
+    console.log(`[hit-ingest] DONE ${endIso} processed=${seen} upserts=${created} skipped_existing=${skippedExisting} filtered_old=${filteredOld}`);
   }
 }
 
