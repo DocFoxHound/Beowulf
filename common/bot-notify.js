@@ -79,11 +79,11 @@ async function notifyRemovalFromQueue(){
 }
 
 async function notifyRejoinWelcome(userData, openai, client) {
-    let bloodedToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.BLOODED_ROLE : process.env.TEST_BLOODED_ROLE;
+    let bloodedToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.RECRUITER_ROLE : process.env.TEST_RECRUITER_ROLE;
     let channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.WELCOME_CHANNEL : process.env.TEST_GENERAL_CHANNEL;
-    let messageToBot = `Comment on ${userData.nickname || userData.username}'s return to IronPoint. Make fun of them for leaving and then returning, and then ask them why they wanted to come back.`;
+    let messageToBot = `Comment on ${userData.nickname || userData.username}'s return to IronPoint and welcome them back to the fold.`;
     // Add ping for bloodedToNotify
-    let pingBlooded = `<@&${bloodedToNotify}>`;
+    let pingRecruiter = `<@&${bloodedToNotify}>`;
     const guildId = process.env.LIVE_ENVIRONMENT === "true" ? process.env.GUILD_ID : process.env.TEST_GUILD_ID;
     const formattedResponse = await runWithResponses({
         openai,
@@ -94,17 +94,17 @@ async function notifyRejoinWelcome(userData, openai, client) {
         contextSnippets: []
     });
     if (formattedResponse) {
-        const messageWithPing = `${pingBlooded} ${formattedResponse}`;
+        const messageWithPing = `${pingRecruiter} ${formattedResponse}`;
         await sendMessageNotifySubject(channelToNotify, userData.id, messageWithPing, client);
     }
 }
 
 async function notifyJoinMemberWelcome(userData, openai, client) {
-    let bloodedToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.BLOODED_ROLE : process.env.TEST_BLOODED_ROLE;
+    let bloodedToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.RECRUITER_ROLE : process.env.TEST_RECRUITER_ROLE;
     let channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.WELCOME_CHANNEL : process.env.TEST_GENERAL_CHANNEL;
     let messageToBot = `Welcome ${userData.nickname || userData.username} to IronPoint as a prospective new Member! Be sure to mention the website and provide a link (https://www.ironpoint.org/) and bulletize the things they can do on the website: check promotion progress, join a fleet, view leaderboards, record pirate hits. Also be sure to mention the kill-tracking bot called BeowulfHunter and provide a link: (https://github.com/DocFoxHound/BeowulfHunterPy/releases/latest) and describe what it does: tracks and records kills made in-game. Also describe IronPoint as the best Pirate crew in Star Citizen. Talk about how a player has to prove their worth through their fighting prowess and rugged creative problem solving, and that we like to see them taking something valuable. Make a little fun of the player, too.`;
     // Add ping for bloodedToNotify
-    let pingBlooded = `<@&${bloodedToNotify}>`;
+    let pingRecruiter = `<@&${bloodedToNotify}>`;
     const guildId = process.env.LIVE_ENVIRONMENT === "true" ? process.env.GUILD_ID : process.env.TEST_GUILD_ID;
     const formattedResponse = await runWithResponses({
         openai,
@@ -115,17 +115,17 @@ async function notifyJoinMemberWelcome(userData, openai, client) {
         contextSnippets: []
     });
     if (formattedResponse) {
-        const messageWithPing = `${pingBlooded} ${formattedResponse}`;
+        const messageWithPing = `${pingRecruiter} ${formattedResponse}`;
         await sendMessageNotifySubject(channelToNotify, userData.id, messageWithPing, client);
     }
 }
 
 async function notifyJoinGuestWelcome(userData, openai, client) {
-    let bloodedToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.BLOODED_ROLE : process.env.TEST_BLOODED_ROLE;
+    let bloodedToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.RECRUITER_ROLE : process.env.TEST_RECRUITER_ROLE;
     let channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.WELCOME_CHANNEL : process.env.TEST_GENERAL_CHANNEL;
     let messageToBot = `Welcome ${userData.nickname || userData.username} to IronPoint as a friendly guest! Make fun of the player for not wanting to join up, but make sure they feel welcome to play with us any time.`;
     // Add ping for bloodedToNotify
-    let pingBlooded = `<@&${bloodedToNotify}>`;
+    let pingRecruiter = `<@&${bloodedToNotify}>`;
     const guildId = process.env.LIVE_ENVIRONMENT === "true" ? process.env.GUILD_ID : process.env.TEST_GUILD_ID;
     const formattedResponse = await runWithResponses({
         openai,
@@ -136,7 +136,7 @@ async function notifyJoinGuestWelcome(userData, openai, client) {
         contextSnippets: []
     });
     if (formattedResponse) {
-        const messageWithPing = `${pingBlooded} ${formattedResponse}`;
+        const messageWithPing = `${pingRecruiter} ${formattedResponse}`;
         await sendMessageNotifySubject(channelToNotify, userData.id, messageWithPing, client);
     }
 }
