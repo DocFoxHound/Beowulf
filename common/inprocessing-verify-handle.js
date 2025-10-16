@@ -265,7 +265,7 @@ async function handleSimpleWelcomeProspect(interaction, client, openai){
         console.error('Error removing newUserRole:', error);
     }
     // Create welcome message
-    const messageToBot = `Congratulate ${dbUser.username} on joining as a PROSPECT. Let them know they need to now prove themselves to become part of the Crew. Explain that they'll have to learn pirate skills and dogfighting to excel, but most importantly they need to learn how to work as a team member. Explain that Piracy is the most challenging and rewarding activity in StarCitizen, and that they're contributions to the crew's success will be crucial.`;
+    const messageToBot = `Congratulate ${dbUser.username} on joining as a PROSPECT. Let them know they need to now prove themselves to become part of the Crew. Explain that they'll have to learn pirate skills and dogfighting to excel, but most importantly to jump into a voice channel and play with the crew..`;
     let returnedMessage = "";
     try{
         returnedMessage = await notifyWelcomeForEmbed(dbUser, openai, client, messageToBot);
@@ -281,6 +281,7 @@ async function handleSimpleWelcomeProspect(interaction, client, openai){
         .setThumbnail(avatarUrl)
         .setColor(0x3498db)
         .addFields(
+            { name: 'Quick Info', value: '[Info Page](https://discord.com/channels/692428312840110090/1426579928161456238)', inline: false },
             { name: 'Website', value: '[ironpoint.org](https://www.ironpoint.org/)', inline: false },
             { name: 'Kill Tracker', value: '[BeowulfHunter](https://github.com/DocFoxHound/BeowulfHunterPy/releases/latest)', inline: false },
             { name: 'Dogfighting 101 Videos', value: `[Kozuka's Raptor 101](https://www.youtube.com/playlist?list=PL3P2dFMRGUtYJa4NauDruO76hSdNCDBOQ)`, inline: false },
