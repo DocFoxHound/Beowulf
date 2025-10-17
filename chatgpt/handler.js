@@ -110,13 +110,8 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
 
   // Send typing indicator and run via Responses API
   message.channel.sendTyping();
-  const text = await runWithResponses({
-    openai,
-    formattedUserMessage: formattedMessage,
-    guildId: message.guild?.id,
-    channelId: message.channelId,
-    rank: rankLabel || null,
-      contextSnippets: [
+  // Build context snippets with light logging for diagnostics
+  const contextParts = [
         ...(latestHit ? [latestHit] : []),
         // For piracy-specific questions, avoid chat snippets to reduce noise
         ...(!isPiracyIntent && recentSnippet ? [recentSnippet] : []),
@@ -129,8 +124,8 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
           guildId: message.guild?.id,
           preferVector: (process.env.KNOWLEDGE_PREFER_VECTOR || 'true').toLowerCase() === 'true',
         }) : []),
-        // Skip general retrieval for piracy intents; rely on curated hit-tracker knowledge
-        ...(!isPiracyIntent && looksInfoSeeking ? await getTopK({
+        // For general information-seeking intents, pull in retrieval context
+        ...(((routed?.intent === 'general.info') || (!isPiracyIntent && looksInfoSeeking)) ? await getTopK({
           query: message.content,
           k: 6,
           sources: ['messages', 'knowledge'],
@@ -140,7 +135,24 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
           preferVector: (process.env.KNOWLEDGE_PREFER_VECTOR || 'true').toLowerCase() === 'true',
           temporalHint: asksRecentActivity,
         }) : []),
-      ],
+  ];
+  if ((process.env.DEBUG_RETRIEVAL || 'false').toLowerCase() === 'true') {
+    try {
+      console.log('[retrieval] intent=', routed?.intent, 'piracyIntent=', isPiracyIntent);
+      console.log('[retrieval] contextParts count=', contextParts.length);
+      for (let i = 0; i < Math.min(5, contextParts.length); i++) {
+        console.log(`[retrieval] part[${i}]`, String(contextParts[i]).slice(0, 200));
+      }
+    } catch {}
+  }
+
+  const text = await runWithResponses({
+    openai,
+    formattedUserMessage: formattedMessage,
+    guildId: message.guild?.id,
+    channelId: message.channelId,
+    rank: rankLabel || null,
+      contextSnippets: contextParts,
   });
   if (text && text.trim()) {
     await sendResponse(message, text.trim(), true);

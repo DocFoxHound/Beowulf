@@ -280,7 +280,10 @@ client.on("messageCreate", async (message) => {
   if (!channelIds.includes(message.channelId) || !message.guild || message.system) {
     return;
   }
-  // saveMessage(message, client);
+  // Optionally persist messages to the backend for retrieval scoring
+  if ((process.env.SAVE_MESSAGES || 'false').toLowerCase() === 'true') {
+    try { await saveMessage(message, client); } catch {}
+  }
 
   // Detect if this message is directed at the bot: mention or reply to bot
   const isMentioningBot = message.mentions?.users?.has?.(client.user.id);
