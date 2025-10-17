@@ -205,7 +205,7 @@ async function handleMemberOrGuestJoin(interaction, client, openai) {
 async function handleSimpleJoin(interaction, client, openai){
     const { EmbedBuilder } = require('discord.js');
     const friendlyPendingRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.FRIENDLY_PENDING_ROLE : process.env.FRIENDLY_ROLE;
-    const bloodedToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.BLOODED_ROLE : process.env.TEST_BLOODED_ROLE;
+    const recruiterToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.RECRUITER_ROLE : process.env.TEST_RECRUITER_ROLE;
     const channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.WELCOME_CHANNEL : process.env.TEST_GENERAL_CHANNEL;
     const userId = interaction.user.id;
     const dbUser = await getUserById(userId);
@@ -234,9 +234,9 @@ async function handleSimpleJoin(interaction, client, openai){
         .setDescription(returnedMessage)
         .setThumbnail(avatarUrl)
         .setColor(0x3498db);
-    // Send embed to channel, ping bloodedToNotify role in message content
+    // Send embed to channel, ping recruiterToNotify role in message content
     const channel = guild.channels.cache.get(channelToNotify);
-    const ping = `<@&${bloodedToNotify}> <@${userId}>`;
+    const ping = `<@&${recruiterToNotify}> <@${userId}>`;
     if (channel) {
         await channel.send({ content: ping, embeds: [embed] });
     } else {
