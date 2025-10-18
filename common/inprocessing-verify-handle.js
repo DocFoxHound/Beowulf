@@ -233,7 +233,10 @@ async function handleSimpleJoin(interaction, client, openai){
         .setTitle(`${dbUser.username}, welcome to IronPoint!`)
         .setDescription(returnedMessage)
         .setThumbnail(avatarUrl)
-        .setColor(0x3498db);
+        .setColor(0x3498db)
+        .addFields(
+            { name: 'RSI Page', value: '[IRONPOINT](https://robertsspaceindustries.com/en/orgs/IRONPOINT)', inline: false }
+        );
     // Send embed to channel, ping recruiterToNotify role in message content
     const channel = guild.channels.cache.get(channelToNotify);
     const ping = `<@&${recruiterToNotify}> <@${userId}>`;
