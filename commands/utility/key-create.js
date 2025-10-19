@@ -31,7 +31,7 @@ module.exports = {
             if (result) {
                 // Send the API key to the user as an ephemeral message
                 await interaction.reply({
-                    content: `Your new API key has been generated:\n\`\`\`${apiKey}\`\`\`\nKeep it safe!`,
+                    content: `Your new API key has been generated:\nPlayer Key:\`\`\`${apiKey}\`\`\`\nOrg Key:\`\`\`${process.env.ORG_API_KEY}\`\`\`\nKeep it safe!`,
                     ephemeral: true
                 });
             } else {
