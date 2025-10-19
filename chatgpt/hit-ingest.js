@@ -1,4 +1,4 @@
-const { listKnowledge, createKnowledge, updateKnowledge, deleteKnowledge, updateKnowledgeEmbedding } = require('../api/knowledgeApi');
+const { listKnowledge, createKnowledge, updateKnowledge, deleteKnowledge, updateKnowledgeEmbedding, findKnowledgeByUrl, listAllKnowledgeUrls } = require('../api/knowledgeApi');
 const { getAllHitLogs } = require('../api/hitTrackerApi');
 
 function utcDayKey(d = new Date()) {
@@ -130,27 +130,27 @@ async function upsertHitKnowledge(openai, hit) {
   guild_id: process.env.GUILD_ID,
   };
 
-  // Try create, else attempt a targeted update by looking up existing by URL
+  // If a row already exists for this URL, update instead of creating to avoid unique constraint violations.
+  try {
+    const existing = await findKnowledgeByUrl({ url, category: 'piracy', section: 'hit-log' });
+    if (existing?.id) {
+      const ok = await updateKnowledge(existing.id, doc);
+      if (ok) await maybeUpdateEmbedding(openai, existing.id, doc.content);
+      return existing.id;
+    }
+  } catch (e) {
+    console.error('[hit-ingest] pre-check existing by URL failed:', e?.response?.data || e?.message || e);
+  }
+
+  // Try create; if it still fails (race/duplicate), fallback to update via URL lookup.
   const created = await createKnowledge(doc);
   if (created && created.id) {
     await maybeUpdateEmbedding(openai, created.id, doc.content);
     return created.id;
   }
   try {
-    // Fallback path (likely a duplicate / unique constraint): attempt to locate existing by URL.
-    // We page through results to avoid missing older rows beyond the initial limit.
-    const pageSize = 1000;
-    let offset = 0;
-    let existing = null;
-    while (!existing) {
-      const rows = await listKnowledge({ category: 'piracy', section: 'hit-log', limit: pageSize, offset, order: 'created_at.desc' }) || [];
-      if (!rows.length) break;
-      existing = rows.find(r => r.url === url);
-      if (existing) break;
-      if (rows.length < pageSize) break; // no more pages
-      offset += pageSize;
-      if (offset > 20000) break; // safety cap
-    }
+    // Fallback path (likely a duplicate / race): locate existing by URL directly.
+    const existing = await findKnowledgeByUrl({ url, category: 'piracy', section: 'hit-log' });
     if (existing?.id) {
       const ok = await updateKnowledge(existing.id, doc);
       if (ok) await maybeUpdateEmbedding(openai, existing.id, doc.content);
@@ -166,11 +166,8 @@ async function upsertHitKnowledge(openai, hit) {
 
 async function fetchExistingHitUrls() {
   try {
-    // Fetch a reasonably large recent set to build a URL index
-    const rows = await listKnowledge({ category: 'piracy', section: 'hit-log', limit: 200000, order: 'created_at.desc' }) || [];
-    const set = new Set();
-    for (const r of rows) if (r?.url) set.add(r.url);
-    return set;
+    // Page to build a URL index for dedupe checks
+    return await listAllKnowledgeUrls({ category: 'piracy', section: 'hit-log', pageSize: 2000, maxPages: 200 });
   } catch (e) {
     console.error('[hit-ingest] failed to list existing hits:', e?.response?.data || e?.message || e);
     return new Set();

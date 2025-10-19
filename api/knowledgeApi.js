@@ -74,6 +74,19 @@ async function createKnowledge(doc) {
         const status = error?.response?.status;
         const data = error?.response?.data;
         console.error('Error creating knowledge (primary):', { status, data });
+        // Fast-path: handle unique constraint errors by returning the existing row
+        try {
+            const msg = (typeof data === 'string' ? data : JSON.stringify(data || {})) || '';
+            const isUnique =
+                (data && (data.code === '23505' || data.constraint === 'knowledge_dedupe_uq')) ||
+                (typeof msg === 'string' && msg.toLowerCase().includes('duplicate key value'));
+            if (isUnique && doc?.url) {
+                const existing = await findKnowledgeByUrl({ url: doc.url, category: doc.category, section: doc.section });
+                if (existing) return existing;
+            }
+        } catch (e) {
+            console.error('createKnowledge dedupe lookup failed:', e?.response?.data || e?.message || e);
+        }
         // Retry with sanitized payload
         try {
             const doc1 = sanitizeDocLevel1(doc);
@@ -83,6 +96,19 @@ async function createKnowledge(doc) {
             const status2 = error2?.response?.status;
             const data2 = error2?.response?.data;
             console.error('Error creating knowledge (sanitized):', { status: status2, data: data2 });
+            // If sanitized attempt hits unique, resolve to existing
+            try {
+                const msg2 = (typeof data2 === 'string' ? data2 : JSON.stringify(data2 || {})) || '';
+                const isUnique2 =
+                    (data2 && (data2.code === '23505' || data2.constraint === 'knowledge_dedupe_uq')) ||
+                    (typeof msg2 === 'string' && msg2.toLowerCase().includes('duplicate key value'));
+                if (isUnique2 && (doc?.url || doc1?.url)) {
+                    const existing = await findKnowledgeByUrl({ url: doc?.url || doc1?.url, category: doc?.category || doc1?.category, section: doc?.section || doc1?.section });
+                    if (existing) return existing;
+                }
+            } catch (e2) {
+                console.error('createKnowledge dedupe lookup (sanitized) failed:', e2?.response?.data || e2?.message || e2);
+            }
             // Final fallback: minimal payload
             try {
                 const doc2 = minimalDoc(doc);
@@ -103,10 +129,68 @@ async function createKnowledge(doc) {
                 const status3 = error3?.response?.status;
                 const data3 = error3?.response?.data;
                 console.error('Error creating knowledge (minimal):', { status: status3, data: data3 });
+                // If minimal attempt still hits unique, resolve to existing
+                try {
+                    const msg3 = (typeof data3 === 'string' ? data3 : JSON.stringify(data3 || {})) || '';
+                    const isUnique3 =
+                        (data3 && (data3.code === '23505' || data3.constraint === 'knowledge_dedupe_uq')) ||
+                        (typeof msg3 === 'string' && msg3.toLowerCase().includes('duplicate key value'));
+                    if (isUnique3 && (doc?.url || doc2?.url)) {
+                        const existing = await findKnowledgeByUrl({ url: doc?.url || doc2?.url, category: doc?.category || doc2?.category, section: doc?.section || doc2?.section });
+                        if (existing) return existing;
+                    }
+                } catch (e3) {
+                    console.error('createKnowledge dedupe lookup (minimal) failed:', e3?.response?.data || e3?.message || e3);
+                }
                 return null;
             }
         }
     }
+}
+
+// Page through the knowledge list endpoint to find an entry by exact URL.
+// Optional category/section filters can narrow the scan.
+async function findKnowledgeByUrl({ url, category, section, pageSize = 500, maxPages = 200 }) {
+    if (!url) return null;
+    try {
+        let offset = 0;
+        for (let page = 0; page < maxPages; page++) {
+            const params = { limit: pageSize, offset, order: 'created_at.desc' };
+            if (category) params.category = category;
+            if (section) params.section = section;
+            const rows = await listKnowledge(params);
+            if (!Array.isArray(rows) || rows.length === 0) return null;
+            const found = rows.find(r => r?.url === url);
+            if (found) return found;
+            if (rows.length < pageSize) return null;
+            offset += pageSize;
+        }
+        return null;
+    } catch (error) {
+        console.error('Error in findKnowledgeByUrl:', error?.response?.data || error?.message || error);
+        return null;
+    }
+}
+
+// Collect all URLs for a given category/section by paginating; used for dedupe-fast path
+async function listAllKnowledgeUrls({ category, section, pageSize = 1000, maxPages = 200 }) {
+    const urls = new Set();
+    try {
+        let offset = 0;
+        for (let page = 0; page < maxPages; page++) {
+            const params = { limit: pageSize, offset, order: 'created_at.desc' };
+            if (category) params.category = category;
+            if (section) params.section = section;
+            const rows = await listKnowledge(params);
+            if (!Array.isArray(rows) || rows.length === 0) break;
+            for (const r of rows) if (r?.url) urls.add(r.url);
+            if (rows.length < pageSize) break;
+            offset += pageSize;
+        }
+    } catch (error) {
+        console.error('Error in listAllKnowledgeUrls:', error?.response?.data || error?.message || error);
+    }
+    return urls;
 }
 
 // PUT /api/knowledge/:id
@@ -166,4 +250,6 @@ module.exports = {
     deleteKnowledge,
     vectorSearchKnowledge,
     updateKnowledgeEmbedding,
+    findKnowledgeByUrl,
+    listAllKnowledgeUrls,
 };
