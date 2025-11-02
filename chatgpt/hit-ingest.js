@@ -50,6 +50,51 @@ function topCargoLines(cargo) {
   } catch { return []; }
 }
 
+// Build a concise, heuristic summary without calling an LLM
+function truncate(s, n) {
+  const str = String(s || '');
+  return str.length <= n ? str : str.slice(0, Math.max(0, n - 1)) + '…';
+}
+
+function buildHitHeuristicSummary(hit, dateKey) {
+  try {
+    const bullets = [];
+    const type = hit?.type_of_piracy || 'Piracy';
+    const mode = hit?.air_or_ground || 'unknown';
+    const owner = hit?.username || hit?.user_id || 'unknown';
+    const assists = (hit?.assists_usernames || hit?.assists || []).filter(Boolean);
+    const assistsPart = assists.length ? `${assists.length} assist(s)` : 'no assists';
+    bullets.push(`- ${type} hit (${mode}) by ${owner} with ${assistsPart}`);
+
+    const total = fmtCurrency(hit?.total_value);
+    const cut = fmtCurrency(hit?.total_cut_value);
+    const scu = Number(hit?.total_cut_scu || 0);
+    bullets.push(`- Value: total=${total}, cut=${cut} (${scu} SCU)`);
+
+    const cargoTop = topCargoLines(hit?.cargo)
+      .map(l => l.replace(/^\-\s*/, ''))
+      .slice(0, 3);
+    if (cargoTop.length) bullets.push(`- Cargo top: ${cargoTop.join(', ')}`);
+
+    if (Array.isArray(hit?.victims) && hit.victims.length) {
+      bullets.push(`- Victims: ${truncate(hit.victims.join(', '), 160)}`);
+    }
+
+    if (hit?.video_link || (Array.isArray(hit?.additional_media_links) && hit.additional_media_links.length)) {
+      const mediaCount = (hit.video_link ? 1 : 0) + (Array.isArray(hit.additional_media_links) ? hit.additional_media_links.length : 0);
+      bullets.push(`- Media: ${mediaCount} link(s)`);
+    }
+
+    if (hit?.story) {
+      bullets.push(`- Story: ${truncate(hit.story, 220)}`);
+    }
+
+    return bullets.join('\n');
+  } catch {
+    return '';
+  }
+}
+
 async function llmSummarizeHit(openai, model, hit, dateKey) {
   const system = 'You summarize piracy hits into concise, factual bullet points: target, method, location/air-ground, team, loot (value/SCU), notable moments, and outcome. Avoid fluff.';
   const prompt = `Hit: ${hit.title || 'Untitled'}\nDate(UTC): ${dateKey}\nType: ${hit.type_of_piracy}\nAir/Ground: ${hit.air_or_ground}\nOwner: ${hit.username || hit.user_id}\nAssists: ${(hit.assists_usernames || hit.assists || []).join(', ') || 'none'}\nTotal Value: ${fmtCurrency(hit.total_value)} (cut ${fmtCurrency(hit.total_cut_value)}, ${hit.total_cut_scu || 0} SCU)\nCargo(top):\n${topCargoLines(hit.cargo).join('\n') || '- none'}\nVictims: ${(hit.victims || []).join(', ') || 'unknown'}\nStory: ${hit.story || ''}\n\nSummarize in 5-8 bullets.`;
@@ -108,15 +153,9 @@ async function upsertHitKnowledge(openai, hit) {
     hit.story ? `Story:\n${hit.story}` : null,
   ].filter(Boolean).join('\n');
 
-  try {
-    if ((process.env.KNOWLEDGE_AI_SUMMARY || 'false') === 'true') {
-      const model = process.env.KNOWLEDGE_AI_MODEL || 'gpt-4o-mini';
-      const ai = await llmSummarizeHit(openai, model, hit, dateKey);
-      if (ai) content = `${content}\n\nAI Summary:\n${ai}`;
-    }
-  } catch (e) {
-    console.error('AI summarize hit failed:', e?.response?.data || e?.message || e);
-  }
+  // Append a lightweight heuristic summary instead of calling an LLM
+  const heuristic = buildHitHeuristicSummary(hit, dateKey);
+  if (heuristic) content = `${content}\n\nSummary:\n${heuristic}`;
 
   const doc = {
     source,
@@ -244,7 +283,8 @@ async function ingestHitLogs(client, openai) {
 // Optionally compute and store an embedding for a knowledge row to enable vector search
 async function maybeUpdateEmbedding(openai, id, text) {
   try {
-    if ((process.env.KNOWLEDGE_EMBED_ON_INGEST || 'false') !== 'true') return;
+    // Enable embeddings by default; allow explicit opt-out via KNOWLEDGE_EMBED_ON_INGEST=false
+    if ((process.env.KNOWLEDGE_EMBED_ON_INGEST || 'true') === 'false') return;
     if (!openai || !id || !text) return;
     const model = process.env.EMBEDDING_MODEL || 'text-embedding-3-small';
     const input = String(text).slice(0, 8000);

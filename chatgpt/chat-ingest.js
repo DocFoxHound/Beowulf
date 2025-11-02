@@ -284,17 +284,8 @@ async function generateUserDailySummaries({ client, openai, channel, dateKey, ms
     const username = rec?.nickname || rec?.username || userId;
     const { lines, ownCount, mentionCount } = buildUserRelatedLines(msgs, userId, rec);
     if (!lines.length && ownCount === 0 && mentionCount === 0) continue;
-    let content = buildUserHeuristicSummary({ dateKey, channelName: channel.name || channel.id, username, userId, ownCount, mentionCount, sampleLines: lines.slice(0, 3) });
-    try {
-      if ((process.env.KNOWLEDGE_AI_SUMMARY || 'false') === 'true' && lines.length) {
-        const model = process.env.KNOWLEDGE_AI_MODEL || 'gpt-4o-mini';
-        const transcript = lines.join('\n');
-        const ai = await summarizeUserDailyWithAI(openai, model, channel.name || channel.id, dateKey, username, userId, transcript);
-        if (ai) content = `${content}\n\nAI Summary (user):\n${ai}`;
-      }
-    } catch (e) {
-      console.error('AI user summarization failed, using heuristic:', e?.response?.data || e?.message || e);
-    }
+    // Always use heuristic-only per-user summaries; disable AI to avoid quota usage
+    const content = buildUserHeuristicSummary({ dateKey, channelName: channel.name || channel.id, username, userId, ownCount, mentionCount, sampleLines: lines.slice(0, 3) });
   await upsertUserDailySummary({ guildId, channel, dateKey, userId, username, content, openai });
   }
 }
@@ -416,7 +407,8 @@ async function upsertDailySummary({ guildId, channel, dateKey, content, openai }
 // Optionally compute and store an embedding for a knowledge row to enable vector search
 async function maybeUpdateEmbedding(openai, id, text) {
   try {
-    if ((process.env.KNOWLEDGE_EMBED_ON_INGEST || 'false') !== 'true') return;
+    // Enable embeddings by default; allow explicit opt-out via KNOWLEDGE_EMBED_ON_INGEST=false
+    if ((process.env.KNOWLEDGE_EMBED_ON_INGEST || 'true') === 'false') return;
     if (!openai || !id || !text) return;
     const model = process.env.EMBEDDING_MODEL || 'text-embedding-3-small';
     const input = String(text).slice(0, 8000);
@@ -461,27 +453,8 @@ async function processChannel(client, openai, channelId) {
   const { participants, topKeywords, topQuotes } = analyzeMessages(msgs);
     const baseHeader = buildSummaryContent({ dateKey: today, channelName: channel.name || channel.id, msgsCount: msgs.length, participants, topKeywords, topQuotes });
 
-    let content = baseHeader;
-    try {
-      if ((process.env.KNOWLEDGE_AI_SUMMARY || 'false') === 'true') {
-        const model = process.env.KNOWLEDGE_AI_MODEL || 'gpt-4o-mini';
-        const chunks = chunkTranscript(msgs, 4000, 8);
-        if (chunks.length) {
-          const partials = [];
-          for (const ch of chunks) {
-            const s = await summarizeChunkWithAI(openai, model, channel.name || channel.id, today, ch);
-            if (s) partials.push(s);
-          }
-          if (partials.length) {
-            const merged = await summarizeDailyWithAI(openai, model, channel.name || channel.id, today, partials);
-            if (merged) content = `${baseHeader}\n\nAI Summary:\n${merged}`;
-          }
-        }
-      }
-    } catch (aiErr) {
-      console.error('AI summarization failed, falling back to heuristic summary:', aiErr?.response?.data || aiErr?.message || aiErr);
-      // content remains baseHeader
-    }
+    // Always use heuristic header only; disable AI summarization to avoid quota usage
+    const content = baseHeader;
   await upsertDailySummary({ guildId, channel, dateKey: today, content, openai });
   // Per-user summaries for today
   await generateUserDailySummaries({ client, openai, channel, dateKey: today, msgs });
@@ -548,27 +521,9 @@ async function maybeBackfillChannel(client, openai, channelId) {
       if (!dayMsgs.length) continue;
       const { participants, topKeywords, topQuotes } = analyzeMessages(dayMsgs);
       const baseHeader = buildSummaryContent({ dateKey, channelName: channel.name || channel.id, msgsCount: dayMsgs.length, participants, topKeywords, topQuotes });
-      let content = baseHeader;
-      try {
-        if ((process.env.KNOWLEDGE_AI_SUMMARY || 'false') === 'true') {
-          const model = process.env.KNOWLEDGE_AI_MODEL || 'gpt-4o-mini';
-          const chunks = chunkTranscript(dayMsgs, 4000, 8);
-          if (chunks.length) {
-            const partials = [];
-            for (const ch of chunks) {
-              const s = await summarizeChunkWithAI(openai, model, channel.name || channel.id, dateKey, ch);
-              if (s) partials.push(s);
-            }
-            if (partials.length) {
-              const merged = await summarizeDailyWithAI(openai, model, channel.name || channel.id, dateKey, partials);
-              if (merged) content = `${baseHeader}\n\nAI Summary:\n${merged}`;
-            }
-          }
-        }
-      } catch (aiErr) {
-        console.error('AI summarization (backfill) failed, using heuristic:', aiErr?.response?.data || aiErr?.message || aiErr);
-      }
-  await upsertDailySummary({ guildId, channel, dateKey, content, openai });
+      // Always use heuristic header only during backfill; disable AI summarization
+      const content = baseHeader;
+    await upsertDailySummary({ guildId, channel, dateKey, content, openai });
       await generateUserDailySummaries({ client, openai, channel, dateKey, msgs: dayMsgs });
       createdCount++;
     }
