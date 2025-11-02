@@ -47,6 +47,7 @@ const { refreshPlayerStatsView } = require('./api/playerStatsApi.js');
 const { ingestDailyChatSummaries } = require('./chatgpt/chat-ingest.js');
 const { ingestHitLogs } = require('./chatgpt/hit-ingest.js');
 const { ingestPlayerStats } = require('./chatgpt/player-stats-ingest.js');
+const { removeProspectFromFriendlies } = require('./common/remove-prospect-from-friendly.js');
 
 
 // Initialize dotenv config file
@@ -207,6 +208,13 @@ client.on("ready", async () => {
   try { await ingestPlayerStats(client); } catch (e) { console.error('Initial player-stats ingest failed:', e); }
   // await processPlayerLeaderboards(client, openai)
   console.log("Ready")
+
+  // One-time startup fix: remove PROSPECT_ROLE from users who also have FRIENDLY_ROLE
+  try {
+    await removeProspectFromFriendlies(client);
+  } catch (e) {
+    console.error('Prospect->Friendly cleanup failed:', e);
+  }
 
   setInterval(() => processUEXData("terminal_prices"), 
     86400000 //every 24 hours
