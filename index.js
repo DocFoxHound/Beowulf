@@ -202,19 +202,13 @@ client.on("ready", async () => {
 
 
   preloadedDbTables = await preloadFromDb(); //leave on
+  await removeProspectFromFriendlies(client);
   await refreshUserlist(client, openai) //actually leave this here
   try { await ingestDailyChatSummaries(client, openai); } catch (e) { console.error('Initial chat ingest failed:', e); }
   try { await ingestHitLogs(client, openai); } catch (e) { console.error('Initial hit ingest failed:', e); }
   try { await ingestPlayerStats(client); } catch (e) { console.error('Initial player-stats ingest failed:', e); }
   // await processPlayerLeaderboards(client, openai)
   console.log("Ready")
-
-  // One-time startup fix: remove PROSPECT_ROLE from users who also have FRIENDLY_ROLE
-  try {
-    await removeProspectFromFriendlies(client);
-  } catch (e) {
-    console.error('Prospect->Friendly cleanup failed:', e);
-  }
 
   setInterval(() => processUEXData("terminal_prices"), 
     86400000 //every 24 hours

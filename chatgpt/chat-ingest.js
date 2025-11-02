@@ -405,19 +405,29 @@ async function upsertDailySummary({ guildId, channel, dateKey, content, openai }
 }
 
 // Optionally compute and store an embedding for a knowledge row to enable vector search
+let EMBED_COOLDOWN_UNTIL = 0; // epoch ms until which embeddings are disabled due to 429s
+const { getEmbedding } = require('../common/embeddings');
 async function maybeUpdateEmbedding(openai, id, text) {
   try {
-    // Enable embeddings by default; allow explicit opt-out via KNOWLEDGE_EMBED_ON_INGEST=false
-    if ((process.env.KNOWLEDGE_EMBED_ON_INGEST || 'true') === 'false') return;
-    if (!openai || !id || !text) return;
-    const model = process.env.EMBEDDING_MODEL || 'text-embedding-3-small';
-    const input = String(text).slice(0, 8000);
-    const resp = await openai.embeddings.create({ model, input });
-    const embedding = resp?.data?.[0]?.embedding;
+    // Opt-in only: default disabled unless KNOWLEDGE_EMBED_ON_INGEST=true
+    const embedFlag = (process.env.KNOWLEDGE_EMBED_ON_INGEST || 'false').toLowerCase();
+    if (embedFlag !== 'true') return;
+    // Temporary circuit breaker after rate-limit/quota errors
+    if (Date.now() < EMBED_COOLDOWN_UNTIL) return;
+    if (!id || !text) return;
+    // Use unified embeddings provider (local or openai), controlled by EMBEDDINGS_PROVIDER
+    const embedding = await getEmbedding({ text, openai });
     if (Array.isArray(embedding) && embedding.length) {
       await updateKnowledgeEmbedding(id, embedding);
     }
   } catch (e) {
+    const status = e?.status || e?.response?.status;
+    if (status === 429 || /\b429\b/.test(String(e?.message || ''))) {
+      const cooldownMs = Number(process.env.KNOWLEDGE_EMBED_COOLDOWN_MS || 60 * 60 * 1000);
+      EMBED_COOLDOWN_UNTIL = Date.now() + cooldownMs;
+      console.warn(`[embeddings] rate limited (429); disabling until ${new Date(EMBED_COOLDOWN_UNTIL).toISOString()}`);
+      return;
+    }
     console.error('maybeUpdateEmbedding error:', e?.response?.data || e?.message || e);
   }
 }

@@ -25,6 +25,7 @@
     "lodash": "^4.17.21",
     "openai": "^4.78.1",
     "pm2": "^6.0.5",
+    "@xenova/transformers": "^3.1.0",
     "string-progressbar": "^1.0.4"
   },
   "scripts": {
