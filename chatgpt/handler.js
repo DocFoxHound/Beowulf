@@ -35,6 +35,8 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
   const routed = await routeIntent(openai, formattedMessage);
   const isPiracyIntent = Boolean((routed?.intent || '').startsWith('piracy.'));
   const isDogfightingIntent = Boolean((routed?.intent || '').startsWith('dogfighting.'));
+  const useAutoRouter = ((process.env.AUTO_ROUTER_ENABLED || 'true').toLowerCase() === 'true') && (!routed?.intent || routed.intent === 'other' || (Number(routed?.confidence || 0) < 0.7));
+  const autoPlan = useAutoRouter ? await autoPlanRetrieval(openai, formattedMessage) : null;
 
   // Fast, factual handling for piracy.stats (e.g., "best hit recently")
   if (routed?.intent === 'piracy.stats') {
@@ -175,6 +177,27 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
         // For piracy-specific questions, avoid chat snippets to reduce noise
         ...(!isPiracyIntent && recentSnippet ? [recentSnippet] : []),
         ...(!isPiracyIntent && recentActivity ? [recentActivity] : []),
+        // Auto-router: when enabled and triggered, query per LLM plan
+        ...((autoPlan && autoPlan.sources?.includes('messages')) ? await getTopK({
+          query: autoPlan.query || message.content,
+          k: autoPlan.k_messages || 6,
+          sources: ['messages'],
+          openai,
+          guildId: message.guild?.id,
+          channelId: autoPlan.prefer_channel ? message.channelId : undefined,
+          preferVector: (process.env.KNOWLEDGE_PREFER_VECTOR || 'true').toLowerCase() === 'true',
+          temporalHint: Boolean(autoPlan.temporalHint),
+        }) : []),
+        ...((autoPlan && autoPlan.sources?.includes('knowledge')) ? await getTopK({
+          query: autoPlan.query || message.content,
+          k: autoPlan.k_knowledge || 4,
+          sources: ['knowledge'],
+          openai,
+          guildId: message.guild?.id,
+          channelId: message.channelId,
+          preferVector: (process.env.KNOWLEDGE_PREFER_VECTOR || 'true').toLowerCase() === 'true',
+          temporalHint: Boolean(autoPlan.temporalHint),
+        }) : []),
         // For dogfighting-related asks, pull targeted chat snippets first (prioritize messages)
         ...(isDogfightingIntent ? await getTopK({
           query: buildDogfightingQuery(message.content, routed?.intent, routed?.filters),
@@ -230,7 +253,7 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
   ];
   if ((process.env.DEBUG_RETRIEVAL || 'false').toLowerCase() === 'true') {
     try {
-      console.log('[retrieval] intent=', routed?.intent, 'piracyIntent=', isPiracyIntent);
+      console.log('[retrieval] intent=', routed?.intent, 'conf=', routed?.confidence, 'piracyIntent=', isPiracyIntent, 'dogfightingIntent=', isDogfightingIntent, 'autoUsed=', Boolean(autoPlan));
       console.log('[retrieval] contextParts count=', contextParts.length);
       for (let i = 0; i < Math.min(5, contextParts.length); i++) {
         console.log(`[retrieval] part[${i}]`, String(contextParts[i]).slice(0, 200));
@@ -339,6 +362,74 @@ function buildDogfightingQuery(content, intent, filters) {
     return [ship, s, 'dogfighting', focus].filter(Boolean).join(' ');
   } catch {
     return String(content || '');
+  }
+}
+
+// LLM self-query auto-router: judges category and retrieval plan, produces enriched query
+async function autoPlanRetrieval(openai, content) {
+  try {
+    if (!openai) return null;
+    const model = process.env.KNOWLEDGE_AI_MODEL || 'gpt-4o-mini';
+    const system = 'You are a retrieval planner for a Discord bot. Classify the user message into a broad category and decide whether to search recent chats, knowledge docs, or both. Extract concise keywords and entities (e.g., ship names, item names) and produce one focused search query string. Output compact JSON only.';
+    const schema = {
+      category: 'one of: dogfighting, piracy, market, chat, users, general',
+      sources: 'array including any of: messages, knowledge',
+      prefer_channel: 'boolean if channel-local chat should be prioritized',
+      temporalHint: 'boolean if recency matters based on phrasing (today, this week, etc.)',
+      query: 'string to use for retrieval',
+      keywords: 'array of short keywords',
+      ship_name: 'optional string',
+      item_name: 'optional string',
+      k_messages: 'optional integer 1..10',
+      k_knowledge: 'optional integer 1..10',
+    };
+    const user = `Message: ${content}\nReturn JSON with fields: ${JSON.stringify(Object.keys(schema))}.`;
+    let out = null;
+    if (openai?.responses?.create) {
+      const res = await openai.responses.create({
+        model,
+        input: [
+          { role: 'system', content: [{ type: 'text', text: system }] },
+          { role: 'user', content: [{ type: 'text', text: `Schema: ${JSON.stringify(schema)}` }] },
+          { role: 'user', content: [{ type: 'text', text: user }] },
+        ],
+      });
+      out = res.output_text?.trim?.();
+    } else if (openai?.chat?.completions?.create) {
+      const resp = await openai.chat.completions.create({
+        model,
+        temperature: 0,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: `Schema: ${JSON.stringify(schema)}` },
+          { role: 'user', content: user },
+        ],
+      });
+      out = resp.choices?.[0]?.message?.content?.trim();
+    }
+    if (!out) return null;
+    try {
+      const plan = JSON.parse(out);
+      // Normalize sources
+      const sources = Array.isArray(plan.sources) ? plan.sources.filter(v => v === 'messages' || v === 'knowledge') : ['messages'];
+      return {
+        category: plan.category || 'general',
+        sources: sources.length ? sources : ['messages'],
+        prefer_channel: Boolean(plan.prefer_channel),
+        temporalHint: Boolean(plan.temporalHint),
+        query: String(plan.query || '').slice(0, 400) || String(content || ''),
+        keywords: Array.isArray(plan.keywords) ? plan.keywords.slice(0, 8) : [],
+        ship_name: plan.ship_name || null,
+        item_name: plan.item_name || null,
+        k_messages: Math.max(1, Math.min(10, Number(plan.k_messages || 6))) || 6,
+        k_knowledge: Math.max(1, Math.min(10, Number(plan.k_knowledge || 4))) || 4,
+      };
+    } catch {
+      return null;
+    }
+  } catch (e) {
+    console.error('autoPlanRetrieval error:', e?.response?.data || e?.message || e);
+    return null;
   }
 }
 
