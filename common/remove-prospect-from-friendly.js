@@ -19,6 +19,7 @@ function chunk(arr, n) {
  * @param {import('discord.js').Client} client
  */
 async function removeProspectFromFriendlies(client) {
+    console.log('[prospect-friendly-fix] Starting cleanup to remove PROSPECT_ROLE from members with FRIENDLY_ROLE.');
   try {
     const prospectRoleId = process.env.PROSPECT_ROLE;
     const friendlyRoleId = process.env.FRIENDLY_ROLE;
