@@ -320,12 +320,12 @@ async function handleSimpleWelcomeGuest(interaction, client, openai){
         console.error('Error removing newUserRole:', error);
     }
     // Create welcome message
-    const messageToBot = `Welcome ${dbUser.username} as a Guest of IronPoint. Let them know that they're free to join in on the action whenever they feel like it, but to respect our rules. Tell them if they'd like to join, to please let DocHound or any of the Blooded members know.`;
+    const messageToBot = `Welcome ${dbUser.username} as a Guest of IronPoint. Let them know that they're free to join in on the action whenever they feel like it, but we'd rather have them apply to the crew. Explain that our Crew is top notch and is looking for eager and aggressive players.`;
     let returnedMessage = "";
     try{
         returnedMessage = await notifyWelcomeForEmbed(dbUser, openai, client, messageToBot);
     }catch(error){
-        returnedMessage = "Welcome to IronPoint! We're glad to have you as a guest. If you are interested in joining IronPoint as a member, feel free to apply when we are recruiting! In the meantime, feel free to tag along whenever you see us online.";
+        returnedMessage = "Welcome to IronPoint, the best Pirate Crew in Star Citizen! We're glad to have you here. If you are interested in joining IronPoint as a member, then apply! We are looking for bloodthirsty and smart players, and we'd be glad to add you to our Crew if you fit in! In the meantime, feel free to tag along whenever you see us online and enjoy yourself.";
         console.error("Error notifying welcome for embed:", error);
     }
     // Create embed with avatar, title, and welcome message
@@ -336,6 +336,7 @@ async function handleSimpleWelcomeGuest(interaction, client, openai){
         .setThumbnail(avatarUrl)
         .setColor(0x3498db)
         .addFields(
+            { name: 'Apply to IronPoint', value: '[💀Join IronPoint💀](https://discord.com/channels/692428312840110090/1434066387529240646)', inline: false },
             { name: 'Website', value: '[ironpoint.org](https://www.ironpoint.org/)', inline: false },
             { name: 'Kill Tracker', value: '[BeowulfHunter](https://github.com/DocFoxHound/BeowulfHunterPy/releases/latest)', inline: false },
             { name: 'Dogfighting 101 Videos', value: `[Kozuka's Raptor 101](https://www.youtube.com/playlist?list=PL3P2dFMRGUtYJa4NauDruO76hSdNCDBOQ)`, inline: false },

@@ -174,9 +174,14 @@ function nameCandidates(rec) {
   if (rec?.nickname) out.add(rec.nickname.toLowerCase());
   // Also split on spaces for nicknames with multiple words
   for (const s of Array.from(out)) {
-    for (const part of s.split(/\s+/)) if (part.length > 2) out.add(part);
+    for (const part of s.split(/\s+/)) {
+      const p = part.trim().toLowerCase();
+      if (p && p.length > 2 && !STOPWORDS.has(p)) out.add(p);
+    }
   }
-  return Array.from(out);
+  // Remove generic stopwords from full names too
+  const filtered = Array.from(out).filter(v => v && v.length > 2 && !STOPWORDS.has(v));
+  return filtered;
 }
 
 function buildUserRelatedLines(msgs, targetId, rec) {
@@ -189,8 +194,13 @@ function buildUserRelatedLines(msgs, targetId, rec) {
     const text = (m.content || '');
     const isOwn = m.author?.id === targetId;
     const isMention = Boolean(m.mentions?.users?.has?.(targetId));
-    const lower = text.toLowerCase();
-    const nameHit = names.length ? names.some(n => n && new RegExp(`(^|[^a-z0-9])${n}([^a-z0-9]|$)`, 'i').test(lower)) : false;
+    // Normalize text and candidate names to alphanumeric tokens; avoid fragile regex construction
+    const norm = ` ${String(text).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()} `;
+    const nameHit = names.length ? names.some(n => {
+      const safe = ` ${String(n || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()} `;
+      if (!safe || safe.trim().length < 3) return false;
+      return norm.includes(safe);
+    }) : false;
     if (isOwn) ownCount++;
     if (isMention || nameHit) mentionCount++;
     if (isOwn || isMention || nameHit) {
