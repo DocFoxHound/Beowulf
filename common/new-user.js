@@ -10,7 +10,7 @@ function getGuild(client) {
 
 async function handleNewGuildMember(member, client, openai) {
     const logChannel = process.env.LIVE_ENVIRONMENT === "true" ? process.env.ENTRY_LOG_CHANNEL : process.env.TEST_ENTRY_LOG_CHANNEL;
-    const friendlyRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.FRIENDLY_ROLE : process.env.TEST_FRIENDLY_ROLE;
+    const friendlyRole = process.env.LIVE_ENVIRONMENT === "true" ? (process.env.FRIENDLY_ROLE || process.env.TEST_FRIENDLY_ROLE) : (process.env.TEST_FRIENDLY_ROLE || process.env.FRIENDLY_ROLE);
     const guild = getGuild(member.client);
     
     try {
@@ -41,15 +41,21 @@ async function handleNewGuildMember(member, client, openai) {
                 joined_date: new Date().toISOString(),
             };
             result = await createUser(newUser);
-            // Assign newUserRole if not already present
-            if (!member.roles.cache.has(friendlyRole)) {
-                try {
-                    await member.roles.add(friendlyRole);
-                } catch (roleErr) {
-                    console.error("Error adding new user role: ", roleErr);
-                }
-            }
             actionMsg = `User ${member.user.username} has been successfully added to the Database.`;
+        }
+
+        // Ensure Friendly role is applied for both new and returning users
+        if (!friendlyRole) {
+            console.warn(`[handleNewGuildMember] FRIENDLY_ROLE/TEST_FRIENDLY_ROLE not set. LIVE_ENVIRONMENT=${process.env.LIVE_ENVIRONMENT}`);
+        } else if (!member.roles.cache.has(friendlyRole)) {
+            try {
+                await member.roles.add(friendlyRole, 'Auto-assign Friendly role on join');
+                actionMsg += ` Friendly role applied.`;
+            } catch (roleErr) {
+                const errMsg = `[handleNewGuildMember] Failed to add Friendly role (${friendlyRole}) to ${member.user.tag}: ${roleErr?.message || roleErr}`;
+                console.error(errMsg);
+                actionMsg += ` Failed to apply Friendly role.`;
+            }
         }
 
         if (result) {

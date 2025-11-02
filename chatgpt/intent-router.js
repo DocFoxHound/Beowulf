@@ -1,6 +1,8 @@
 const SAFE_INTENTS = [
   // Piracy-focused intents
   'piracy.latest',        // user wants the most recent hit
+  'piracy.summary',       // user wants a recap/summary of recent hits
+  'piracy.advice',        // user asks general piracy questions/tips/strategy
   'piracy.find',          // user wants specific hits (by patch/owner/date/keywords)
   'piracy.stats',         // user wants counts or value aggregates over hits
   // Chat/General
@@ -71,8 +73,17 @@ function parseTimeframe(s) {
 function quickHeuristic(text) {
   const s = String(text || '').toLowerCase();
   const isPiracy = /(\bhit\b|\bhits\b|\bpiracy\b|\bpirate\b)/.test(s);
-  if (isPiracy && /(latest|most\s*recent|last)\s+hit/.test(s)) {
+  // Allow both singular and plural (e.g., "latest hit" and "latest hits")
+  if (isPiracy && /(latest|most\s*recent|last)\s+hits?/.test(s)) {
     return { intent: 'piracy.latest', confidence: 0.95, filters: {} };
+  }
+  // Recap/summary of recent hits, broader phrasing than just "latest"
+  if (isPiracy && /(summar(y|ise|ize)|recap|overview|what\s+happened|what\s+did\s+we\s+do|brief me|catch\s+me\s+up)/.test(s)) {
+    const filters = { ...parseTimeframe(s) };
+    // Optional limit detection: "top 3", "last 5"
+    const lim = (s.match(/\b(last|top)\s+(\d{1,2})\b/) || [])[2];
+    if (lim) filters.limit = Math.max(1, Math.min(10, Number(lim)));
+    return { intent: 'piracy.summary', confidence: 0.9, filters };
   }
   if (isPiracy && /(how many|count|sum|total|average|avg|highest|max|lowest|min|best|biggest|largest|most\s+valuable)/.test(s)) {
     let metric = undefined;
@@ -82,6 +93,10 @@ function quickHeuristic(text) {
     if (/(sum|total)/.test(s)) metric = metric || 'total_value';
     if (/(how many|count)/.test(s)) metric = metric || 'count';
     return { intent: 'piracy.stats', confidence: 0.85, filters: { metric, ...parseTimeframe(s) } };
+  }
+  // General piracy Q&A / advice
+  if (isPiracy && /(how\b|what\b|why\b|where\b|when\b|should\b|tips?|advice|guide|strategy|strategies|strats|tactic|tactics|approach|recommend|avoid|counter|deal\s+with|handle|board|trap|ambush|disable|scan)/.test(s)) {
+    return { intent: 'piracy.advice', confidence: 0.8, filters: { ...parseTimeframe(s) } };
   }
   if (isPiracy) {
     const patch = (s.match(/\b(\d+\.\d+(?:\.\d+)?)\b/) || [])[1] || null;
@@ -107,18 +122,31 @@ function quickHeuristic(text) {
   if (/\b(best|optimal)\b/.test(s) && /\b(price|profit|route)\b/.test(s)) {
     return { intent: 'market.best', confidence: 0.7, filters: { ...parseTimeframe(s) } };
   }
-  // Dogfighting
-  if (/\bdogfight|\bpvp\b|\bvtol\b|\bloadout\b|\bmeta\b|\bstrat|\btactic|\btraining\b/.test(s)) {
-    if (/\bloadout|guns|cannon|shield|power|cooler|components?\b/.test(s)) {
-      return { intent: 'dogfighting.equipment', confidence: 0.75, filters: {} };
+  // Dogfighting (pilotry, loadouts, equipment, strategies)
+  const dogfightCue = /(\bdogfight\b|\bpvp\b|\bvtol\b|\bspace\s*pvp\b|\bpilotry\b|\bpiloting\b|\bflight\b|\bflying\b|\baim\b|\bpip\b|\bdecouple\b|\bstrafe\b|\bjoust\b|\bduel\b|\bace\b|\bintercept\b|\bloadouts?\b|\boutfits?\b|\bequipment\b|\bcomponents?\b|\bmeta\b|\bstrat|\btactic|\btraining\b)/;
+  if (dogfightCue.test(s)) {
+    // Try to extract a simple ship name phrase e.g. "for my Gladius” or “Arrow loadout”
+    const shipFromFor = (s.match(/(?:for|on|in)\s+(?:the|my|an|a)?\s*([a-z0-9\-\' ]{3,30})\b/) || [])[1] || null;
+    const shipFromBare = (s.match(/\b([a-z][a-z0-9\-\' ]{2,30})\s+(?:loadouts?|outfits?|fit|build|setup)/) || [])[1] || null;
+    const ship_name = (shipFromBare || shipFromFor || '').trim() || null;
+
+    // Equipment / loadout oriented
+    if (/(\bloadouts?|outfits?|fit|build|setup\b|\bguns?\b|\bcannons?\b|\brepeaters?\b|\bballistic\b|\blaser\b|\bdisto|\bdistortion\b|\bgimbal|\bgimballed\b|\bfixed\b|\bshield\b|\bpower\b|\bcoolers?\b|\bcomponents?\b)/.test(s)) {
+      return { intent: 'dogfighting.equipment', confidence: 0.8, filters: { ship_name } };
     }
+    // Which/best ship queries or ship vs ship matchups
+    if (/(\bbest\b|\bwhich\b|\bwhat\b).*\b(ship|fighter)\b/.test(s) || /\bvs\.?\b/.test(s)) {
+      return { intent: 'dogfighting.ships', confidence: 0.75, filters: { ship_name } };
+    }
+    // Meta
     if (/\bmeta\b/.test(s)) {
-      return { intent: 'dogfighting.meta', confidence: 0.75, filters: {} };
+      return { intent: 'dogfighting.meta', confidence: 0.8, filters: { ship_name } };
     }
-    if (/\btraining\b/.test(s)) {
-      return { intent: 'dogfighting.training', confidence: 0.7, filters: {} };
+    // Training / piloting fundamentals
+    if (/(\btraining\b|\bpractice\b|\blearn\b|\bhow\s+to\s+fly\b|\bimprove\s+(aim|pip|strafe|tracking)\b)/.test(s)) {
+      return { intent: 'dogfighting.training', confidence: 0.75, filters: { ship_name } };
     }
-    return { intent: 'dogfighting.strategies', confidence: 0.7, filters: {} };
+    return { intent: 'dogfighting.strategies', confidence: 0.75, filters: { ship_name } };
   }
   // User-focused
   if (/<@!?\d+>/.test(text) || /\buser\b|\bmember\b|\bstats\b/.test(s)) {

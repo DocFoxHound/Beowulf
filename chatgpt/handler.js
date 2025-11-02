@@ -34,6 +34,7 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
   const { routeIntent } = require('./intent-router');
   const routed = await routeIntent(openai, formattedMessage);
   const isPiracyIntent = Boolean((routed?.intent || '').startsWith('piracy.'));
+  const isDogfightingIntent = Boolean((routed?.intent || '').startsWith('dogfighting.'));
 
   // Fast, factual handling for piracy.stats (e.g., "best hit recently")
   if (routed?.intent === 'piracy.stats') {
@@ -78,6 +79,64 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
     }
   }
 
+  // Deterministic recap of recent hits from knowledge for piracy.latest / piracy.summary
+  if (routed?.intent === 'piracy.latest' || routed?.intent === 'piracy.summary') {
+    try {
+      const filters = routed?.filters || {};
+      const limit = Math.max(1, Math.min(10, Number(filters.limit || (routed.intent === 'piracy.latest' ? 1 : 3))));
+      const rows = await listKnowledge({ category: 'piracy', section: 'hit-log', limit: Math.max(limit * 3, 10), order: 'created_at.desc' }) || [];
+      const ds = filters?.date_start ? new Date(filters.date_start + 'T00:00:00Z') : null;
+      const de = filters?.date_end ? new Date(filters.date_end + 'T23:59:59Z') : null;
+      const getDateFromTags = (r) => {
+        try {
+          const tag = Array.isArray(r.tags) ? (r.tags.find(t => String(t).startsWith('date:')) || '') : '';
+          return tag ? tag.slice(5) : null; // YYYY-MM-DD
+        } catch { return null; }
+      };
+      const withinRange = (r) => {
+        if (!ds && !de) return true;
+        const tagDate = getDateFromTags(r);
+        const d = tagDate ? new Date(tagDate + 'T12:00:00Z') : (r.created_at ? new Date(r.created_at) : null);
+        if (!d) return true;
+        if (ds && d < ds) return false;
+        if (de && d > de) return false;
+        return true;
+      };
+      const pickSummaryLines = (content) => {
+        try {
+          const s = String(content || '');
+          const idx = s.indexOf('Summary:');
+          const block = idx >= 0 ? s.slice(idx + 8) : s; // 8 = 'Summary:'.length
+          const lines = block.split(/\r?\n/).map(l => l.trim());
+          // Prefer bullet lines first
+          const bullets = lines.filter(l => /^[-•]/.test(l)).slice(0, 4);
+          if (bullets.length) return bullets;
+          // Fallback: take first few non-empty lines
+          return lines.filter(Boolean).slice(0, 4);
+        } catch { return []; }
+      };
+      const filtered = rows.filter(withinRange).slice(0, limit);
+      if (!filtered.length) {
+        await sendResponse(message, 'No recent hits found to summarize.', true);
+        return;
+      }
+      const parts = [];
+      parts.push(routed.intent === 'piracy.latest' ? 'Latest piracy hit:' : 'Recent piracy hits:');
+      for (const r of filtered) {
+        const dt = getDateFromTags(r) || (r.created_at ? String(r.created_at).slice(0,10) : 'recent');
+        const title = r.title || 'Hit';
+        const lines = pickSummaryLines(r.content);
+        parts.push(`- ${dt} — ${title}`);
+        for (const l of lines) parts.push(`  ${l}`);
+      }
+      await sendResponse(message, parts.join('\n'), true);
+      return;
+    } catch (e) {
+      console.error('piracy.latest/summary handling failed:', e?.response?.data || e?.message || e);
+      // fall through to normal flow
+    }
+  }
+
   // Prefer knowledge-based daily summaries for recent-activity queries; fallback to quick snapshot
   let recentActivity = '';
   if (asksRecentActivity) {
@@ -116,6 +175,28 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
         // For piracy-specific questions, avoid chat snippets to reduce noise
         ...(!isPiracyIntent && recentSnippet ? [recentSnippet] : []),
         ...(!isPiracyIntent && recentActivity ? [recentActivity] : []),
+        // For dogfighting-related asks, pull targeted chat snippets first (prioritize messages)
+        ...(isDogfightingIntent ? await getTopK({
+          query: buildDogfightingQuery(message.content, routed?.intent, routed?.filters),
+          k: 6,
+          sources: ['messages'],
+          openai,
+          guildId: message.guild?.id,
+          channelId: message.channelId,
+          preferVector: (process.env.KNOWLEDGE_PREFER_VECTOR || 'true').toLowerCase() === 'true',
+          temporalHint: false,
+        }) : []),
+        // Optionally enrich with knowledge snippets for equipment/meta/ships
+        ...((isDogfightingIntent && /dogfighting\.(equipment|meta|ships)/.test(routed?.intent || '')) ? await getTopK({
+          query: buildDogfightingQuery(message.content, routed?.intent, routed?.filters),
+          k: 3,
+          sources: ['knowledge'],
+          openai,
+          guildId: message.guild?.id,
+          channelId: message.channelId,
+          preferVector: (process.env.KNOWLEDGE_PREFER_VECTOR || 'true').toLowerCase() === 'true',
+          temporalHint: false,
+        }) : []),
         // If router says this is a piracy-related ask, add top piracy knowledge snippets (guild-wide)
         ...((routed?.intent || '').startsWith('piracy.') ? await getTopKFromKnowledgePiracy({
           query: message.content,
@@ -123,6 +204,17 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
           openai,
           guildId: message.guild?.id,
           preferVector: (process.env.KNOWLEDGE_PREFER_VECTOR || 'true').toLowerCase() === 'true',
+        }) : []),
+        // For piracy.advice, explicitly include chat snippets about piracy as well
+        ...((routed?.intent === 'piracy.advice') ? await getTopK({
+          query: /\bpiracy\b|\bpirate\b/.test(message.content) ? message.content : `${message.content} piracy`,
+          k: 5,
+          sources: ['messages'],
+          openai,
+          guildId: message.guild?.id,
+          channelId: message.channelId,
+          preferVector: (process.env.KNOWLEDGE_PREFER_VECTOR || 'true').toLowerCase() === 'true',
+          temporalHint: false,
         }) : []),
         // For general information-seeking intents, pull in retrieval context
         ...(((routed?.intent === 'general.info') || (!isPiracyIntent && looksInfoSeeking)) ? await getTopK({
@@ -225,6 +317,29 @@ function truncateText(s, n) {
   if (!s) return '';
   if (s.length <= n) return s;
   return s.slice(0, Math.max(0, n - 1)) + '…';
+}
+
+// Helper: craft a focused retrieval query for dogfighting asks
+function buildDogfightingQuery(content, intent, filters) {
+  try {
+    const s = String(content || '');
+    const ship = String(filters?.ship_name || '').trim();
+    let focus = '';
+    if (/dogfighting\.equipment/.test(intent || '')) {
+      focus = 'loadout equipment components guns cannons repeaters ballistic laser distortion gimballed fixed shield power cooler';
+    } else if (/dogfighting\.ships/.test(intent || '')) {
+      focus = 'best ship fighter choice vs matchup';
+    } else if (/dogfighting\.meta/.test(intent || '')) {
+      focus = 'pvp meta patch balance';
+    } else if (/dogfighting\.training/.test(intent || '')) {
+      focus = 'training piloting aim pip tracking strafing decouple practice';
+    } else if (/dogfighting\./.test(intent || '')) {
+      focus = 'strategy tactics approach engage disengage ambush joust turnfight boom and zoom';
+    }
+    return [ship, s, 'dogfighting', focus].filter(Boolean).join(' ');
+  } catch {
+    return String(content || '');
+  }
 }
 
 // Helper: derive a single rank label from the member's roles using env role IDs
