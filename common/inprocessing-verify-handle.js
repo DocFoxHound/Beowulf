@@ -320,12 +320,12 @@ async function handleSimpleWelcomeGuest(interaction, client, openai){
         console.error('Error removing newUserRole:', error);
     }
     // Create welcome message
-    const messageToBot = `Welcome ${dbUser.username} as a Guest of IronPoint. Let them know that they're free to join in on the action whenever they feel like it, but we'd rather have them apply to the crew. Explain that our Crew is top notch and is looking for eager and aggressive players.`;
+    const messageToBot = `Reword the following in your own way:  ${dbUser.username}, welcome to IronPoint, the best Pirate Crew in Star Citizen! IronPoint values capable Dogfighters, creative Pirates, and mature players. We encourage skill development, teamwork, and a mature outlook towards the community. Give 'GGs' after fights, and Leave Only Bare Metal on your victims.`;
     let returnedMessage = "";
     try{
         returnedMessage = await notifyWelcomeForEmbed(dbUser, openai, client, messageToBot);
     }catch(error){
-        returnedMessage = "Welcome to IronPoint, the best Pirate Crew in Star Citizen! We're glad to have you here. If you are interested in joining IronPoint as a member, then apply! We are looking for bloodthirsty and smart players, and we'd be glad to add you to our Crew if you fit in! In the meantime, feel free to tag along whenever you see us online and enjoy yourself.";
+        returnedMessage = "Welcome to IronPoint, the best Pirate Crew in Star Citizen! IronPoint values capable Dogfighters, creative Pirates, and mature players. We encourage skill development, teamwork, and a mature outlook towards the community. Give 'GG`s' after fights, and Leave Only Bare Metal on your victims.";
         console.error("Error notifying welcome for embed:", error);
     }
     // Create embed with avatar, title, and welcome message
