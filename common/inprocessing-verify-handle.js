@@ -325,7 +325,7 @@ async function handleSimpleWelcomeGuest(interaction, client, openai){
     try{
         returnedMessage = await notifyWelcomeForEmbed(dbUser, openai, client, messageToBot);
     }catch(error){
-        returnedMessage = "Welcome to IronPoint! We're glad to have you as a guest. Please feel free to join in on the action whenever you feel, and if you're interested in joining up just let DocHound or any of the Blooded members know!";
+        returnedMessage = "Welcome to IronPoint! We're glad to have you as a guest. If you are interested in joining IronPoint as a member, feel free to apply when we are recruiting! In the meantime, feel free to tag along whenever you see us online.";
         console.error("Error notifying welcome for embed:", error);
     }
     // Create embed with avatar, title, and welcome message
