@@ -358,7 +358,7 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
   if (routed?.intent === 'market.activity' || /most\s+(movement|active)|transactions?/.test(message.content || '')) {
     try {
       const location = routed?.filters?.location_name || null;
-      const scope = routed?.filters?.scope || (/(?:\bby\s+terminal\b|\bper\s+terminal\b|\bterminals?\b|\bstations?\b)/i.test(message.content || '') ? 'terminal' : 'commodity');
+      const scope = routed?.filters?.scope || (/(?:\bby\s+terminal\b|\bper\s+terminal\b|\bterminals?\b|\bstations?\b|\boutposts?\b)/i.test(message.content || '') ? 'terminal' : 'commodity');
       const ans = await mostMovement({ scope, top: 7, location });
       await sendResponse(message, ans.text, true);
       return;

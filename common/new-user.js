@@ -1,5 +1,5 @@
 const { getUserById, createUser, editUser } = require('../api/userlistApi');
-const { verifyHandle } = require('../common/inprocessing-verify-handle');
+const { verifyHandle, handleSimpleWelcomeGuest } = require('../common/inprocessing-verify-handle');
 const { notifyRejoinWelcome, notifyJoinMemberWelcome, notifyJoinGuestWelcome } = require('./bot-notify');
 
 // Helper to get the guild from client and .env
@@ -16,6 +16,7 @@ async function handleNewGuildMember(member, client, openai) {
     try {
         // Check if the user already exists in the database
         const user = await getUserById(member.user.id) || null;
+        const isNewUser = !user;
         let result;
         let actionMsg;
         const verificationCode = user ? user.verification_code : Date.now();
@@ -51,6 +52,14 @@ async function handleNewGuildMember(member, client, openai) {
             try {
                 await member.roles.add(friendlyRole, 'Auto-assign Friendly role on join');
                 actionMsg += ` Friendly role applied.`;
+                // If this is a brand-new user, initiate the simple Guest welcome flow
+                if (isNewUser) {
+                    try {
+                        await handleSimpleWelcomeGuest({ user: member.user }, client, openai);
+                    } catch (welcomeErr) {
+                        console.error('[handleNewGuildMember] Failed to send simple guest welcome:', welcomeErr);
+                    }
+                }
             } catch (roleErr) {
                 const errMsg = `[handleNewGuildMember] Failed to add Friendly role (${friendlyRole}) to ${member.user.tag}: ${roleErr?.message || roleErr}`;
                 console.error(errMsg);

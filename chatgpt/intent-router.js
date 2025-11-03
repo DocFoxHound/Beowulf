@@ -122,7 +122,12 @@ function quickHeuristic(text) {
   const mentionsOutpost = /(\boutposts?\b|\bresearch\s*outpost\b|\bmining\s*outpost\b|\bshubin\b|\brayari\b|\boutpost:\s*[a-z0-9\-\' ]{3,40})/.test(s);
   const getLoc = () => {
     const m = s.match(/\b(?:in|at|on|around|near)\s+([a-z0-9\-\'\s]{2,40})/i);
-    return m ? m[1].trim() : null;
+    if (!m) return null;
+    // Trim trailing timeframe or filler like "right now", "today", etc., and punctuation
+    let loc = m[1].trim();
+    loc = loc.replace(/\b(right\s*now|currently|today|yesterday|this\s+week|last\s+week|this\s+month|last\s+month|recently|lately|as\s+of\s+now)\b.*$/i, '').trim();
+    loc = loc.replace(/[,.;?!].*$/, '').trim();
+    return loc || null;
   };
   const getSystemName = () => {
     // Try a few patterns to extract a system name
@@ -203,7 +208,7 @@ function quickHeuristic(text) {
   }
   if (/(most\s+movement|most\s+active|transactions?|reports?)/.test(s)) {
     const location_name = getLoc();
-    const scope = (/\bby\s+terminal\b|\bper\s+terminal\b|\bterminals?\b|\bstations?\b/.test(s)) ? 'terminal' : undefined;
+    const scope = (/\bby\s+terminal\b|\bper\s+terminal\b|\bterminals?\b|\bstations?\b|\boutposts?\b/.test(s)) ? 'terminal' : undefined;
     return { intent: 'market.activity', confidence: 0.75, filters: { location_name, scope, ...parseTimeframe(s) } };
   }
   // Star systems
@@ -337,7 +342,13 @@ function quickHeuristic(text) {
   if (mentionsOutpost || /\boutposts?\b/.test(s)) {
     const outpostFromAt = (s.match(/(?:outpost|at|in|on)\s+([a-z0-9\-\' ]{3,40})\b/i) || [])[1] || null;
     const outpost_name = outpostFromAt ? outpostFromAt.trim() : null;
-    const location_name = (s.match(/(?:on|in|near|around)\s+([a-z0-9\-\' ]{3,40})\b/i) || [])[1] || null;
+    let location_name = (s.match(/(?:on|in|near|around)\s+([a-z0-9\-\' ]{3,40})\b/i) || [])[1] || null;
+    if (location_name) {
+      location_name = location_name
+        .replace(/\b(right\s*now|currently|today|yesterday|this\s+week|last\s+week|this\s+month|last\s+month|recently|lately|as\s+of\s+now)\b.*$/i, '')
+        .replace(/[,.;?!].*$/, '')
+        .trim();
+    }
     // Services and policy flags (mirror space station set sans lagrange)
     const serviceFlags = {
       has_refinery: /\brefinery\b/.test(s),
