@@ -48,6 +48,12 @@ const { ingestDailyChatSummaries } = require('./chatgpt/chat-ingest.js');
 const { ingestHitLogs } = require('./chatgpt/hit-ingest.js');
 const { ingestPlayerStats } = require('./chatgpt/player-stats-ingest.js');
 const { removeProspectFromFriendlies } = require('./common/remove-prospect-from-friendly.js');
+// Preloaders for location and market caches
+const { loadSystems } = require('./chatgpt/star-systems-answerer.js');
+const { loadStations } = require('./chatgpt/space-stations-answerer.js');
+const { loadPlanets } = require('./chatgpt/planets-answerer.js');
+const { loadOutposts } = require('./chatgpt/outposts-answerer.js');
+const { primeMarketCache } = require('./chatgpt/market-answerer.js');
 
 
 // Initialize dotenv config file
@@ -209,16 +215,47 @@ client.on("ready", async () => {
   try { await ingestPlayerStats(client); } catch (e) { console.error('Initial player-stats ingest failed:', e); }
   // await processPlayerLeaderboards(client, openai)
   console.log("Ready")
-
-  setInterval(() => processUEXData("terminal_prices"), 
-    86400000 //every 24 hours
-  );
-  setInterval(() => processUEXData("items_by_terminal"), 
-    87480000 //every 24.3 hours
-  );
-  setInterval(() => processUEXData("other_tables"),
-    674800000 //every 7 days
-  );
+  // Sequential UEX refresh + cache warmup
+  const DAY_MS = 86400000;
+  let uexRefreshInProgress = false;
+  const primeLocationAndMarketCaches = async () => {
+    try {
+      await Promise.allSettled([
+        loadSystems({ force: true }),
+        loadStations({ force: true }),
+        loadPlanets({ force: true }),
+        loadOutposts({ force: true }),
+        primeMarketCache({ force: true }),
+      ]);
+    } catch (e) {
+      console.error('Cache prime failed:', e);
+    }
+  };
+  const runUEXRefreshSequence = async () => {
+    if (uexRefreshInProgress) {
+      console.warn('UEX refresh already running; skipping this cycle.');
+      return;
+    }
+    uexRefreshInProgress = true;
+    try {
+      // Ensure these run sequentially
+      await processUEXData("terminal_prices");
+      await processUEXData("items_by_terminal");
+      await processUEXData("other_tables");
+      // Only after all three complete, warm caches into memory
+      await primeLocationAndMarketCaches();
+      console.log('[UEX] Refresh + cache prime completed.');
+    } catch (e) {
+      console.error('[UEX] Refresh sequence failed:', e);
+    } finally {
+      uexRefreshInProgress = false;
+    }
+  };
+  // Run once at startup, then on a fixed interval
+  // At launch: only warm caches from existing DB data (no external refresh)
+  await primeLocationAndMarketCaches();
+  console.log('[Cache] Initial in-memory caches primed from DB.');
+  setInterval(runUEXRefreshSequence, DAY_MS); // every 24 hours
   setInterval(async () => preloadedDbTables = preloadFromDb(),
     21600000 //every 6 hours
   );

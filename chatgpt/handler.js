@@ -35,6 +35,7 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
   const routed = await routeIntent(openai, formattedMessage);
   const isPiracyIntent = Boolean((routed?.intent || '').startsWith('piracy.'));
   const isDogfightingIntent = Boolean((routed?.intent || '').startsWith('dogfighting.'));
+  const isPiracySpots = routed?.intent === 'piracy.spots';
   const useAutoRouter = ((process.env.AUTO_ROUTER_ENABLED || 'true').toLowerCase() === 'true') && (!routed?.intent || routed.intent === 'other' || (Number(routed?.confidence || 0) < 0.7));
   const autoPlan = useAutoRouter ? await autoPlanRetrieval(openai, formattedMessage) : null;
 
@@ -168,17 +169,385 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
     }
   }
   const { getTopK, getTopKFromKnowledgePiracy } = require('./retrieval');
+  const { bestBuyLocations, bestSellLocations, spotFor, mostMovement, bestProfitRoutes } = require('./market-answerer');
+  const {
+    starSystemDetails,
+    listStarSystems,
+    searchStarSystems,
+    recentStarSystemChanges,
+    starSystemFactionSummary,
+    starSystemJurisdictionSummary,
+  } = require('./star-systems-answerer');
+  const {
+    spaceStationDetails,
+    listSpaceStations,
+    searchSpaceStations,
+    recentSpaceStationChanges,
+  } = require('./space-stations-answerer');
+  const {
+    planetDetails,
+    listPlanets,
+    searchPlanets,
+    recentPlanetChanges,
+    planetFactionSummary,
+    planetJurisdictionSummary,
+  } = require('./planets-answerer');
+  const {
+    outpostDetails,
+    listOutposts,
+    searchOutposts,
+    recentOutpostChanges,
+    outpostFactionSummary,
+    outpostJurisdictionSummary,
+  } = require('./outposts-answerer');
 
-  // Send typing indicator and run via Responses API
-  message.channel.sendTyping();
-  // Build context snippets with light logging for diagnostics
-  const contextParts = [
-        ...(latestHit ? [latestHit] : []),
-        // For piracy-specific questions, avoid chat snippets to reduce noise
-        ...(!isPiracyIntent && recentSnippet ? [recentSnippet] : []),
-        ...(!isPiracyIntent && recentActivity ? [recentActivity] : []),
-        // Auto-router: when enabled and triggered, query per LLM plan
-        ...((autoPlan && autoPlan.sources?.includes('messages')) ? await getTopK({
+  // Track retrieval results by bucket for grounding decisions
+  let autoPlanMessages = [];
+  let autoPlanKnowledge = [];
+  let dogfightMessages = [];
+  let dogfightKnowledge = [];
+  let generalMessages = [];
+  let generalKnowledge = [];
+
+  // Pre-fetch targeted retrieval for piracy.spots so we can enforce grounding if nothing found
+  let piracySpotsMessages = [];
+  let piracySpotsKnowledge = [];
+  if (isPiracySpots) {
+    try {
+      piracySpotsMessages = await getTopK({
+        query: buildPiracySpotsQuery(message.content, routed?.filters),
+        k: 8,
+        sources: ['messages'],
+        openai,
+        guildId: message.guild?.id,
+        // Search org-wide for spot discussions; do not constrain to channel
+        preferVector: (process.env.KNOWLEDGE_PREFER_VECTOR || 'true').toLowerCase() === 'true',
+        temporalHint: true,
+      });
+    } catch {}
+    try {
+      piracySpotsKnowledge = await getTopKFromKnowledgePiracy({
+        query: buildPiracySpotsQuery(message.content, routed?.filters),
+        k: 4,
+        openai,
+        guildId: message.guild?.id,
+        preferVector: (process.env.KNOWLEDGE_PREFER_VECTOR || 'true').toLowerCase() === 'true',
+      });
+    } catch {}
+  }
+
+  // Market and items: direct API answers (non-vector) for structured queries
+  if (routed?.intent === 'item.buy') {
+    const name = routed?.filters?.item_name || '';
+    const location = routed?.filters?.location_name || null;
+    if (!name) {
+      await sendResponse(message, 'What item or commodity do you want to buy?', true);
+      return;
+    }
+    try {
+      const ans = await bestBuyLocations({ name, top: 5, location });
+      await sendResponse(message, ans.text, true);
+      return;
+    } catch (e) {
+      console.error('item.buy failed:', e?.response?.data || e?.message || e);
+    }
+  }
+  if (routed?.intent === 'item.sell') {
+    const name = routed?.filters?.item_name || '';
+    const location = routed?.filters?.location_name || null;
+    if (!name) {
+      await sendResponse(message, 'What item or commodity do you want to sell?', true);
+      return;
+    }
+    try {
+      const ans = await bestSellLocations({ name, top: 5, location });
+      await sendResponse(message, ans.text, true);
+      return;
+    } catch (e) {
+      console.error('item.sell failed:', e?.response?.data || e?.message || e);
+    }
+  }
+  if (routed?.intent === 'market.spot') {
+    const name = routed?.filters?.item_name || '';
+    const location = routed?.filters?.location_name || null;
+    if (!name) {
+      await sendResponse(message, 'Which item or commodity do you want spot prices for?', true);
+      return;
+    }
+    try {
+      const ans = await spotFor({ name, top: 6, location });
+      await sendResponse(message, ans.text, true);
+      return;
+    } catch (e) {
+      console.error('market.spot failed:', e?.response?.data || e?.message || e);
+    }
+  }
+  if (routed?.intent === 'market.route') {
+    const name = routed?.filters?.item_name || '';
+    const location = routed?.filters?.location_name || null;
+    if (!name) {
+      await sendResponse(message, 'Which item or commodity do you want a profit route for?', true);
+      return;
+    }
+    try {
+      const ans = await bestProfitRoutes({ name, top: 5, location });
+      await sendResponse(message, ans.text, true);
+      return;
+    } catch (e) {
+      console.error('market.route failed:', e?.response?.data || e?.message || e);
+    }
+  }
+  if (routed?.intent === 'market.activity' || /most\s+(movement|active)|transactions?/.test(message.content || '')) {
+    try {
+      const location = routed?.filters?.location_name || null;
+      const scope = routed?.filters?.scope || (/(?:\bby\s+terminal\b|\bper\s+terminal\b|\bterminals?\b|\bstations?\b)/i.test(message.content || '') ? 'terminal' : 'commodity');
+      const ans = await mostMovement({ scope, top: 7, location });
+      await sendResponse(message, ans.text, true);
+      return;
+    } catch (e) {
+      console.error('market.activity failed:', e?.response?.data || e?.message || e);
+    }
+  }
+
+  // Star systems: info, lists, availability, wiki, faction/jurisdiction, search, changes, default
+  if (routed?.intent && routed.intent.startsWith('starsystem.')) {
+    try {
+      if (routed.intent === 'starsystem.info' || routed.intent === 'starsystem.wiki' || routed.intent === 'starsystem.availability') {
+        const system_name = routed?.filters?.system_name || null;
+        const system_code = routed?.filters?.system_code || null;
+        const ans = await starSystemDetails({ name: system_name, code: system_code });
+        await sendResponse(message, ans.text, true);
+        return;
+      }
+      if (routed.intent === 'starsystem.list' || routed.intent === 'starsystem.default') {
+        const liveOnly = Boolean(routed?.filters?.live_only);
+        const visibleOnly = Boolean(routed?.filters?.visible_only);
+        const defaultOnly = routed.intent === 'starsystem.default' ? true : Boolean(routed?.filters?.default_only);
+        const ans = await listStarSystems({ liveOnly, visibleOnly, defaultOnly, top: 50 });
+        await sendResponse(message, ans.text, true);
+        return;
+      }
+      if (routed.intent === 'starsystem.search') {
+        const q = routed?.filters?.query || routed?.filters?.system_name || '';
+        const ans = await searchStarSystems({ query: q, top: 12 });
+        await sendResponse(message, ans.text, true);
+        return;
+      }
+      if (routed.intent === 'starsystem.changes') {
+        const { date_start, date_end } = routed?.filters || {};
+        const ans = await recentStarSystemChanges({ date_start, date_end });
+        await sendResponse(message, ans.text, true);
+        return;
+      }
+      if (routed.intent === 'starsystem.faction') {
+        const system_name = routed?.filters?.system_name || null;
+        if (system_name) {
+          const ans = await starSystemDetails({ name: system_name });
+          await sendResponse(message, ans.text, true);
+        } else {
+          const ans = await starSystemFactionSummary();
+          await sendResponse(message, ans.text, true);
+        }
+        return;
+      }
+      if (routed.intent === 'starsystem.jurisdiction') {
+        const system_name = routed?.filters?.system_name || null;
+        if (system_name) {
+          const ans = await starSystemDetails({ name: system_name });
+          await sendResponse(message, ans.text, true);
+        } else {
+          const ans = await starSystemJurisdictionSummary();
+          await sendResponse(message, ans.text, true);
+        }
+        return;
+      }
+    } catch (e) {
+      console.error('starsystem handling failed:', e?.response?.data || e?.message || e);
+      // fall through
+    }
+  }
+
+  // Space stations: info, lists, availability/features, search, changes, default
+  if (routed?.intent && routed.intent.startsWith('spacestation.')) {
+    try {
+      if (routed.intent === 'spacestation.info' || routed.intent === 'spacestation.availability') {
+        const station_name = routed?.filters?.station_name || null;
+        const ans = await spaceStationDetails({ name: station_name });
+        await sendResponse(message, ans.text, true);
+        return;
+      }
+      if (routed.intent === 'spacestation.list' || routed.intent === 'spacestation.default') {
+        const filters = { ...routed?.filters };
+        if (routed.intent === 'spacestation.default') filters.is_default = true;
+        const ans = await listSpaceStations({ filters, top: 50 });
+        await sendResponse(message, ans.text, true);
+        return;
+      }
+      if (routed.intent === 'spacestation.features') {
+        const station_name = routed?.filters?.station_name || null;
+        if (station_name) {
+          const ans = await spaceStationDetails({ name: station_name });
+          await sendResponse(message, ans.text, true);
+        } else {
+          const filters = { ...routed?.filters };
+          const ans = await listSpaceStations({ filters, top: 30 });
+          await sendResponse(message, ans.text, true);
+        }
+        return;
+      }
+      if (routed.intent === 'spacestation.search') {
+        const q = routed?.filters?.query || routed?.filters?.station_name || '';
+        const location_name = routed?.filters?.location_name || null;
+        const ans = await searchSpaceStations({ query: q, top: 12, location_name });
+        await sendResponse(message, ans.text, true);
+        return;
+      }
+      if (routed.intent === 'spacestation.changes') {
+        const { date_start, date_end } = routed?.filters || {};
+        const ans = await recentSpaceStationChanges({ date_start, date_end });
+        await sendResponse(message, ans.text, true);
+        return;
+      }
+    } catch (e) {
+      console.error('spacestation handling failed:', e?.response?.data || e?.message || e);
+      // fall through
+    }
+  }
+
+  // Planets: info, list, availability, search, changes, default, faction/jurisdiction
+  if (routed?.intent && routed.intent.startsWith('planet.')) {
+    try {
+      if (routed.intent === 'planet.info' || routed.intent === 'planet.availability') {
+        const planet_name = routed?.filters?.planet_name || null;
+        const planet_code = routed?.filters?.planet_code || null;
+        const system_name = routed?.filters?.system_name || null;
+        const ans = await planetDetails({ name: planet_name, code: planet_code, system_name });
+        await sendResponse(message, ans.text, true);
+        return;
+      }
+      if (routed.intent === 'planet.list' || routed.intent === 'planet.default') {
+        const filters = { ...routed?.filters };
+        if (routed.intent === 'planet.default') filters.is_default = true;
+        const ans = await listPlanets({ filters, top: 50 });
+        await sendResponse(message, ans.text, true);
+        return;
+      }
+      if (routed.intent === 'planet.search') {
+        const q = routed?.filters?.query || routed?.filters?.planet_name || '';
+        const system_name = routed?.filters?.system_name || null;
+        const ans = await searchPlanets({ query: q, top: 12, system_name });
+        await sendResponse(message, ans.text, true);
+        return;
+      }
+      if (routed.intent === 'planet.changes') {
+        const { date_start, date_end } = routed?.filters || {};
+        const ans = await recentPlanetChanges({ date_start, date_end });
+        await sendResponse(message, ans.text, true);
+        return;
+      }
+      if (routed.intent === 'planet.faction') {
+        const planet_name = routed?.filters?.planet_name || null;
+        if (planet_name) {
+          const ans = await planetDetails({ name: planet_name });
+          await sendResponse(message, ans.text, true);
+        } else {
+          const ans = await planetFactionSummary();
+          await sendResponse(message, ans.text, true);
+        }
+        return;
+      }
+      if (routed.intent === 'planet.jurisdiction') {
+        const planet_name = routed?.filters?.planet_name || null;
+        if (planet_name) {
+          const ans = await planetDetails({ name: planet_name });
+          await sendResponse(message, ans.text, true);
+        } else {
+          const ans = await planetJurisdictionSummary();
+          await sendResponse(message, ans.text, true);
+        }
+        return;
+      }
+    } catch (e) {
+      console.error('planet handling failed:', e?.response?.data || e?.message || e);
+      // fall through
+    }
+  }
+
+  // Outposts: info, list, availability, features, search, changes, default, faction/jurisdiction
+  if (routed?.intent && routed.intent.startsWith('outpost.')) {
+    try {
+      if (routed.intent === 'outpost.info' || routed.intent === 'outpost.availability') {
+        const outpost_name = routed?.filters?.outpost_name || null;
+        const ans = await outpostDetails({ name: outpost_name });
+        await sendResponse(message, ans.text, true);
+        return;
+      }
+      if (routed.intent === 'outpost.list' || routed.intent === 'outpost.default') {
+        const filters = { ...routed?.filters };
+        if (routed.intent === 'outpost.default') filters.is_default = true;
+        const ans = await listOutposts({ filters, top: 50 });
+        await sendResponse(message, ans.text, true);
+        return;
+      }
+      if (routed.intent === 'outpost.features') {
+        const outpost_name = routed?.filters?.outpost_name || null;
+        if (outpost_name) {
+          const ans = await outpostDetails({ name: outpost_name });
+          await sendResponse(message, ans.text, true);
+        } else {
+          const filters = { ...routed?.filters };
+          const ans = await listOutposts({ filters, top: 30 });
+          await sendResponse(message, ans.text, true);
+        }
+        return;
+      }
+      if (routed.intent === 'outpost.search') {
+        const q = routed?.filters?.query || routed?.filters?.outpost_name || '';
+        const location_name = routed?.filters?.location_name || null;
+        const ans = await searchOutposts({ query: q, top: 12, location_name });
+        await sendResponse(message, ans.text, true);
+        return;
+      }
+      if (routed.intent === 'outpost.changes') {
+        const { date_start, date_end } = routed?.filters || {};
+        const ans = await recentOutpostChanges({ date_start, date_end });
+        await sendResponse(message, ans.text, true);
+        return;
+      }
+      if (routed.intent === 'outpost.faction') {
+        const outpost_name = routed?.filters?.outpost_name || null;
+        if (outpost_name) {
+          const ans = await outpostDetails({ name: outpost_name });
+          await sendResponse(message, ans.text, true);
+        } else {
+          const ans = await outpostFactionSummary();
+          await sendResponse(message, ans.text, true);
+        }
+        return;
+      }
+      if (routed.intent === 'outpost.jurisdiction') {
+        const outpost_name = routed?.filters?.outpost_name || null;
+        if (outpost_name) {
+          const ans = await outpostDetails({ name: outpost_name });
+          await sendResponse(message, ans.text, true);
+        } else {
+          const ans = await outpostJurisdictionSummary();
+          await sendResponse(message, ans.text, true);
+        }
+        return;
+      }
+    } catch (e) {
+      console.error('outpost handling failed:', e?.response?.data || e?.message || e);
+      // fall through
+    }
+  }
+
+
+  // Auto-router driven retrieval (messages first, then knowledge) when applicable
+  if (autoPlan) {
+    try {
+      if (autoPlan.sources?.includes('messages')) {
+        autoPlanMessages = await getTopK({
           query: autoPlan.query || message.content,
           k: autoPlan.k_messages || 6,
           sources: ['messages'],
@@ -187,8 +556,12 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
           channelId: autoPlan.prefer_channel ? message.channelId : undefined,
           preferVector: (process.env.KNOWLEDGE_PREFER_VECTOR || 'true').toLowerCase() === 'true',
           temporalHint: Boolean(autoPlan.temporalHint),
-        }) : []),
-        ...((autoPlan && autoPlan.sources?.includes('knowledge')) ? await getTopK({
+        });
+      }
+    } catch {}
+    try {
+      if (autoPlan.sources?.includes('knowledge')) {
+        autoPlanKnowledge = await getTopK({
           query: autoPlan.query || message.content,
           k: autoPlan.k_knowledge || 4,
           sources: ['knowledge'],
@@ -197,20 +570,28 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
           channelId: message.channelId,
           preferVector: (process.env.KNOWLEDGE_PREFER_VECTOR || 'true').toLowerCase() === 'true',
           temporalHint: Boolean(autoPlan.temporalHint),
-        }) : []),
-        // For dogfighting-related asks, pull targeted chat snippets first (prioritize messages)
-        ...(isDogfightingIntent ? await getTopK({
-          query: buildDogfightingQuery(message.content, routed?.intent, routed?.filters),
-          k: 6,
-          sources: ['messages'],
-          openai,
-          guildId: message.guild?.id,
-          channelId: message.channelId,
-          preferVector: (process.env.KNOWLEDGE_PREFER_VECTOR || 'true').toLowerCase() === 'true',
-          temporalHint: false,
-        }) : []),
-        // Optionally enrich with knowledge snippets for equipment/meta/ships
-        ...((isDogfightingIntent && /dogfighting\.(equipment|meta|ships)/.test(routed?.intent || '')) ? await getTopK({
+        });
+      }
+    } catch {}
+  }
+
+  // Dogfighting specific retrieval buckets
+  if (isDogfightingIntent) {
+    try {
+      dogfightMessages = await getTopK({
+        query: buildDogfightingQuery(message.content, routed?.intent, routed?.filters),
+        k: 6,
+        sources: ['messages'],
+        openai,
+        guildId: message.guild?.id,
+        channelId: message.channelId,
+        preferVector: (process.env.KNOWLEDGE_PREFER_VECTOR || 'true').toLowerCase() === 'true',
+        temporalHint: false,
+      });
+    } catch {}
+    try {
+      if (/dogfighting\.(equipment|meta|ships)/.test(routed?.intent || '')) {
+        dogfightKnowledge = await getTopK({
           query: buildDogfightingQuery(message.content, routed?.intent, routed?.filters),
           k: 3,
           sources: ['knowledge'],
@@ -219,9 +600,69 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
           channelId: message.channelId,
           preferVector: (process.env.KNOWLEDGE_PREFER_VECTOR || 'true').toLowerCase() === 'true',
           temporalHint: false,
-        }) : []),
+        });
+      }
+    } catch {}
+  }
+
+  // General info retrieval split across messages and knowledge for better grounding and counts
+  if ((routed?.intent === 'general.info') || (!isPiracyIntent && looksInfoSeeking)) {
+    try {
+      generalMessages = await getTopK({
+        query: message.content,
+        k: 4,
+        sources: ['messages'],
+        openai,
+        guildId: message.guild?.id,
+        channelId: message.channelId,
+        preferVector: (process.env.KNOWLEDGE_PREFER_VECTOR || 'true').toLowerCase() === 'true',
+        temporalHint: asksRecentActivity,
+      });
+    } catch {}
+    try {
+      generalKnowledge = await getTopK({
+        query: message.content,
+        k: 3,
+        sources: ['knowledge'],
+        openai,
+        guildId: message.guild?.id,
+        channelId: message.channelId,
+        preferVector: (process.env.KNOWLEDGE_PREFER_VECTOR || 'true').toLowerCase() === 'true',
+        temporalHint: asksRecentActivity,
+      });
+    } catch {}
+  }
+
+  const anyRetrieval = [
+    piracySpotsMessages, piracySpotsKnowledge,
+    autoPlanMessages, autoPlanKnowledge,
+    dogfightMessages, dogfightKnowledge,
+    generalMessages, generalKnowledge,
+  ].some(arr => Array.isArray(arr) && arr.length > 0);
+
+  // Send typing indicator and run via Responses API
+  message.channel.sendTyping();
+  // Build context snippets with light logging for diagnostics
+  const contextParts = [
+        // Grounding instruction for any retrieval-backed answer
+        ...(anyRetrieval ? [
+          'Grounding: Use only information found in the following snippets from chat and knowledge. If nothing relevant is found to answer the question, say you do not have enough recent info instead of guessing.',
+        ] : []),
+        ...(latestHit ? [latestHit] : []),
+        // For piracy-specific questions, avoid chat snippets to reduce noise
+        ...(!isPiracyIntent && recentSnippet ? [recentSnippet] : []),
+        ...(!isPiracyIntent && recentActivity ? [recentActivity] : []),
+        // For piracy.spots, include targeted results explicitly
+        ...(isPiracySpots ? piracySpotsMessages : []),
+        ...(isPiracySpots ? piracySpotsKnowledge : []),
+        // Auto-plan results
+        ...(autoPlanMessages || []),
+        ...(autoPlanKnowledge || []),
+        // Dogfighting buckets
+        ...(dogfightMessages || []),
+        ...(dogfightKnowledge || []),
         // If router says this is a piracy-related ask, add top piracy knowledge snippets (guild-wide)
-        ...((routed?.intent || '').startsWith('piracy.') ? await getTopKFromKnowledgePiracy({
+        ...((routed?.intent || '').startsWith('piracy.') && !isPiracySpots ? await getTopKFromKnowledgePiracy({
           query: message.content,
           k: 4,
           openai,
@@ -239,26 +680,43 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
           preferVector: (process.env.KNOWLEDGE_PREFER_VECTOR || 'true').toLowerCase() === 'true',
           temporalHint: false,
         }) : []),
-        // For general information-seeking intents, pull in retrieval context
-        ...(((routed?.intent === 'general.info') || (!isPiracyIntent && looksInfoSeeking)) ? await getTopK({
-          query: message.content,
-          k: 6,
-          sources: ['messages', 'knowledge'],
-          openai,
-          guildId: message.guild?.id,
-          channelId: message.channelId,
-          preferVector: (process.env.KNOWLEDGE_PREFER_VECTOR || 'true').toLowerCase() === 'true',
-          temporalHint: asksRecentActivity,
-        }) : []),
+        // General info buckets
+        ...(generalMessages || []),
+        ...(generalKnowledge || []),
   ];
   if ((process.env.DEBUG_RETRIEVAL || 'false').toLowerCase() === 'true') {
     try {
-      console.log('[retrieval] intent=', routed?.intent, 'conf=', routed?.confidence, 'piracyIntent=', isPiracyIntent, 'dogfightingIntent=', isDogfightingIntent, 'autoUsed=', Boolean(autoPlan));
+      console.log('[retrieval] intent=', routed?.intent, 'conf=', routed?.confidence, 'piracyIntent=', isPiracyIntent, 'piracySpots=', isPiracySpots, 'dogfightingIntent=', isDogfightingIntent, 'autoUsed=', Boolean(autoPlan));
+      console.log('[retrieval] counts:', {
+        piracySpotsMessages: piracySpotsMessages.length,
+        piracySpotsKnowledge: piracySpotsKnowledge.length,
+        autoPlanMessages: autoPlanMessages.length,
+        autoPlanKnowledge: autoPlanKnowledge.length,
+        dogfightMessages: dogfightMessages.length,
+        dogfightKnowledge: dogfightKnowledge.length,
+        generalMessages: generalMessages.length,
+        generalKnowledge: generalKnowledge.length,
+      });
       console.log('[retrieval] contextParts count=', contextParts.length);
       for (let i = 0; i < Math.min(5, contextParts.length); i++) {
         console.log(`[retrieval] part[${i}]`, String(contextParts[i]).slice(0, 200));
       }
     } catch {}
+  }
+
+  // If this was a piracy.spots ask and we found no relevant context, avoid fabricating
+  if (isPiracySpots && (!piracySpotsMessages?.length && !piracySpotsKnowledge?.length)) {
+    await sendResponse(message, 'I couldn\'t find recent chat or knowledge about current piracy spots. If you can hint a region, system, or route, I can look again.', true);
+    return;
+  }
+
+  // Generic guardrail: for info-seeking asks with zero retrieval results, avoid guessing
+  const intentName = routed?.intent || '';
+  const likelyInfoSeeking = looksInfoSeeking || /^(general\.info|market\.|item\.|location\.|dogfighting\.|piracy\.)/.test(intentName);
+  const excludedHandled = intentName === 'piracy.stats' || intentName === 'piracy.latest' || intentName === 'piracy.summary';
+  if (likelyInfoSeeking && !excludedHandled && !anyRetrieval) {
+    await sendResponse(message, 'I couldn\'t find enough relevant chat or knowledge to answer confidently. Add a timeframe, location, or specific target and I\'ll search again.', true);
+    return;
   }
 
   const text = await runWithResponses({
@@ -360,6 +818,20 @@ function buildDogfightingQuery(content, intent, filters) {
       focus = 'strategy tactics approach engage disengage ambush joust turnfight boom and zoom';
     }
     return [ship, s, 'dogfighting', focus].filter(Boolean).join(' ');
+  } catch {
+    return String(content || '');
+  }
+}
+
+// Helper: focused query for piracy spot discovery
+function buildPiracySpotsQuery(content, filters) {
+  try {
+    const s = String(content || '');
+    const time = (filters?.date_start && filters?.date_end) ? `time:${filters.date_start}..${filters.date_end}` : 'recent';
+    const focus = 'piracy spot spots hotspot hot spots location route lane where to pirate targets shipping lanes';
+    const loc = String(filters?.location_name || '').trim();
+    const locTag = loc ? `loc:${loc}` : '';
+    return [s, focus, time, locTag].filter(Boolean).join(' ');
   } catch {
     return String(content || '');
   }
