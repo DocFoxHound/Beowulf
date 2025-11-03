@@ -437,8 +437,49 @@ function quickHeuristic(text) {
   if ((isShort && (hasLaugh || hasGreeting || hasCustomEmoji || hasUnicodeEmoji)) && !hasQuestion) {
     return { intent: 'chat.banter', confidence: 0.8, filters: {} };
   }
+  // Small-talk question like "how are you" should be treated as banter, not info-seeking
+  const smallTalkQ = /(how\s*(are|r)\s*(you|ya|y’all|yall)|how\s*('?s| is)\s*(it|it going|things|everything)|how\s*(you|ya)\s*(doing|doin')|how\s*are\s*we\s*doing|how\s*are\s*you\s*handling\s*(today|tonight|this))/i;
+  if (smallTalkQ.test(s)) {
+    return { intent: 'chat.banter', confidence: 0.85, filters: {} };
+  }
+  // Thanks / Apologies / Farewells
+  if (/(^|\b)(thanks|thank\s*you|ty|thx|appreciate\s*it|much\s*appreciated)(\b|!|\.)/i.test(s)) {
+    return { intent: 'chat.banter', confidence: 0.85, filters: { kind: 'thanks' } };
+  }
+  if (/(^|\b)(sorry|my\s*bad|oops|whoops)(\b|!|\.)/i.test(s)) {
+    return { intent: 'chat.banter', confidence: 0.85, filters: { kind: 'apology' } };
+  }
+  if (/(^|\b)(bye|good\s*night|goodnight|gn|good\s*morning|gm|good\s*evening|ge|cya|see\s*ya|later|l8r|brb|gtg|g2g)(\b|!|\.)/i.test(s) && !hasQuestion) {
+    return { intent: 'chat.banter', confidence: 0.85, filters: { kind: 'farewell' } };
+  }
+  // Jokes / persona queries / preferences (off-topic, conversational)
+  if (/(tell\s*me\s*a\s*joke|make\s*me\s*laugh|another\s*joke|got\s*jokes?)/i.test(s)) {
+    return { intent: 'chat.banter', confidence: 0.85, filters: { kind: 'joke' } };
+  }
+  if (/(who\s*are\s*you|what\s*are\s*you|are\s*you\s*(alive|real)|do\s*you\s*sleep|do\s*you\s*eat)/i.test(s)) {
+    return { intent: 'chat.banter', confidence: 0.85, filters: { kind: 'persona' } };
+  }
+  if (/(what\s*(is|\'s)\s*your\s*favo(u)?rite|do\s*you\s*like|what\s*do\s*you\s*think\s*about)/i.test(s)) {
+    return { intent: 'chat.banter', confidence: 0.8, filters: { kind: 'preferences' } };
+  }
+  // Roasts / light insults / banter between users (keep it non-toxic on response)
+  const roastCue = /(noob|trash|garbage|skill\s*issue|git\s*gud|cope|seethe|mald|ratio\b|cry\s*about\s*it|you\s*suck|loser|clown|bozo|npc\b|ez\b|u\s*mad)/i;
+  if (roastCue.test(s)) {
+    return { intent: 'chat.banter', confidence: 0.85, filters: { kind: 'roast' } };
+  }
+  // General off-topic small questions (weather/life/day) that aren’t SC queries
+  if (/(how\s*('s|is)\s*(life|your\s*day)|hows\s*your\s*day|how\s*was\s*your\s*day|what\s*'s\s*up|what\s*are\s*you\s*up\s*to|wyd\b|wya\b|weather\b)/i.test(s)) {
+    return { intent: 'chat.banter', confidence: 0.8, filters: {} };
+  }
   if (/(what\s+has\s+everyone\s+been\s+doing|recent\s+activity|what\'s\s+been\s+going\s+on)/.test(s)) {
     return { intent: 'chat.recent', confidence: 0.8, filters: {} };
+  }
+  // If it looks like a casual/general question but doesn’t match domain intents, treat as banter
+  if (hasQuestion && !isPiracy && !mentionsStarSystem && !mentionsSpaceStation && !mentionsPlanet && !mentionsOutpost && !dogfightCue.test(s)) {
+    // Avoid promoting broad general.info for off-topic chatter
+    if (/(life|day|feeling|feelings|age|name|from|where\s*are\s*you|favorite|joke|sleep|eat|robot|ai|bot)/i.test(s)) {
+      return { intent: 'chat.banter', confidence: 0.7, filters: {} };
+    }
   }
   if (/[?]/.test(s) || /(what|how|why|where|when|who|rules?|policy)/.test(s)) {
     return { intent: 'general.info', confidence: 0.6, filters: {} };

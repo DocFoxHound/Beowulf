@@ -39,6 +39,64 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
   const useAutoRouter = ((process.env.AUTO_ROUTER_ENABLED || 'true').toLowerCase() === 'true') && (!routed?.intent || routed.intent === 'other' || (Number(routed?.confidence || 0) < 0.7));
   const autoPlan = useAutoRouter ? await autoPlanRetrieval(openai, formattedMessage) : null;
 
+  // Small talk / banter: reply lightly without retrieval or knowledge search
+  if (routed?.intent === 'chat.banter') {
+    const s = String(message.content || '').toLowerCase();
+    const reply = (function() {
+      // Thanks / gratitude
+      if (/(^|\b)(thanks|thank\s*you|ty|thx|appreciate\s*it|much\s*appreciated)(\b|!|\.)/i.test(s)) {
+        return "You're welcome! o7";
+      }
+      // Apologies
+      if (/(^|\b)(sorry|my\s*bad|oops|whoops)(\b|!|\.)/i.test(s)) {
+        return "No worries.";
+      }
+      // Farewells
+      if (/(^|\b)(bye|good\s*night|goodnight|gn|good\s*morning|gm|good\s*evening|ge|cya|see\s*ya|later|l8r|brb|gtg|g2g)(\b|!|\.)/i.test(s)) {
+        return "Catch you later!";
+      }
+      // Jokes
+      if (/(tell\s*me\s*a\s*joke|make\s*me\s*laugh|another\s*joke|got\s*jokes?)/i.test(s)) {
+        const jokes = [
+          "Why did the developer go broke? Because they used up all their cache.",
+          "I told my rig a joke about UDP… it didn't get it, but maybe it will later.",
+          "What do you call 8 hobbits? A hobbyte.",
+        ];
+        return jokes[(new Date().getSeconds()) % jokes.length];
+      }
+      // Persona / preferences (keep concise)
+      if (/(who\s*are\s*you|what\s*are\s*you|are\s*you\s*(alive|real)|do\s*you\s*sleep|do\s*you\s*eat)/i.test(s)) {
+        return "I'm Beowulf — here to help with org info, piracy logs, market lookups, and quick answers.";
+      }
+      if (/(what\s*(is|\'s)\s*your\s*favo(u)?rite|do\s*you\s*like|what\s*do\s*you\s*think\s*about)/i.test(s)) {
+        return "I don't have personal tastes, but I'm happy to help you decide.";
+      }
+      // Roasts / light insults — keep it friendly and deflect
+      if (/(noob|trash|garbage|skill\s*issue|git\s*gud|cope|seethe|mald|ratio\b|cry\s*about\s*it|you\s*suck|loser|clown|bozo|npc\b|ez\b|u\s*mad)/i.test(s)) {
+        return "Keeping it friendly over here. Need anything useful from me?";
+      }
+      // General small talk
+      if (/(how\s*(are|r)\s*(you|ya)|how\s*('?s| is)\s*(it|it going|things|everything)|how\s*(you|ya)\s*(doing|doin')|how\s*are\s*you\s*handling\s*(today|tonight|this))/i.test(s)) {
+        const opts = [
+          "Doing well and ready to help — what can I do for you?",
+          "All systems green. How can I help today?",
+          "Holding steady. Need anything?",
+        ];
+        return opts[(new Date().getSeconds()) % opts.length];
+      }
+      // Default light banter
+      const defaults = [
+        "Here and listening. How can I help?",
+        "I'm here. Need a hand with anything?",
+        "Present and accounted for. What's up?",
+      ];
+      return defaults[(new Date().getSeconds()) % defaults.length];
+    })();
+
+    await sendResponse(message, reply, true);
+    return;
+  }
+
   // Fast, factual handling for piracy.stats (e.g., "best hit recently")
   if (routed?.intent === 'piracy.stats') {
     try {
