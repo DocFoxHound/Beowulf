@@ -90,7 +90,7 @@ function buildSystemHeader({ guildId, channelId, rank }) {
 
 async function runWithResponses({ openai, formattedUserMessage, guildId, channelId, rank, contextSnippets = [] }) {
   const system = buildSystemHeader({ guildId, channelId, rank });
-  const model = process.env.RESPONSES_MODEL || 'gpt-4o-mini';
+  const model = process.env.RESPONSES_MODEL || 'gpt-5-chat-latest';
   const fallbackText = process.env.ON_QUOTA_MESSAGE || 'I\'m temporarily out of AI capacity. Try again shortly.';
   // Personality tuning: configurable sampling and penalties
   const tempMin = Number(process.env.BOT_TEMP_MIN ?? '0.7');
