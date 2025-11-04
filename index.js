@@ -210,7 +210,7 @@ client.on("ready", async () => {
   await removeProspectFromFriendlies(client);
   await refreshUserlist(client, openai) //actually leave this here
   // Ensure SKILL_LEVEL_* roles are aligned at startup based on live Discord roles (RAPTOR/RAIDER)
-  try { await syncSkillLevelsFromGuild(client); } catch (e) { console.error('[Startup] Skill role sync failed:', e?.message || e); }
+  // try { await syncSkillLevelsFromGuild(client); } catch (e) { console.error('[Startup] Skill role sync failed:', e?.message || e); }
   try { await ingestDailyChatSummaries(client, openai); } catch (e) { console.error('Initial chat ingest failed:', e); }
   try { await ingestHitLogs(client, openai); } catch (e) { console.error('Initial hit ingest failed:', e); }
   try { await ingestPlayerStats(client); } catch (e) { console.error('Initial player-stats ingest failed:', e); }
