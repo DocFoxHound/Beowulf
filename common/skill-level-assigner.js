@@ -6,7 +6,7 @@ const VERBOSE = String(process.env.SKILL_SYNC_VERBOSE || 'false').toLowerCase() 
 const SYNC_MODE = String(process.env.SKILL_SYNC_MODE || 'prefetch').toLowerCase(); // 'prefetch' | 'cache-only' | 'per-user'
 const SYNC_LIMIT = Number(process.env.SKILL_SYNC_LIMIT || 0) || 0; // 0 = no limit
 const SYNC_CONCURRENCY = Math.max(1, Math.min(10, Number(process.env.SKILL_SYNC_CONCURRENCY || 3) || 3));
-const FETCH_TIMEOUT_MS = Number(process.env.SKILL_SYNC_FETCH_TIMEOUT_MS || 15000) || 15000; // 15s default
+const FETCH_TIMEOUT_MS = Number(process.env.SKILL_SYNC_FETCH_TIMEOUT_MS || 60000) || 605000; // 60s default
 
 function envBool(val) {
   if (val === undefined || val === null) return false;
