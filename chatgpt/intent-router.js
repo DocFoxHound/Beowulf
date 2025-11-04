@@ -6,6 +6,7 @@ const SAFE_INTENTS = [
   'piracy.find',          // user wants specific hits (by patch/owner/date/keywords)
   'piracy.stats',         // user wants counts or value aggregates over hits
   'piracy.spots',         // user asks about good piracy locations/spots/hotspots
+  'piracy.hit.create',    // user wants to log/submit a new hit via chat
   // Chat/General
   'chat.banter',          // casual banter; keep light, no heavy retrieval
   'chat.recent',          // recent activity in this channel
@@ -114,12 +115,58 @@ function parseTimeframe(s) {
 }
 
 function quickHeuristic(text) {
-  const s = String(text || '').toLowerCase();
+  const raw = String(text || '');
+  // Strip leading bot mention for easier matching
+  const s = raw.replace(/^<@!?\d+>\s*/, '').toLowerCase();
   const isPiracy = /(\bhit\b|\bhits\b|\bpiracy\b|\bpirate\b)/.test(s);
+  const mentionsLoot = /(\bloot\b|\bplunder\b|\bhaul\b|\bscored\b\s*(?:a\s*)?hit\b|\bmade\b\s*(?:a\s*)?hit\b|\bgot\b\s*(?:a\s*)?hit\b)/.test(s);
   const mentionsStarSystem = /(\bstar\s*systems?\b|\bsystems?\b\s*(?:list|available|visible|default)|\bpyro\b|\bstanton\b|\bnyx\b|\bterra\b|\bsol\b)/.test(s);
   const mentionsSpaceStation = /(\bspace\s*stations?\b|\bstation\b|\bport\b|\brest\s*stop\b|\bgrim\s*hex\b|\bport\s*olisar\b|\bhorizon\b|\bcru\s*l\d+\b|\bunknown\s*station\b)/.test(s);
   const mentionsPlanet = /(\bplanets?\b|\bhurston\b|\bmicrotech\b|\barccorp\b|\bcrusader\b|\bterra\b|\bhur-l\d\b)/.test(s);
   const mentionsOutpost = /(\boutposts?\b|\bresearch\s*outpost\b|\bmining\s*outpost\b|\bshubin\b|\brayari\b|\boutpost:\s*[a-z0-9\-\' ]{3,40})/.test(s);
+  // Helper: extract user mentions (raw has original tokens)
+  const extractMentions = () => {
+    try {
+      const ids = Array.from(raw.matchAll(/<@!?(\d+)>/g)).map((m) => m[1]).filter(Boolean);
+      return ids;
+    } catch { return []; }
+  };
+  // Helper: attempt to extract cargo declarations like "120 scu quant" or "quant x 120 scu"
+  const extractCargo = () => {
+    const items = [];
+    try {
+      // Pattern 1: 120 scu of quant
+      const re1 = /(\d{1,6}(?:\.\d+)?)\s*(?:scu|u|units)\s*(?:of\s+)?([a-z][a-z0-9\- '\/]{2,40})/gi;
+      let m;
+      while ((m = re1.exec(s)) !== null) {
+        items.push({ commodity_name: m[2].trim(), scu: Number(m[1]) });
+      }
+      // Pattern 2: quant x 120 scu
+      const re2 = /\b([a-z][a-z0-9\- '\/]{2,40})\b\s*[x×*]\s*(\d{1,6}(?:\.\d+)?)\s*(?:scu|u|units)\b/gi;
+      while ((m = re2.exec(s)) !== null) {
+        items.push({ commodity_name: m[1].trim(), scu: Number(m[2]) });
+      }
+      // Pattern 3: list with commas "120 scu quant, 50 scu scrap"
+      // (covered by re1 globally)
+    } catch {}
+    // Deduplicate by name+scu
+    const seen = new Set();
+    return items.filter(it => {
+      const key = `${it.commodity_name}|${it.scu}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+  // Helper: detect air/ground
+  const extractAOG = () => {
+    const g = /(\bfps\b|\bfoot\b|\bground\b|\bon\s*foot\b|\bon\s*the\s*ground\b)/.test(s);
+    const a = /(\bspace\b|\bair\b|\bflight\b|\bflying\b|\bship\b|\binterdict(?:ed|ion)?\b|\bsnare\b)/.test(s);
+    if (/\bmixed\b/.test(s) || (g && a)) return 'Mixed';
+    if (g) return 'Ground';
+    if (a) return 'Air';
+    return undefined;
+  };
   const getLoc = () => {
     const m = s.match(/\b(?:in|at|on|around|near)\s+([a-z0-9\-\'\s]{2,40})/i);
     if (!m) return null;
@@ -141,6 +188,20 @@ function quickHeuristic(text) {
   // Allow both singular and plural (e.g., "latest hit" and "latest hits")
   if (isPiracy && /(latest|most\s*recent|last)\s+hits?/.test(s)) {
     return { intent: 'piracy.latest', confidence: 0.95, filters: {} };
+  }
+  // Hit creation cues: player signals they completed a hit and wants to log it
+  if ((isPiracy || mentionsLoot) && /(finished|wrapped\s*up|completed|logged|log|submit|submit\s+it|record|track|got|made|scored)\s+(?:a\s+)?hit\b|\bgot\s+(?:some\s+)?loot\b/.test(s)) {
+    const filters = {};
+    const cargo = extractCargo();
+    if (cargo.length) filters.cargo = cargo;
+    const aog = extractAOG();
+    if (aog) filters.air_or_ground = aog;
+    const assists = extractMentions();
+    if (assists.length) filters.assists = assists;
+    // Try to grab a video link if present
+    const url = (raw.match(/https?:\/\/\S+/i) || [])[0];
+    if (url) filters.video_link = url;
+    return { intent: 'piracy.hit.create', confidence: 0.95, filters };
   }
   // Recap/summary of recent hits, broader phrasing than just "latest"
   if (isPiracy && /(summar(y|ise|ize)|recap|overview|what\s+happened|what\s+did\s+we\s+do|brief me|catch\s+me\s+up)/.test(s)) {
@@ -167,8 +228,16 @@ function quickHeuristic(text) {
     return { intent: 'piracy.spots', confidence: 0.9, filters };
   }
   // General piracy Q&A / advice
-  if (isPiracy && /(how\b|what\b|why\b|where\b|when\b|should\b|tips?|advice|guide|strategy|strategies|strats|tactic|tactics|approach|recommend|avoid|counter|deal\s+with|handle|board|trap|ambush|disable|scan)/.test(s)) {
-    return { intent: 'piracy.advice', confidence: 0.8, filters: { ...parseTimeframe(s) } };
+  if (isPiracy && /(how\b|what\b|why\b|where\b|when\b|should\b|tips?|advice|guide|strategy|strategies|strats|tactic|tactics|approach|recommend|avoid|counter|deal\s+with|handle|board|trap|ambush|disable|scan|snare|camp|invade|interdict)/.test(s)) {
+    // Extract cross-location phrasing if present
+    const mBetween = s.match(/\bbetween\s+([a-z0-9\-\' ]{2,30})\s+and\s+([a-z0-9\-\' ]{2,30})\b/i);
+    const mFromTo = s.match(/\bfrom\s+([a-z0-9\-\' ]{2,30})\s+to\s+([a-z0-9\-\' ]{2,30})\b/i);
+    const route_from = (mBetween ? mBetween[1] : (mFromTo ? mFromTo[1] : null)) || undefined;
+    const route_to = (mBetween ? mBetween[2] : (mFromTo ? mFromTo[2] : null)) || undefined;
+    // Try to capture commodity/item around 'run' or explicit commodity words
+    const mItem = raw.match(/\b(?:run|haul|for)\s+([A-Za-z][A-Za-z0-9\- ]{2,40})\b/i);
+    const item_name = mItem ? mItem[1].trim() : undefined;
+    return { intent: 'piracy.advice', confidence: 0.8, filters: { route_from, route_to, item_name, ...parseTimeframe(raw) } };
   }
   if (isPiracy) {
     const patch = (s.match(/\b(\d+\.\d+(?:\.\d+)?)\b/) || [])[1] || null;
@@ -404,6 +473,21 @@ function quickHeuristic(text) {
       return { intent: 'outpost.info', confidence: 0.75, filters: { outpost_name } };
     }
   }
+  // Player/user asks without @mention: "tell me about X", "who is X", "describe X"
+  {
+    const m = raw.replace(/^<@!?\d+>\s*/, '').match(/^(?:tell\s+me\s+about|who\s+is|who'?s|info\s+on|about|describe|how\s+would\s+you\s+describe)\s+([A-Za-z0-9_\-]{2,64})\b/i);
+    if (m && m[1]) {
+      const owner_name = m[1].trim();
+      // If it looks like an org/bot/system keyword, don't force user intent here
+      if (!/(beowulf|robohound|bot|stanton|pyro|nyx|terra|sol)/i.test(owner_name)) {
+        if (/stats?/i.test(s)) return { intent: 'user.stats', confidence: 0.8, filters: { owner_name } };
+        // Prefer activity for describe/about
+        return { intent: 'user.activity', confidence: 0.85, filters: { owner_name } };
+      }
+      // Still allow opinion intent if explicitly asking opinion
+      if (/what\s+do\s+you\s+think|opinion/i.test(s)) return { intent: 'user.opinion', confidence: 0.7, filters: { owner_name } };
+    }
+  }
   // Dogfighting (pilotry, loadouts, equipment, strategies)
   const dogfightCue = /(\bdogfight\b|\bpvp\b|\bvtol\b|\bspace\s*pvp\b|\bpilotry\b|\bpiloting\b|\bflight\b|\bflying\b|\baim\b|\bpip\b|\bdecouple\b|\bstrafe\b|\bjoust\b|\bduel\b|\bace\b|\bintercept\b|\bloadouts?\b|\boutfits?\b|\bequipment\b|\bcomponents?\b|\bmeta\b|\bstrat|\btactic|\btraining\b)/;
   if (dogfightCue.test(s)) {
@@ -505,6 +589,11 @@ async function llmRouteIntent(openai, model, text) {
     intent: 'one of: ' + SAFE_INTENTS.join(', '),
     confidence: '0.0..1.0',
     filters: {
+      // Hit creation
+      air_or_ground: 'for piracy.hit.create: Air|Ground|Mixed',
+      assists: 'for piracy.hit.create: array of mentioned user IDs (strings)',
+      cargo: 'for piracy.hit.create: array of { commodity_name, scu }',
+      video_link: 'for piracy.hit.create: optional URL to clip/video',
       patch: 'optional string like 3.23 or 3.23.1',
       owner_name: 'optional string',
       owner_id: 'optional string',

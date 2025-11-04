@@ -18,6 +18,8 @@ const { refreshUserlist } = require("./common/refresh-userlist.js");
 const { saveMessage } = require("./common/message-saver.js");
 const { loadChatlogs } = require("./vector-handling/vector-handler.js");
 const { trimChatLogs } = require("./vector-handling/vector-handler.js");
+const { main: ingestChatBatch, ingestChatMessage } = require('./vector-handling/chat-ingest.js');
+const { ingestDailyChatSummaries, ingestHitLogs, ingestPlayerStats } = require('./vector-handling/extra-ingest.js');
 const { checkRecentGatherings } = require("./common/recent-gatherings.js");
 const bodyParser = require('body-parser');
 const { handleHitPost } = require('./functions/post-new-hit.js');
@@ -42,11 +44,7 @@ const { processOrgLeaderboards } = require('./functions/process-leaderboards.js'
 const { verifyUser } = require('./functions/verify-user.js');
 const { handleNewGuildMember } = require('./common/new-user.js');
 const { handleSimpleWelcomeProspect, handleSimpleWelcomeGuest, handleSimpleJoin } = require("./common/inprocessing-verify-handle.js");
-const { checkRecentFleets, manageRecentFleets } = require('./common/recent-fleets.js');
 const { refreshPlayerStatsView } = require('./api/playerStatsApi.js');
-const { ingestDailyChatSummaries } = require('./chatgpt/chat-ingest.js');
-const { ingestHitLogs } = require('./chatgpt/hit-ingest.js');
-const { ingestPlayerStats } = require('./chatgpt/player-stats-ingest.js');
 const { removeProspectFromFriendlies } = require('./common/remove-prospect-from-friendly.js');
 // Preloaders for location and market caches
 const { loadSystems } = require('./chatgpt/star-systems-answerer.js');
@@ -214,18 +212,18 @@ client.on("ready", async () => {
   try { await ingestHitLogs(client, openai); } catch (e) { console.error('Initial hit ingest failed:', e); }
   try { await ingestPlayerStats(client); } catch (e) { console.error('Initial player-stats ingest failed:', e); }
   // await processPlayerLeaderboards(client, openai)
-  console.log("Ready")
   // Sequential UEX refresh + cache warmup
   const DAY_MS = 86400000;
   let uexRefreshInProgress = false;
   const primeLocationAndMarketCaches = async () => {
     try {
+      // Do a single forced DB refresh via market cache, then non-blocking warms for the rest
+      await primeMarketCache({ force: true });
       await Promise.allSettled([
-        loadSystems({ force: true }),
-        loadStations({ force: true }),
-        loadPlanets({ force: true }),
-        loadOutposts({ force: true }),
-        primeMarketCache({ force: true }),
+        loadSystems({ force: false }),
+        loadStations({ force: false }),
+        loadPlanets({ force: false }),
+        loadOutposts({ force: false }),
       ]);
     } catch (e) {
       console.error('Cache prime failed:', e);
@@ -255,6 +253,21 @@ client.on("ready", async () => {
   // At launch: only warm caches from existing DB data (no external refresh)
   await primeLocationAndMarketCaches();
   console.log('[Cache] Initial in-memory caches primed from DB.');
+  // Indicate bot is fully ready only after caches are primed
+  console.log("Ready")
+  // After startup preloads: batch-ingest chat logs into knowledge vectors, then prune
+  // Optional: batch-ingest historical chat logs into knowledge vectors at startup
+  if ((process.env.KNOWLEDGE_INGEST_ENABLE || 'false').toLowerCase() === 'true' && (process.env.CHAT_VECTOR_INGEST_ON_START || 'false').toLowerCase() === 'true') {
+    (async () => {
+      try {
+        console.log('[ChatIngest] Starting initial chat vector ingest…');
+        await ingestChatBatch();
+        console.log('[ChatIngest] Initial chat vector ingest complete.');
+      } catch (e) {
+        console.error('[ChatIngest] Initial ingest failed:', e?.message || e);
+      }
+    })();
+  }
   setInterval(runUEXRefreshSequence, DAY_MS); // every 24 hours
   setInterval(async () => preloadedDbTables = preloadFromDb(),
     21600000 //every 6 hours
@@ -322,6 +335,23 @@ client.on("messageCreate", async (message) => {
   // Optionally persist messages to the backend for retrieval scoring
   if ((process.env.SAVE_MESSAGES || 'false').toLowerCase() === 'true') {
     try { await saveMessage(message, client); } catch {}
+  }
+
+  // Ingest each new message into knowledge vectors (advice/opinion grounding)
+  if ((process.env.KNOWLEDGE_INGEST_ENABLE || 'false').toLowerCase() === 'true' && (process.env.CHAT_VECTOR_INGEST_LIVE || 'false').toLowerCase() === 'true') {
+    try {
+      const payload = {
+        id: message.id,
+        content: message.content,
+        username: message.author?.username,
+        channel_name: message.channel?.name,
+        timestamp: message.createdAt,
+      };
+      // Non-blocking: do not await, but catch errors
+      Promise.resolve(ingestChatMessage(payload)).catch((e) => console.error('[ChatIngest] live ingest error:', e?.message || e));
+    } catch (e) {
+      console.error('[ChatIngest] failed to schedule live ingest:', e?.message || e);
+    }
   }
 
   // Detect if this message is directed at the bot: mention or reply to bot

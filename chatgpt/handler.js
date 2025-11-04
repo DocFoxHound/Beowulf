@@ -3,12 +3,244 @@
 const { sendResponse } = require('../threads/send-response.js');
 const { runWithResponses } = require('./responses-run.js');
 const { getUserById } = require('../api/userlistApi.js');
+const { ChatLogsModel } = require('../api/models/chat-logs');
 const { getAllHitLogs } = require('../api/hitTrackerApi.js');
-const { buildRecentConversationSnippet, buildRecentActivitySnapshot } = require('./context-builders');
 const { listKnowledge } = require('../api/knowledgeApi.js');
+const { createHitLog } = require('../api/hitTrackerApi.js');
+const { getAllGameVersions } = require('../api/gameVersionApi.js');
+const { getAllSummarizedItems, getAllSummarizedCommodities } = require('../api/uexApi.js');
+const { handleHitPost } = require('../functions/post-new-hit.js');
 
 // Lightweight memory to reduce repetitive quick-replies in banter flows
 const lastQuickReplies = new Map(); // key: channelId:userId -> { text, ts }
+// Remember last market query context per user/channel for follow-up questions like "and in Pyro?"
+const lastMarketContext = new Map(); // key: channelId:userId -> { intent, item_name, location, ts }
+// Maintain conversational hit-drafts per user/channel to complete missing fields across messages
+const lastHitDrafts = new Map(); // key: channelId:userId -> { draft, awaiting, ts }
+
+function marketContextKey(message) {
+  return `${message.channelId}:${message.author?.id}`;
+}
+
+function rememberMarketContext(message, intent, item_name, location) {
+  try {
+    const key = marketContextKey(message);
+    lastMarketContext.set(key, { intent, item_name, location: location || null, ts: Date.now() });
+  } catch {}
+}
+
+function hitDraftKey(message) {
+  return `${message.channelId}:${message.author?.id}`;
+}
+
+function rememberHitDraft(message, draft) {
+  try {
+    const key = hitDraftKey(message);
+    lastHitDrafts.set(key, { ...draft, ts: Date.now() });
+  } catch {}
+}
+
+function getHitDraft(message) {
+  const key = hitDraftKey(message);
+  const entry = lastHitDrafts.get(key);
+  if (!entry) return null;
+  // TTL 10 minutes
+  if (Date.now() - (entry.ts || 0) > 10 * 60 * 1000) {
+    lastHitDrafts.delete(key);
+    return null;
+  }
+  return entry;
+}
+
+function clearHitDraft(message) {
+  const key = hitDraftKey(message);
+  lastHitDrafts.delete(key);
+}
+
+// Helpers for hit parsing/valuation
+const normalizeName = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+async function getPriceCatalog() {
+  try {
+    const [commodities, items] = await Promise.all([
+      getAllSummarizedCommodities(),
+      getAllSummarizedItems(),
+    ]);
+    const list = ([]).concat(commodities || [], items || []);
+    const map = new Map();
+    for (const it of list) {
+      const key = normalizeName(it.commodity_name || it.name);
+      if (!key) continue;
+      map.set(key, it);
+    }
+    return map;
+  } catch (e) {
+    console.error('getPriceCatalog failed:', e?.message || e);
+    return new Map();
+  }
+}
+
+function extractCargoFromText(text) {
+  const s = String(text || '');
+  const items = [];
+  try {
+    // 120 scu of quantanium
+    const re1 = /(\d{1,6}(?:\.\d+)?)\s*(?:scu|u|units)\s*(?:of\s+)?([a-z][a-z0-9\- '\/]{2,40})/gi;
+    let m;
+    while ((m = re1.exec(s)) !== null) items.push({ commodity_name: m[2].trim(), scuAmount: Number(m[1]) });
+    // quantanium x 120 scu
+    const re2 = /\b([a-z][a-z0-9\- '\/]{2,40})\b\s*[x×*]\s*(\d{1,6}(?:\.\d+)?)\s*(?:scu|u|units)\b/gi;
+    while ((m = re2.exec(s)) !== null) items.push({ commodity_name: m[1].trim(), scuAmount: Number(m[2]) });
+  } catch {}
+  // Merge duplicates of same commodity
+  const byName = new Map();
+  for (const it of items) {
+    const key = normalizeName(it.commodity_name);
+    const prev = byName.get(key);
+    if (prev) prev.scuAmount += it.scuAmount; else byName.set(key, { ...it });
+  }
+  return Array.from(byName.values());
+}
+
+function detectAirOrGround(text) {
+  const s = String(text || '').toLowerCase();
+  const g = /(\bfps\b|\bfoot\b|\bground\b|\bon\s*foot\b|\bon\s*the\s*ground\b)/.test(s);
+  const a = /(\bspace\b|\bair\b|\bflight\b|\bflying\b|\bship\b|\binterdict(?:ed|ion)?\b|\bsnare\b)/.test(s);
+  if (/\bmixed\b/.test(s) || (g && a)) return 'Mixed';
+  if (g) return 'Ground';
+  if (a) return 'Air';
+  return undefined;
+}
+
+function extractMentionsFromContent(text) {
+  try {
+    return Array.from(String(text || '').matchAll(/<@!?(\d+)>/g)).map(m => m[1]);
+  } catch { return []; }
+}
+
+function extractVideoLink(text) {
+  return (String(text || '').match(/https?:\/\/\S+/i) || [])[0] || null;
+}
+
+async function getLatestPatch() {
+  try {
+    const patches = await getAllGameVersions();
+    if (!Array.isArray(patches) || !patches.length) return null;
+    const latest = [...patches].sort((a,b) => (b.id||0) - (a.id||0))[0];
+    return latest?.version || null;
+  } catch { return null; }
+}
+
+// Basic Levenshtein distance for fuzzy matching
+function levenshtein(a, b) {
+  a = a || ''; b = b || '';
+  const m = a.length, n = b.length;
+  if (m === 0) return n; if (n === 0) return m;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+    }
+  }
+  return dp[m][n];
+}
+
+function findBestCommodityMatch(name, catalogList) {
+  const q = normalizeName(name);
+  if (!q) return null;
+  // exact first
+  let exact = catalogList.find(c => c.norm === q);
+  if (exact) return exact;
+  // contains/starts-with heuristics
+  let contains = catalogList.find(c => c.norm.includes(q) || q.includes(c.norm));
+  if (contains) return contains;
+  // Levenshtein with threshold relative to length
+  let best = null, bestDist = Infinity;
+  for (const c of catalogList) {
+    const d = levenshtein(q, c.norm);
+    if (d < bestDist) { bestDist = d; best = c; }
+  }
+  const threshold = Math.max(1, Math.floor(Math.min(q.length, best?.norm?.length || 0) * 0.35));
+  if (best && bestDist <= threshold) return best;
+  return null;
+}
+
+function getTopSuggestions(name, catalogList, topN = 5) {
+  const q = normalizeName(name);
+  const scored = catalogList.map(c => ({ c, d: levenshtein(q, c.norm) }))
+    .sort((a, b) => a.d - b.d)
+    .slice(0, topN)
+    .map(({ c, d }) => ({
+      commodity_name: c.entry?.commodity_name || c.entry?.name || c.norm,
+      commodity_code: c.entry?.commodity_code || c.entry?.code || null,
+      norm: c.norm,
+      distance: d,
+    }));
+  return scored;
+}
+
+async function computeTotalsAndEnrichCargo(cargoList, priceCatalog) {
+  const enriched = [];
+  let unknown = [];
+  let ambiguous = [];
+  let totalValue = 0;
+  let totalSCU = 0;
+  // Build list view from map for fuzzy search
+  const catalogList = Array.from(priceCatalog.entries()).map(([norm, entry]) => ({ norm, entry }));
+  for (const it of cargoList || []) {
+    const match = findBestCommodityMatch(it.commodity_name, catalogList);
+    const entry = match?.entry || null;
+    const avg = entry ? (Number(entry.price_sell_avg) === 0 ? Number(entry.price_buy_avg) : Number(entry.price_sell_avg)) : 0;
+    const value = avg * Number(it.scuAmount || 0);
+    totalSCU += Number(it.scuAmount || 0);
+    totalValue += value;
+    // Prefer catalog's official name/code if we matched; include both name and code
+    const officialName = entry?.commodity_name || entry?.name || it.commodity_name;
+    const officialCode = entry?.commodity_code || entry?.code || null;
+    enriched.push({ commodity_name: officialName, commodity_code: officialCode, scuAmount: it.scuAmount, avg_price: avg });
+    if (!entry) {
+      unknown.push(it.commodity_name);
+      // prepare suggestions (top 5)
+      const suggestions = getTopSuggestions(it.commodity_name, catalogList, 5);
+      ambiguous.push({ input_name: it.commodity_name, norm: normalizeName(it.commodity_name), suggestions });
+    }
+  }
+  return { enrichedCargo: enriched, totalValue, totalSCU, unknownItems: Array.from(new Set(unknown)), ambiguous };
+}
+
+// LLM-based extractor to enrich hit details from free-form text
+async function llmExtractHitFields(openai, content) {
+  try {
+    if ((process.env.HIT_LLM_EXTRACT || 'true').toLowerCase() === 'false') return null;
+    const sys = 'You extract structured hit log details from casual chat. Output STRICT JSON with fields: { air_or_ground: "Air|Ground|Mixed|null", cargo: [{ name: string, scu: number }], video_link: string|null, title: string|null, story: string|null }. \n- Infer Air vs Ground vs Mixed from context; if unsure, null.\n- Parse cargo like "120 scu quant", "quant x 120 scu" into items. Sum duplicates. Use plain commodity names, no codes.\n- video_link: a URL if present, else null.\n- title/story: brief and clean; keep story under 280 chars.';
+    const usr = `Message:\n${content}`;
+    const res = await openai.responses.create({
+      model: process.env.OPENAI_RESPONSES_MODEL || 'gpt-4o-mini',
+      temperature: 0.2,
+      response_format: { type: 'json_object' },
+      input: [
+        { role: 'system', content: sys },
+        { role: 'user', content: usr },
+      ],
+    });
+    const txt = res?.output?.[0]?.content?.[0]?.text || res?.output_text || '';
+    try {
+      const obj = JSON.parse(txt);
+      const cargo = Array.isArray(obj?.cargo) ? obj.cargo.map(i => ({ commodity_name: String(i.name||'').trim(), scuAmount: Number(i.scu)||0 })).filter(i=>i.commodity_name && i.scuAmount>0) : [];
+      const aog = obj?.air_or_ground && ['Air','Ground','Mixed'].includes(obj.air_or_ground) ? obj.air_or_ground : null;
+      const video = obj?.video_link && /^https?:\/\//i.test(obj.video_link) ? obj.video_link : null;
+      const title = obj?.title ? String(obj.title).slice(0, 80) : null;
+      const story = obj?.story ? String(obj.story).slice(0, 280) : null;
+      return { air_or_ground: aog, cargo, video_link: video, title, story };
+    } catch { return null; }
+  } catch (e) {
+    console.error('llmExtractHitFields failed:', e?.message || e);
+    return null;
+  }
+}
 
 function pickDifferent(arr, avoid) {
   if (!Array.isArray(arr) || !arr.length) return '';
@@ -49,6 +281,42 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
   const isPiracySpots = routed?.intent === 'piracy.spots';
   const useAutoRouter = ((process.env.AUTO_ROUTER_ENABLED || 'true').toLowerCase() === 'true') && (!routed?.intent || routed.intent === 'other' || (Number(routed?.confidence || 0) < 0.7));
   const autoPlan = useAutoRouter ? await autoPlanRetrieval(openai, formattedMessage) : null;
+
+  // Quick user/org profile ask detection (e.g., "tell me about DocHound", "who is DocHound", "describe DocHound/Beowulf")
+  const userQueryMatch = (() => {
+    const s0 = String(message.content || '').trim();
+    // Remove leading bot mention if present for clean matching
+    const s = s0.replace(/^<@!?\d+>\s*/, '');
+    const m1 = s.match(/^(?:tell\s+me\s+about|who\s+is|who\'s|whos|info\s+on|about|describe|how\s+would\s+you\s+describe)\s+([A-Za-z0-9_\-]{2,64})\b/i);
+    if (m1 && m1[1]) return m1[1];
+    return null;
+  })();
+  if (userQueryMatch) {
+    try {
+      const target = userQueryMatch;
+      // If asking about the bot or org name, handle specially
+      const botName = (client?.user?.username || '').trim().toLowerCase();
+      const tLower = String(target).trim().toLowerCase();
+      if (botName && (tLower === botName || tLower === 'robohound')) {
+        const selfDesc = 'I\'m RoboHound — a Discord bot for Star Citizen ops. I can summarize recent activity, answer market questions (UEX-backed), list systems/planets/stations/outposts, and fetch piracy stats and summaries from our knowledge.';
+        await sendResponse(message, selfDesc, true);
+        return;
+      }
+      if (tLower === 'beowulf') {
+        const org = await buildOrgSummary('Beowulf');
+        if (org) { await sendResponse(message, org, true); return; }
+      }
+      // Prefer an opinionated take over a raw profile summary
+  const opinion = await buildUserOpinionSummary(target, openai);
+      if (opinion) { await sendResponse(message, opinion, true); return; }
+      // Fallback to a factual profile if we couldn't form an opinion
+      const prof = await buildUserProfileSummary(target);
+      if (prof) { await sendResponse(message, prof, true); return; }
+    } catch (e) {
+      console.error('user profile lookup failed:', e?.response?.data || e?.message || e);
+      // fall through
+    }
+  }
 
   // Small talk / banter: prefer LLM-generated responses unless disabled
   if (routed?.intent === 'chat.banter') {
@@ -107,6 +375,223 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
     try { await new Promise(r => setTimeout(r, 200 + Math.floor(Math.random() * 400))); } catch {}
     await sendResponse(message, finalReply, true);
     return;
+  }
+
+  // Conversational hit creation flow: detect and guide user to log a new hit
+  if (routed?.intent === 'piracy.hit.create' || getHitDraft(message)) {
+    try {
+      // Load or initialize draft
+      let draft = getHitDraft(message) || { awaiting: null };
+      const filters = routed?.filters || {};
+      // If this is a fresh start, seed from routed filters
+      if (!draft?.seeded) {
+        const assists = Array.isArray(filters.assists) ? filters.assists : extractMentionsFromContent(message.content);
+        draft = {
+          seeded: true,
+          awaiting: null,
+          user_id: message.author?.id,
+          username: message.author?.username,
+          nickname: message.member?.nickname || null,
+          air_or_ground: filters.air_or_ground || detectAirOrGround(message.content) || null,
+          cargo: Array.isArray(filters.cargo) ? filters.cargo.map(c => ({ commodity_name: c.commodity_name, scuAmount: Number(c.scu) || Number(c.scuAmount) || 0 })).filter(c => c.scuAmount > 0) : extractCargoFromText(message.content),
+          assists: assists || [],
+          video_link: filters.video_link || extractVideoLink(message.content) || null,
+          source_text: message.content,
+        };
+      } else {
+        // Existing draft: interpret this message as an answer to the last question
+        if (draft.awaiting === 'cargo') {
+          const added = extractCargoFromText(message.content);
+          if (added.length) {
+            // merge
+            const byName = new Map(draft.cargo.map(it => [normalizeName(it.commodity_name), { ...it }]));
+            for (const it of added) {
+              const k = normalizeName(it.commodity_name);
+              const prev = byName.get(k);
+              if (prev) prev.scuAmount += it.scuAmount; else byName.set(k, { ...it });
+            }
+            draft.cargo = Array.from(byName.values());
+          }
+        } else if (draft.awaiting === 'air_or_ground') {
+          const aog = detectAirOrGround(message.content) || (/\b(air|space)\b/i.test(message.content) ? 'Air' : (/\b(ground|fps|foot)\b/i.test(message.content) ? 'Ground' : (/\bmixed\b/i.test(message.content) ? 'Mixed' : null)));
+          if (aog) draft.air_or_ground = aog;
+        } else if (draft.awaiting === 'confirm') {
+          const s = String(message.content || '').trim().toLowerCase();
+          if (/^(y|yes|confirm|ok|okay|create|submit)$/i.test(s)) {
+            draft.confirmed = true;
+          } else if (/^(n|no|cancel|stop|abort)$/i.test(s)) {
+            await sendResponse(message, 'Canceled. I did not create the hit.', true);
+            clearHitDraft(message);
+            return;
+          } else {
+            await sendResponse(message, "Please reply 'confirm' to create the hit or 'cancel' to abort.", true);
+            rememberHitDraft(message, draft);
+            return;
+          }
+        } else if (draft.awaiting === 'cargo_disambiguate' && draft._disambigPending) {
+          // Parse mappings like: "quant=1, scrap=2" or allow "name idx"
+          const txt = String(message.content || '').toLowerCase();
+          const pairs = txt.split(/[;,\n]+/).map(s => s.trim()).filter(Boolean);
+          const selections = new Map();
+          for (const p of pairs) {
+            let m = p.match(/^([^=]+)\s*[=:]\s*(\d+|none|skip)$/i) || p.match(/^(.+?)\s+(\d+|none|skip)$/i);
+            if (!m) continue;
+            const key = normalizeName(m[1]);
+            const val = String(m[2]).toLowerCase();
+            selections.set(key, val);
+          }
+          if (selections.size === 0) {
+            await sendResponse(message, "Please reply like 'quant=1, scrap=2' or 'name=none' to skip.", true);
+            rememberHitDraft(message, draft);
+            return;
+          }
+          const pending = draft._disambigPending.items || [];
+          for (const amb of pending) {
+            const choice = selections.get(amb.norm);
+            if (!choice) continue;
+            if (choice === 'none' || choice === 'skip') continue; // leave unvalued
+            const idx = Number(choice) - 1;
+            if (Number.isFinite(idx) && idx >= 0 && idx < amb.suggestions.length) {
+              const picked = amb.suggestions[idx];
+              const ci = draft.cargo.findIndex(x => normalizeName(x.commodity_name) === amb.norm);
+              if (ci >= 0) draft.cargo[ci].commodity_name = picked.commodity_name;
+            }
+          }
+          delete draft._disambigPending;
+          draft.awaiting = null;
+        }
+        // Always capture any new mentions/video links in follow-ups
+        const newMentions = extractMentionsFromContent(message.content);
+        if (Array.isArray(newMentions) && newMentions.length) {
+          const set = new Set([...(draft.assists || []), ...newMentions]);
+          draft.assists = Array.from(set);
+        }
+        draft.video_link = draft.video_link || extractVideoLink(message.content) || null;
+      }
+
+      // LLM enrichment pass (optional): try to fill missing cargo/type/story from this message
+      if ((process.env.HIT_LLM_EXTRACT || 'true').toLowerCase() !== 'false') {
+        try {
+          const llm = await llmExtractHitFields(openai, formattedMessage);
+          if (llm) {
+            // merge air_or_ground if missing
+            if (!draft.air_or_ground && llm.air_or_ground) draft.air_or_ground = llm.air_or_ground;
+            // merge cargo if none captured yet
+            if ((!Array.isArray(draft.cargo) || draft.cargo.length === 0) && Array.isArray(llm.cargo) && llm.cargo.length) {
+              draft.cargo = llm.cargo;
+            }
+            // narrative fields (optional, used as defaults)
+            if (!draft.title && llm.title) draft.title = llm.title;
+            if (!draft.story && llm.story) draft.story = llm.story;
+            if (!draft.video_link && llm.video_link) draft.video_link = llm.video_link;
+          }
+        } catch (e) { console.error('LLM enrichment pass failed:', e?.message || e); }
+      }
+
+      // Determine missing required pieces
+      const missing = [];
+      if (!Array.isArray(draft.cargo) || draft.cargo.length === 0) missing.push('cargo');
+      if (!draft.air_or_ground) missing.push('air_or_ground');
+
+      if (missing.length) {
+        draft.awaiting = missing[0];
+        rememberHitDraft(message, draft);
+        if (draft.awaiting === 'cargo') {
+          await sendResponse(message,
+            "Nice work! I can log this hit. What's the cargo? Reply like: '120 scu quantanium, 50 scu scrap' or 'quantanium x 120 scu'.",
+            true);
+        } else if (draft.awaiting === 'air_or_ground') {
+          await sendResponse(message,
+            "Got it. Was this Air, Ground (FPS), or Mixed? Reply with 'Air', 'Ground', or 'Mixed'.",
+            true);
+        }
+        return;
+      }
+
+      // We have enough; compute totals and confirm with the user first
+      const [priceCatalog, latestPatch] = await Promise.all([
+        getPriceCatalog(),
+        getLatestPatch(),
+      ]);
+      const { enrichedCargo, totalValue, totalSCU, unknownItems, ambiguous } = await computeTotalsAndEnrichCargo(draft.cargo, priceCatalog);
+      // If we have ambiguous items and haven't resolved them, prompt user
+      if (Array.isArray(ambiguous) && ambiguous.length && !draft._disambigPending && !draft.confirmed) {
+        draft._disambigPending = { items: ambiguous };
+        draft.awaiting = 'cargo_disambiguate';
+        rememberHitDraft(message, draft);
+        const parts = [];
+        parts.push("I couldn't confidently match some cargo names. Pick the closest option by replying like 'quant=1, scrap=2' or 'name=none' to leave unvalued.");
+        for (const amb of ambiguous) {
+          parts.push(`For "${amb.input_name}":`);
+          amb.suggestions.forEach((sug, idx) => {
+            parts.push(`  ${idx + 1}) ${sug.commodity_name}${sug.commodity_code ? ` [${sug.commodity_code}]` : ''}`);
+          });
+        }
+        await sendResponse(message, parts.join('\n'), true);
+        return;
+      }
+      const totalCutValue = Math.round(Number(totalValue || 0) / (Number(draft.assists?.length || 0) + 1));
+      // Prepare a human summary and ask for confirmation
+      const cargoLines = enrichedCargo.map(c => `- ${c.commodity_name}${c.commodity_code ? ` [${c.commodity_code}]` : ''}: ${c.scuAmount} SCU`).join('\n');
+      const assistText = (draft.assists||[]).length ? draft.assists.map(id=>`<@${id}>`).join(', ') : 'None';
+      const notes = unknownItems?.length ? `\nNote: value for ${unknownItems.join(', ')} wasn't found; counted at 0 aUEC.` : '';
+      await sendResponse(message,
+        `Review this hit before I create it:\n`+
+        `- Type: ${draft.air_or_ground}\n`+
+        `- Patch: ${latestPatch || 'N/A'}\n`+
+        `- Cargo (total ${Math.round(totalSCU)} SCU):\n${cargoLines}\n`+
+        `- Total Value: ${Math.round(totalValue).toLocaleString()} aUEC\n`+
+        `- Split Value (per pirate): ${Math.round(totalCutValue).toLocaleString()} aUEC\n`+
+        `- Crew: ${assistText}\n`+
+        `${draft.video_link ? `- Video: ${draft.video_link}\n` : ''}`+
+        `${notes}\n\n`+
+        `Type 'confirm' to create or 'cancel' to abort.`,
+        true);
+      draft.awaiting = 'confirm';
+      draft._computed = { enrichedCargo, totalValue: Math.round(totalValue), totalSCU: Math.round(totalSCU), totalCutValue, latestPatch };
+      rememberHitDraft(message, draft);
+      if (!draft.confirmed) return;
+
+      // User confirmed; persist now
+      const parentId = Date.now();
+      const dbUser = await getUserById(message.author?.id).catch(() => null);
+      const payload = {
+        id: parentId,
+        user_id: message.author?.id,
+        username: dbUser?.username || message.author?.username,
+        nickname: dbUser?.nickname || message.member?.nickname || null,
+        air_or_ground: draft.air_or_ground,
+        cargo: draft._computed.enrichedCargo,
+        total_value: draft._computed.totalValue,
+        total_cut_value: draft._computed.totalCutValue,
+        total_scu: draft._computed.totalSCU,
+        patch: draft._computed.latestPatch || undefined,
+        assists: Array.isArray(draft.assists) ? draft.assists : [],
+        video_link: draft.video_link || undefined,
+        title: `Hit: ${draft._computed.totalSCU} SCU ${draft._computed.enrichedCargo[0]?.commodity_name || ''}`.trim(),
+        story: draft.source_text || 'Logged via chat',
+        type_of_piracy: draft.air_or_ground, // allow 'Air', 'Ground', or 'Mixed'
+        timestamp: new Date().toISOString(),
+        fleet_activity: false,
+      };
+      const created = await createHitLog(payload);
+      if (!created) {
+        await sendResponse(message, 'I couldn\'t create the hit right now. Please try again in a bit.', true);
+        rememberHitDraft(message, draft); // keep for retry
+        return;
+      }
+      try { await handleHitPost(client, openai, { ...payload, ...created }); } catch (e) { console.error('handleHitPost failed:', e?.message || e); }
+      clearHitDraft(message);
+      await sendResponse(
+        message,
+        `Logged hit #${created.id || payload.id}: ${Math.round(payload.total_value).toLocaleString()} aUEC over ${Math.round(payload.total_scu)} SCU. Crew: ${(payload.assists||[]).length ? payload.assists.map(id=>`<@${id}>`).join(', ') : 'None'}.`,
+        true
+      );
+      return;
+    } catch (e) {
+      console.error('piracy.hit.create handling failed:', e?.response?.data || e?.message || e);
+      // fall through to normal flow
+    }
   }
 
   // Fast, factual handling for piracy.stats (e.g., "best hit recently")
@@ -210,6 +695,32 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
     }
   }
 
+  // Deterministic route-focused piracy advice using world graph + terminal activity
+  if (routed?.intent === 'piracy.advice') {
+    try {
+      const filters = routed?.filters || {};
+      let from = filters.route_from || filters.from || null;
+      let to = filters.route_to || filters.to || null;
+      const item = filters.item_name || null;
+      // Fallback parse in case router missed endpoints
+      const s = String(message.content || '');
+      if (!from || !to) {
+        const mBetween = s.match(/\bbetween\s+([a-z0-9\-\' ]{2,30})\s+and\s+([a-z0-9\-\' ]{2,30})\b/i);
+        const mFromTo = s.match(/\bfrom\s+([a-z0-9\-\' ]{2,30})\s+to\s+([a-z0-9\-\' ]{2,30})\b/i);
+        if (mBetween || mFromTo) {
+          from = from || (mBetween ? mBetween[1] : mFromTo[1]);
+          to = to || (mBetween ? mBetween[2] : mFromTo[2]);
+        }
+      }
+      const ans = await piracyAdviceForRoute({ from, to, item });
+      await sendResponse(message, ans.text, true);
+      return;
+    } catch (e) {
+      console.error('piracy.advice handling failed:', e?.response?.data || e?.message || e);
+      // fall through to retrieval path if deterministic fails
+    }
+  }
+
   // Prefer knowledge-based daily summaries for recent-activity queries; fallback to quick snapshot
   let recentActivity = '';
   if (asksRecentActivity) {
@@ -239,7 +750,8 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
     }
   }
   const { getTopK, getTopKFromKnowledgePiracy } = require('./retrieval');
-  const { bestBuyLocations, bestSellLocations, spotFor, mostMovement, bestProfitRoutes } = require('./market-answerer');
+  const { bestBuyLocations, bestSellLocations, spotFor, mostMovement, bestProfitRoutes, mostActiveTerminals, bestOverallProfitRoute, bestCrossSystemRoutes } = require('./market-answerer');
+  const { piracyAdviceForRoute } = require('./piracy-route-advice');
   const {
     starSystemDetails,
     listStarSystems,
@@ -270,6 +782,50 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
     outpostFactionSummary,
     outpostJurisdictionSummary,
   } = require('./outposts-answerer');
+
+  // Conversational market follow-up handler: e.g., "and in Pyro?" reuses last item/intent
+  try {
+    const s = String(message.content || '').trim();
+    const likelyFollowUp = /^(?:and\s+)?(?:(?:in|at|near)\s+.+|[A-Za-z][\w\s'\-]{1,30}\??)$/.test(s.toLowerCase());
+    const mentionsOnlyLocation = /(\band\b\s+)?\b(in|at|near)\b\s+(.+)/i.exec(s);
+    // If router didn't explicitly classify as a market/item ask, attempt follow-up reuse
+    if (!/^item\.|^market\./.test(routed?.intent || '') && (likelyFollowUp || mentionsOnlyLocation)) {
+      const key = `${message.channelId}:${message.author?.id}`;
+      const ctx = lastMarketContext.get(key);
+      if (ctx && ctx.item_name && /^market\.|^item\./.test(ctx.intent || '')) {
+        const loc = mentionsOnlyLocation ? (mentionsOnlyLocation[3] || '').replace(/[?!.]+$/,'').trim() : s.replace(/^and\s+/i, '').replace(/[?!.]+$/,'').trim();
+        if (loc) {
+          try {
+            if (ctx.intent === 'item.buy') {
+              const ans = await bestBuyLocations({ name: ctx.item_name, top: 5, location: loc });
+              rememberMarketContext(message, ctx.intent, ctx.item_name, loc);
+              await sendResponse(message, ans.text, true);
+              return;
+            } else if (ctx.intent === 'item.sell') {
+              const ans = await bestSellLocations({ name: ctx.item_name, top: 5, location: loc });
+              rememberMarketContext(message, ctx.intent, ctx.item_name, loc);
+              await sendResponse(message, ans.text, true);
+              return;
+            } else if (ctx.intent === 'market.route') {
+              const ans = (ctx.item_name === '*')
+                ? await bestOverallProfitRoute({ top: 5, location: loc })
+                : await bestProfitRoutes({ name: ctx.item_name, top: 5, location: loc });
+              rememberMarketContext(message, ctx.intent, ctx.item_name, loc);
+              await sendResponse(message, ans.text, true);
+              return;
+            } else if (ctx.intent === 'market.spot') {
+              const ans = await spotFor({ name: ctx.item_name, top: 6, location: loc });
+              rememberMarketContext(message, ctx.intent, ctx.item_name, loc);
+              await sendResponse(message, ans.text, true);
+              return;
+            }
+          } catch (e) {
+            console.error('market follow-up reuse failed:', e?.response?.data || e?.message || e);
+          }
+        }
+      }
+    }
+  } catch {}
 
   // Track retrieval results by bucket for grounding decisions
   let autoPlanMessages = [];
@@ -316,6 +872,7 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
     }
     try {
       const ans = await bestBuyLocations({ name, top: 5, location });
+      rememberMarketContext(message, 'item.buy', name, location);
       await sendResponse(message, ans.text, true);
       return;
     } catch (e) {
@@ -331,6 +888,7 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
     }
     try {
       const ans = await bestSellLocations({ name, top: 5, location });
+      rememberMarketContext(message, 'item.sell', name, location);
       await sendResponse(message, ans.text, true);
       return;
     } catch (e) {
@@ -346,6 +904,7 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
     }
     try {
       const ans = await spotFor({ name, top: 6, location });
+      rememberMarketContext(message, 'market.spot', name, location);
       await sendResponse(message, ans.text, true);
       return;
     } catch (e) {
@@ -353,14 +912,34 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
     }
   }
   if (routed?.intent === 'market.route') {
-    const name = routed?.filters?.item_name || '';
-    const location = routed?.filters?.location_name || null;
-    if (!name) {
-      await sendResponse(message, 'Which item or commodity do you want a profit route for?', true);
-      return;
+    let name = routed?.filters?.item_name || '';
+    let location = routed?.filters?.location_name || null;
+    const s = String(message.content || '');
+    // Detect cross-system ask: "between X and Y" or "from X to Y"
+    const mBetween = s.match(/\bbetween\s+([a-z0-9\-\' ]{2,30})\s+and\s+([a-z0-9\-\' ]{2,30})\b/i);
+    const mFromTo = s.match(/\bfrom\s+([a-z0-9\-\' ]{2,30})\s+to\s+([a-z0-9\-\' ]{2,30})\b/i);
+    if (mBetween || mFromTo) {
+      const from = (mBetween ? mBetween[1] : mFromTo[1]).trim();
+      const to = (mBetween ? mBetween[2] : mFromTo[2]).trim();
+      try {
+        const ans = await bestCrossSystemRoutes({ from, to, top: 6 });
+        rememberMarketContext(message, 'market.route', '*', `${from} -> ${to}`);
+        await sendResponse(message, ans.text, true);
+        return;
+      } catch (e) {
+        console.error('market.route cross-system failed:', e?.response?.data || e?.message || e);
+      }
     }
+    const wantsOverall = !name || /\b(any|all|overall)\b/i.test(name) || /(overall|any|all)\s+(best\s+)?(trade\s+)?route/i.test(s);
     try {
+      if (wantsOverall) {
+        const ans = await bestOverallProfitRoute({ top: 5, location });
+        rememberMarketContext(message, 'market.route', '*', location);
+        await sendResponse(message, ans.text, true);
+        return;
+      }
       const ans = await bestProfitRoutes({ name, top: 5, location });
+      rememberMarketContext(message, 'market.route', name, location);
       await sendResponse(message, ans.text, true);
       return;
     } catch (e) {
@@ -370,6 +949,13 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
   if (routed?.intent === 'market.activity' || /most\s+(movement|active)|transactions?/.test(message.content || '')) {
     try {
       const location = routed?.filters?.location_name || null;
+      const wantTerminalScope = (/(?:\bby\s+terminal\b|\bper\s+terminal\b|\bterminals?\b)/i.test(message.content || '')) || String(routed?.filters?.scope || '') === 'terminal';
+      const mentionsReportsOrActive = /(report|reports|most\s+active)/i.test(message.content || '');
+      if (wantTerminalScope || mentionsReportsOrActive) {
+        const ans = await mostActiveTerminals({ top: 10, location });
+        await sendResponse(message, ans.text, true);
+        return;
+      }
       const scope = routed?.filters?.scope || (/(?:\bby\s+terminal\b|\bper\s+terminal\b|\bterminals?\b|\bstations?\b|\boutposts?\b)/i.test(message.content || '') ? 'terminal' : 'commodity');
       const ans = await mostMovement({ scope, top: 7, location });
       await sendResponse(message, ans.text, true);
@@ -675,8 +1261,8 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
     } catch {}
   }
 
-  // General info retrieval split across messages and knowledge for better grounding and counts
-  if ((routed?.intent === 'general.info') || (!isPiracyIntent && looksInfoSeeking)) {
+  // General / user-focused retrieval split across messages and knowledge for better grounding and counts
+  if ((routed?.intent === 'general.info') || (String(routed?.intent || '').startsWith('user.')) || (!isPiracyIntent && looksInfoSeeking)) {
     try {
       generalMessages = await getTopK({
         query: message.content,
@@ -701,6 +1287,23 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
         temporalHint: asksRecentActivity,
       });
     } catch {}
+  }
+
+  // If router classified as user.* with an owner_name, return a deterministic profile summary
+  if ((routed?.intent && routed.intent.startsWith('user.')) && (routed?.filters?.owner_name || routed?.filters?.owner_id)) {
+    try {
+      const name = routed?.filters?.owner_name || null;
+      if (name) {
+        const prof = await buildUserProfileSummary(name);
+        if (prof) {
+          await sendResponse(message, prof, true);
+          return;
+        }
+      }
+    } catch (e) {
+      console.error('user.* deterministic profile failed:', e?.response?.data || e?.message || e);
+    }
+    // If deterministic fails, allow the normal retrieval flow below to proceed
   }
 
   const anyRetrieval = [
@@ -810,6 +1413,33 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
   }
 }
 
+// Helper: derive a single rank label from the member's roles using env role IDs
+function deriveRankLabel(member) {
+  try {
+    if (!member?.roles?.cache) return null;
+    const roleIds = new Set(member.roles.cache.map(r => r.id));
+    const isLive = process.env.LIVE_ENVIRONMENT === 'true';
+    // Explicitly prioritize Captain when multiple rank roles are present
+    const captainRoleId = process.env[isLive ? 'CAPTAIN_ROLE' : 'TEST_CAPTAIN_ROLE'];
+    if (captainRoleId && roleIds.has(captainRoleId)) return 'Captain';
+    const ranks = [
+      { live: 'BLOODED_ROLE', test: 'TEST_BLOODED_ROLE', label: 'Blooded' },
+      { live: 'MARAUDER_ROLE', test: 'TEST_MARAUDER_ROLE', label: 'Marauder' },
+      { live: 'CREW_ROLE', test: 'TEST_CREW_ROLE', label: 'Crew' },
+      { live: 'PROSPECT_ROLE', test: 'TEST_PROSPECT_ROLE', label: 'Prospect' },
+      { live: 'FRIENDLY_ROLE', test: 'TEST_FRIENDLY_ROLE', label: 'Friendly' },
+    ];
+    for (const r of ranks) {
+      const id = process.env[isLive ? r.live : r.test];
+      if (id && roleIds.has(id)) return r.label;
+    }
+    return null;
+  } catch (e) {
+    console.error('deriveRankLabel error:', e);
+    return null;
+  }
+}
+
 // Local formatter modeled after legacy behavior: replace user mentions with display names.
 async function formatDiscordMessage(message) {
   const mentionRegex = /<@!?(\d+)>/g;
@@ -839,6 +1469,79 @@ module.exports = {
   handleBotConversation,
 };
 
+// Helper: pull last ~5 minutes of chat in this channel for lightweight context
+async function buildRecentConversationSnippet(message, opts = {}) {
+  try {
+    const maxMinutes = Number(opts.minutes || 5);
+    const maxItems = Math.max(3, Math.min(15, Number(opts.maxItems || 10)));
+    const maxChars = Math.max(200, Math.min(1800, Number(opts.maxChars || 900)));
+    const channelName = message?.channel?.name || '';
+    if (!channelName) return '';
+
+    // Fetch chat logs and filter by channel and recency
+    const rows = await ChatLogsModel.list();
+    if (!Array.isArray(rows) || !rows.length) return '';
+    const now = Date.now();
+    const cutoff = now - maxMinutes * 60_000;
+
+    const recent = rows
+      .filter(r => {
+        try {
+          const meta = r?.message?.metadata || {};
+          const ch = String(r?.channel_name || meta.channel || '');
+          if (ch !== channelName) return false;
+          const ts = new Date(meta.date || r?.message?.timestamp || r?.created_at || 0).getTime();
+          return ts && ts >= cutoff && ts <= now;
+        } catch { return false; }
+      })
+      // sort ascending by time for natural reading order
+      .sort((a,b) => {
+        const ta = new Date(a?.message?.metadata?.date || 0).getTime();
+        const tb = new Date(b?.message?.metadata?.date || 0).getTime();
+        return ta - tb;
+      })
+      .slice(-maxItems);
+
+    if (!recent.length) return '';
+
+    const lines = [];
+    for (const r of recent) {
+      const meta = r?.message?.metadata || {};
+      const role = String(r?.message?.role || '').toLowerCase();
+      const isBot = role === 'assistant';
+      const user = String(meta.user || '').trim();
+      // Message content is saved like: "@user: 'text'"; strip label and quotes
+      let content = String(r?.message?.content || '')
+        .replace(/^@[^:]+:\s*/i, '')
+        .replace(/^['“”"]|['“”"]$/g, '')
+        .replace(/<@!?\d+>/g, '@user');
+      // Trim line
+      content = content.replace(/\s+/g, ' ').trim();
+      if (!content) continue;
+      // timestamp HH:MM
+      let hhmm = '';
+      try {
+        const d = new Date(meta.date || Date.now());
+        hhmm = d.toISOString().slice(11,16);
+      } catch {}
+      const speaker = user || (isBot ? 'bot' : 'user');
+      const line = `- [${hhmm}] ${speaker}: ${content}`;
+      lines.push(line.length > 220 ? line.slice(0, 217) + '…' : line);
+      // Safety cap on total chars
+      const total = lines.join('\n');
+      if (total.length > maxChars) break;
+    }
+
+    if (!lines.length) return '';
+    // Important instruction so model treats this as background only
+    const header = `Recent channel chatter (last ${Math.min(maxMinutes, 60)}m in #${channelName}) — background only; answer the user's latest message, do not reply to these lines:`;
+    return [header].concat(lines).join('\n');
+  } catch (e) {
+    console.error('buildRecentConversationSnippet error:', e?.message || e);
+    return '';
+  }
+}
+
 // Helper: fetch latest daily summaries from knowledge and format a compact snippet
 async function buildKnowledgeRecentActivitySnippet({ guildId, channelId, limit = 3, maxChars = 1400 }) {
   try {
@@ -865,6 +1568,61 @@ async function buildKnowledgeRecentActivitySnippet({ guildId, channelId, limit =
 }
 
 function truncateText(s, n) {
+
+// Fallback snapshot when knowledge summaries aren't available; focuses on channel-local last 5m
+async function buildRecentActivitySnapshot(message, opts = {}) {
+  try {
+    const maxMinutes = Number(opts.minutes || 5);
+    const maxItems = Math.max(3, Math.min(20, Number(opts.maxItems || 12)));
+    const maxChars = Math.max(200, Math.min(1800, Number(opts.maxChars || 1100)));
+    const channelName = message?.channel?.name || '';
+    if (!channelName) return '';
+    const rows = await ChatLogsModel.list();
+    if (!Array.isArray(rows) || !rows.length) return '';
+    const now = Date.now();
+    const cutoff = now - maxMinutes * 60_000;
+    const recent = rows
+      .filter(r => {
+        try {
+          const ch = String(r?.channel_name || r?.message?.metadata?.channel || '');
+          if (ch !== channelName) return false;
+          const ts = new Date(r?.message?.metadata?.date || 0).getTime();
+          return ts && ts >= cutoff && ts <= now;
+        } catch { return false; }
+      })
+      .sort((a,b) => new Date(a?.message?.metadata?.date||0) - new Date(b?.message?.metadata?.date||0))
+      .slice(-maxItems);
+    if (!recent.length) return '';
+
+    // Basic stats
+    const users = new Set();
+    for (const r of recent) {
+      const u = String(r?.message?.metadata?.user || '').trim();
+      if (u) users.add(u);
+    }
+    const header = `Recent activity (last ${Math.min(maxMinutes,60)}m) in #${channelName}: ${recent.length} messages by ${users.size} users`;
+    const lines = [];
+    for (const r of recent.slice(-8)) { // show up to 8 examples
+      const meta = r?.message?.metadata || {};
+      const user = String(meta.user || '').trim();
+      let content = String(r?.message?.content || '')
+        .replace(/^@[^:]+:\s*/i, '')
+        .replace(/^['“”"]|['“”"]$/g, '')
+        .replace(/<@!?\d+>/g, '@user')
+        .replace(/\s+/g, ' ') // compact
+        .trim();
+      if (!content) continue;
+      const snippet = content.length > 140 ? content.slice(0, 137) + '…' : content;
+      lines.push(`- ${user || 'user'}: ${snippet}`);
+      const total = (header + '\n' + lines.join('\n')).length;
+      if (total > maxChars) break;
+    }
+    return [header].concat(lines).join('\n');
+  } catch (e) {
+    console.error('buildRecentActivitySnapshot error:', e?.message || e);
+    return '';
+  }
+}
   if (!s) return '';
   if (s.length <= n) return s;
   return s.slice(0, Math.max(0, n - 1)) + '…';
@@ -975,30 +1733,445 @@ async function autoPlanRetrieval(openai, content) {
   }
 }
 
-// Helper: derive a single rank label from the member's roles using env role IDs
-function deriveRankLabel(member) {
+// Build a compact, natural profile summary for a given username/nickname from chat logs
+async function buildUserProfileSummary(name) {
   try {
-    if (!member?.roles?.cache) return null;
-    const roleIds = new Set(member.roles.cache.map(r => r.id));
-    const isLive = process.env.LIVE_ENVIRONMENT === 'true';
-  // Explicitly prioritize Captain when multiple rank roles are present
-  const captainRoleId = process.env[isLive ? 'CAPTAIN_ROLE' : 'TEST_CAPTAIN_ROLE'];
-  if (captainRoleId && roleIds.has(captainRoleId)) return 'Captain';
-    const ranks = [
-      { live: 'BLOODED_ROLE', test: 'TEST_BLOODED_ROLE', label: 'Blooded' },
-      { live: 'MARAUDER_ROLE', test: 'TEST_MARAUDER_ROLE', label: 'Marauder' },
-      { live: 'CREW_ROLE', test: 'TEST_CREW_ROLE', label: 'Crew' },
-      { live: 'PROSPECT_ROLE', test: 'TEST_PROSPECT_ROLE', label: 'Prospect' },
-      { live: 'FRIENDLY_ROLE', test: 'TEST_FRIENDLY_ROLE', label: 'Friendly' },
-    ];
-
-    for (const r of ranks) {
-      const id = process.env[isLive ? r.live : r.test];
-      if (id && roleIds.has(id)) return r.label;
+    const target = String(name || '').trim();
+    if (!target) return '';
+    const { getUsers } = require('../api/userlistApi.js');
+    const users = await getUsers().catch(()=>null);
+    let userRow = null;
+    if (Array.isArray(users) && users.length) {
+      const norm = (s) => String(s || '').trim().toLowerCase();
+      const tn = norm(target);
+      userRow = users.find(u => norm(u.username || u.nickname || u.name) === tn) ||
+                users.find(u => norm(u.username || '') === tn) ||
+                users.find(u => norm(u.nickname || '') === tn) || null;
     }
-    return null;
+    const rows = await ChatLogsModel.list();
+    const now = Date.now();
+    const daysToMs = (d) => d * 24 * 60 * 60 * 1000;
+    let windowDays = 30;
+    let since = now - daysToMs(windowDays);
+    // Canonicalize names to compare consistently
+    const canon = (s) => {
+      const x = String(s || '').trim();
+      if (!x) return '';
+      // Strip leading @ and optional brackets like [TAG]
+      const noAt = x.replace(/^@+/, '');
+      const noTag = noAt.replace(/^\[[^\]]+\]\s*/, '');
+      return noTag.toLowerCase().replace(/\s+/g, ' ');
+    };
+    // Build a robust set of name tokens for matching and mentions
+    const nameTokens = (() => {
+      const raw = new Set();
+      const add = (s) => { const v = String(s || '').trim(); if (v) raw.add(v); };
+      add(target);
+      if (userRow) {
+        add(userRow.username);
+        add(userRow.nickname);
+        add(userRow.name);
+        if (userRow.id) {
+          raw.add(`<@${userRow.id}>`);
+          raw.add(`<@!${userRow.id}>`);
+        }
+      }
+      const out = new Set();
+      for (const t of raw) {
+        const s = String(t).trim();
+        if (!s) continue;
+        out.add(s);
+        out.add(s.toLowerCase());
+        out.add(s.replace(/\s+/g, ''));
+        out.add(s.toLowerCase().replace(/\s+/g, ''));
+        out.add('@' + s);
+        out.add('@' + s.toLowerCase());
+        // Strip bracket tags like [IRONPOINT] dochound -> dochound
+        const stripTag = s.replace(/^\[[^\]]+\]\s*/, '');
+        if (stripTag !== s) {
+          out.add(stripTag);
+          out.add(stripTag.toLowerCase());
+        }
+      }
+      return Array.from(out).filter(Boolean);
+    })();
+    const matchUser = (u) => {
+      const v = canon(u);
+      if (!v) return false;
+      return nameTokens.some(tok => canon(tok) === v);
+    };
+    const contentMentionsTarget = (content) => {
+      const s = String(content || '');
+      const lc = s.toLowerCase();
+      // Also consider explicit Discord mention forms if we have an id
+      const idForms = (userRow?.id) ? [
+        `<@${userRow.id}>`,
+        `<@!${userRow.id}>`,
+      ] : [];
+      if (idForms.some(m => lc.includes(m.toLowerCase()))) return true;
+      return nameTokens.some(tok => lc.includes(String(tok).toLowerCase()));
+    };
+    const getUserMsgs = (sinceTs) => (Array.isArray(rows) ? rows : []).filter(r => {
+      try {
+        const meta = r?.message?.metadata || {};
+        const ts = new Date(meta.date || r?.created_at || 0).getTime();
+        // Also attempt to parse speaker from content prefix "@name: " if metadata is missing
+        let saidBy = String(meta.user || '').trim();
+        if (!saidBy) {
+          const m = String(r?.message?.content || '').match(/^@([^:]{2,64}):/);
+          saidBy = m ? m[1].trim() : '';
+        }
+        return matchUser(saidBy) && ts && ts >= sinceTs && ts <= now;
+      } catch { return false; }
+    });
+    // Collect messages ABOUT the user (mentions), excluding the user's own lines
+    const getAboutMsgs = (sinceTs) => (Array.isArray(rows) ? rows : []).filter(r => {
+      try {
+        const meta = r?.message?.metadata || {};
+        const ts = new Date(meta.date || r?.created_at || 0).getTime();
+        if (!(ts && ts >= sinceTs && ts <= now)) return false;
+        const raw = String(r?.message?.content || '');
+        // Strip the leading speaker label for content checks
+        const body = raw.replace(/^@[^:]+:\s*/i, '');
+        if (!contentMentionsTarget(raw) && !contentMentionsTarget(body)) return false;
+        // Exclude if spoken by the target user
+        const saidBy = String(meta.user || '').trim();
+        const prefixMatch = raw.match(/^@([^:]{2,64}):/);
+        const speaker = saidBy || (prefixMatch ? prefixMatch[1].trim() : '');
+        if (speaker && matchUser(speaker)) return false;
+        return true;
+      } catch { return false; }
+    });
+    // First pass: 30-day window
+    let userMsgs = getUserMsgs(since);
+    let aboutMsgs = getAboutMsgs(since);
+    // If nothing found, widen the window to 90 days to avoid "0"-only summaries
+    if ((!userMsgs.length && !aboutMsgs.length)) {
+      windowDays = 90;
+      since = now - daysToMs(windowDays);
+      userMsgs = getUserMsgs(since);
+      aboutMsgs = getAboutMsgs(since);
+    }
+    // Stats: counts and top channels
+    const totalAuthored = userMsgs.length;
+    const totalMentions = aboutMsgs.length;
+    const byChannel = new Map();
+    for (const r of userMsgs) {
+      const ch = String(r?.channel_name || r?.message?.metadata?.channel || 'unknown');
+      byChannel.set(ch, (byChannel.get(ch) || 0) + 1);
+    }
+    const topChannels = Array.from(byChannel.entries()).sort((a,b)=>b[1]-a[1]).slice(0, 3);
+    // Recent samples
+    const samples = userMsgs
+      .sort((a,b)=> new Date(b?.message?.metadata?.date || 0) - new Date(a?.message?.metadata?.date || 0))
+      .slice(0, 5)
+      .map(r => {
+        const meta = r?.message?.metadata || {};
+        const when = (()=>{ try { return String(meta.date || '').slice(0, 16).replace('T',' ');} catch { return ''; } })();
+        const text = String(r?.message?.content || '')
+          .replace(/^@[^:]+:\s*/i, '')
+          .replace(/^[‘’'“”"]|[‘’'“”"]$/g, '')
+          .replace(/<@!?.+?>/g, '@user')
+          .replace(/\s+/g, ' ')
+          .trim();
+        return `- [${when}] #${r?.channel_name || meta.channel || '?'}: ${text.length > 160 ? text.slice(0,157)+'…' : text}`;
+      });
+    const aboutSamples = aboutMsgs
+      .sort((a,b)=> new Date(b?.message?.metadata?.date || 0) - new Date(a?.message?.metadata?.date || 0))
+      .slice(0, 5)
+      .map(r => {
+        const meta = r?.message?.metadata || {};
+        const when = (()=>{ try { return String(meta.date || '').slice(0, 16).replace('T',' ');} catch { return ''; } })();
+        const raw = String(r?.message?.content || '');
+        const speaker = String(meta.user || (raw.match(/^@([^:]{2,64}):/)?.[1] || 'user')).trim();
+        const text = raw
+          .replace(/^@[^:]+:\s*/i, '')
+          .replace(/^[‘’'“”"]|[‘’'“”"]$/g, '')
+          .replace(/<@!?.+?>/g, '@user')
+          .replace(/\s+/g, ' ')
+          .trim();
+        return `- [${when}] ${speaker}: ${text.length > 160 ? text.slice(0,157)+'…' : text}`;
+      });
+
+    const parts = [];
+    const display = userRow?.nickname || userRow?.username || target;
+    const windowLabel = windowDays === 30 ? 'last month' : `last ${windowDays} days`;
+
+    // Headline
+    parts.push(`Here’s a quick look at ${display} over the ${windowLabel}:`);
+    // Lightweight context
+    if (userRow && (userRow.joined_at || userRow.joinedAt)) {
+      parts.push(`- joined: ${(userRow.joined_at||userRow.joinedAt).slice(0,10)}`);
+    }
+    // Core stats
+    const channelStr = topChannels.length ? ` — top channels: ${topChannels.map(([c,n])=>`#${c} (${n})`).join(', ')}` : '';
+    parts.push(`- messages: ${totalAuthored}${channelStr}`);
+    if (totalMentions) parts.push(`- mentioned by others: ${totalMentions}`);
+
+    // Recent samples, trimmed to keep it readable
+    if (samples.length) {
+      parts.push('Recent lines:');
+      parts.push(...samples.slice(0, 3));
+    }
+    if (aboutSamples.length) {
+      parts.push('People talking about them:');
+      parts.push(...aboutSamples.slice(0, 3));
+    }
+    // Keep the tone organic, avoid debug-ish footers
+    return parts.join('\n');
   } catch (e) {
-    console.error('deriveRankLabel error:', e);
-    return null;
+    console.error('buildUserProfileSummary error:', e?.response?.data || e?.message || e);
+    return '';
+  }
+}
+
+// Build an opinionated, concise take on a user derived from authored lines and how others mention them
+async function buildUserOpinionSummary(name, openai) {
+  try {
+    const target = String(name || '').trim();
+    if (!target) return '';
+    const { getUsers } = require('../api/userlistApi.js');
+    const users = await getUsers().catch(()=>null);
+    let userRow = null;
+    if (Array.isArray(users) && users.length) {
+      const norm = (s) => String(s || '').trim().toLowerCase();
+      const tn = norm(target);
+      userRow = users.find(u => norm(u.username || u.nickname || u.name) === tn) ||
+                users.find(u => norm(u.username || '') === tn) ||
+                users.find(u => norm(u.nickname || '') === tn) || null;
+    }
+    const rows = await ChatLogsModel.list();
+    const now = Date.now();
+    const daysToMs = (d) => d * 24 * 60 * 60 * 1000;
+    let windowDays = 30;
+    let since = now - daysToMs(windowDays);
+
+    // helpers
+    const canon = (s) => {
+      const x = String(s || '').trim();
+      if (!x) return '';
+      const noAt = x.replace(/^@+/, '');
+      const noTag = noAt.replace(/^\[[^\]]+\]\s*/, '');
+      return noTag.toLowerCase().replace(/\s+/g, ' ');
+    };
+    const nameTokens = (() => {
+      const raw = new Set();
+      const add = (s) => { const v = String(s || '').trim(); if (v) raw.add(v); };
+      add(target);
+      if (userRow) {
+        add(userRow.username); add(userRow.nickname); add(userRow.name);
+        if (userRow.id) { raw.add(`<@${userRow.id}>`); raw.add(`<@!${userRow.id}>`); }
+      }
+      const out = new Set();
+      for (const t of raw) {
+        const s = String(t).trim(); if (!s) continue;
+        out.add(s); out.add(s.toLowerCase()); out.add(s.replace(/\s+/g, ''));
+        out.add(s.toLowerCase().replace(/\s+/g, ''));
+        out.add('@' + s); out.add('@' + s.toLowerCase());
+        const stripTag = s.replace(/^\[[^\]]+\]\s*/, '');
+        if (stripTag !== s) { out.add(stripTag); out.add(stripTag.toLowerCase()); }
+      }
+      return Array.from(out).filter(Boolean);
+    })();
+    const matchUser = (u) => {
+      const v = canon(u); if (!v) return false;
+      return nameTokens.some(tok => canon(tok) === v);
+    };
+    const contentMentionsTarget = (content) => {
+      const s = String(content || '');
+      const lc = s.toLowerCase();
+      const idForms = (userRow?.id) ? [`<@${userRow.id}>`, `<@!${userRow.id}>`] : [];
+      if (idForms.some(m => lc.includes(m.toLowerCase()))) return true;
+      return nameTokens.some(tok => lc.includes(String(tok).toLowerCase()));
+    };
+    const getUserMsgs = (sinceTs) => (Array.isArray(rows) ? rows : []).filter(r => {
+      try {
+        const meta = r?.message?.metadata || {};
+        const ts = new Date(meta.date || r?.created_at || 0).getTime();
+        let saidBy = String(meta.user || '').trim();
+        if (!saidBy) {
+          const m = String(r?.message?.content || '').match(/^@([^:]{2,64}):/);
+          saidBy = m ? m[1].trim() : '';
+        }
+        return matchUser(saidBy) && ts && ts >= sinceTs && ts <= now;
+      } catch { return false; }
+    });
+    const getAboutMsgs = (sinceTs) => (Array.isArray(rows) ? rows : []).filter(r => {
+      try {
+        const meta = r?.message?.metadata || {};
+        const ts = new Date(meta.date || r?.created_at || 0).getTime();
+        if (!(ts && ts >= sinceTs && ts <= now)) return false;
+        const raw = String(r?.message?.content || '');
+        const body = raw.replace(/^@[^:]+:\s*/i, '');
+        if (!contentMentionsTarget(raw) && !contentMentionsTarget(body)) return false;
+        const saidBy = String(meta.user || '').trim();
+        const prefixMatch = raw.match(/^@([^:]{2,64}):/);
+        const speaker = saidBy || (prefixMatch ? prefixMatch[1].trim() : '');
+        if (speaker && matchUser(speaker)) return false;
+        return true;
+      } catch { return false; }
+    });
+
+    let userMsgs = getUserMsgs(since);
+    let aboutMsgs = getAboutMsgs(since);
+    if (!userMsgs.length && !aboutMsgs.length) {
+      windowDays = 90; since = now - daysToMs(windowDays);
+      userMsgs = getUserMsgs(since);
+      aboutMsgs = getAboutMsgs(since);
+    }
+
+    // If still nothing, bail out
+    if (!userMsgs.length && !aboutMsgs.length) return '';
+
+    // Extract clean text bodies
+    const cleanBody = (raw) => String(raw || '')
+      .replace(/^@[^:]+:\s*/i, '')
+      .replace(/<@!?.+?>/g, '@user')
+      .replace(/https?:\/\/\S+/g, '')
+      .replace(/[`*_>~]/g, '')
+      .trim();
+    const userTexts = userMsgs.map(r => cleanBody(r?.message?.content));
+    const aboutTexts = aboutMsgs.map(r => cleanBody(r?.message?.content));
+
+    // Simple style and theme analysis
+    const tokens = (s) => (String(s || '').toLowerCase().match(/[a-z][a-z0-9'\-]{1,}/g) || []);
+    const STOP = new Set(['the','a','an','and','or','but','if','then','so','to','of','in','on','for','with','at','by','from','as','is','are','was','were','be','been','it','this','that','these','those','i','you','we','they','he','she','them','his','her','our','your','their','my','me','us','do','did','does','just','like','get','got','going','gonna','yeah','nah','ok','okay','right','left','up','down','here','there','today','tonight','now','nowadays','lol','lmao','xd','o7','gg']);
+    const countFreq = (arr) => {
+      const m = new Map();
+      for (const t of arr) { if (!STOP.has(t)) m.set(t, (m.get(t)||0)+1); }
+      return m;
+    };
+    const userTok = countFreq(userTexts.flatMap(tokens));
+    const aboutTok = countFreq(aboutTexts.flatMap(tokens));
+    const topK = (m, k=5) => Array.from(m.entries()).sort((a,b)=>b[1]-a[1]).slice(0,k).map(([w])=>w);
+    const topUserThemes = topK(userTok, 5);
+    const topAboutThemes = topK(aboutTok, 5);
+
+    // Style metrics
+    const avgLen = userTexts.length ? Math.round(userTexts.reduce((a,s)=>a+(s||'').length,0)/userTexts.length) : 0;
+    const qRate = userTexts.length ? userTexts.filter(s=>s.includes('?')).length / userTexts.length : 0;
+    const eRate = userTexts.length ? userTexts.filter(s=>s.includes('!')).length / userTexts.length : 0;
+    const curseList = [/\b(fuck|shit|damn|ass|bitch|wtf)\b/i];
+    const curseRate = userTexts.length ? userTexts.filter(s=>curseList.some(rx=>rx.test(s))).length / userTexts.length : 0;
+    const helpfulRate = userTexts.length ? userTexts.filter(s=>/(thanks|thank you|ty|appreciate|help|welcome)/i.test(s)).length / userTexts.length : 0;
+
+    // Mentions sentiment heuristic
+    const mentionsPraise = aboutTexts.filter(s=>/(thanks|props|good|nice|leader|helpful|welcome|great|gg|well done)/i.test(s)).length;
+    const mentionsCritic = aboutTexts.filter(s=>/(bad|wrong|blame|issue|problem|annoying|toxic)/i.test(s)).length;
+    const mentionTone = mentionsPraise > mentionsCritic + 1 ? 'positive' : (mentionsCritic > mentionsPraise + 1 ? 'mixed' : (mentionsPraise+mentionsCritic>0 ? 'neutral' : 'sparse'));
+
+    // Build adjectives
+    const adjectives = [];
+    if (qRate >= 0.25) adjectives.push('inquisitive');
+    if (eRate >= 0.25) adjectives.push('energetic');
+    if (curseRate >= 0.08) adjectives.push('blunt');
+    if (helpfulRate >= 0.08) adjectives.push('helpful');
+    if (!adjectives.length) adjectives.push('straightforward');
+
+    // Top channels
+    const byChannel = new Map();
+    for (const r of userMsgs) {
+      const ch = String(r?.channel_name || r?.message?.metadata?.channel || 'general');
+      byChannel.set(ch, (byChannel.get(ch)||0)+1);
+    }
+    const topChannels = Array.from(byChannel.entries()).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([c])=>`#${c}`);
+
+    // Pick a short example line (avoid pings/links)
+    const example = userTexts.find(s => s && s.length >= 10) || userTexts[0] || '';
+    const exShort = example && example.length > 140 ? example.slice(0,137)+'…' : example;
+
+    const display = userRow?.nickname || userRow?.username || target;
+    const windowLabel = windowDays === 30 ? 'last month' : `last ${windowDays} days`;
+
+    // Optional: Use LLM to craft persona-aligned opinion using only provided facts
+    const useLLM = ((process.env.USER_OPINION_USE_LLM || 'true').toLowerCase() !== 'false');
+    if (useLLM && openai) {
+      try {
+        const facts = [
+          `name: ${display}`,
+          `window: ${windowLabel}`,
+          `adjectives: ${adjectives.slice(0,3).join(', ')}`,
+          `avg_len_chars: ${avgLen}`,
+          `question_rate: ${(qRate*100).toFixed(0)}%`,
+          `exclaim_rate: ${(eRate*100).toFixed(0)}%`,
+          `curse_rate: ${(curseRate*100).toFixed(0)}%`,
+          `helpful_rate: ${(helpfulRate*100).toFixed(0)}%`,
+          `top_channels: ${topChannels.join(', ') || '#general'}`,
+          `themes_self: ${topUserThemes.join(', ')}`,
+          `themes_mentions: ${topAboutThemes.join(', ')}`,
+          `mentions_tone: ${mentionTone}`,
+          exShort ? `example: ${exShort.replace(/^[‘’'“”"]|[‘’'“”"]$/g, '')}` : null,
+        ].filter(Boolean).join('\n');
+
+        const persona = 'RoboHound: witty, succinct, pirate-ops vibe; never toxic; no profanity; 2–4 sentences; confident but grounded.';
+        const guardrails = 'Use ONLY the provided facts. Do not invent achievements or relationships. No usernames beyond the target. No links. Keep it conversational, not a report.';
+        const txt = await runWithResponses({
+          openai,
+          formattedUserMessage: `Summarize ${display}.`,
+          guildId: null,
+          channelId: null,
+          rank: null,
+          contextSnippets: [persona, guardrails, `Facts:\n${facts}`],
+        });
+        const out = (txt || '').trim();
+        if (out) return out;
+      } catch (e) {
+        // fall back to deterministic persona text
+      }
+    }
+
+    // Deterministic, persona-laced fallback (no LLM)
+    const openers = [
+      `${display}? Here’s my read:`,
+      `Quick take on ${display}:`,
+      `Gut check on ${display}:`,
+    ];
+    const lenLabel = avgLen < 60 ? 'short and to-the-point' : (avgLen < 140 ? 'medium-length' : 'long-form');
+    const tones = [];
+    if (qRate>=0.25) tones.push('curious');
+    if (eRate>=0.25) tones.push('animated');
+    if (curseRate>=0.08) tones.push('blunt');
+    if (helpfulRate>=0.08) tones.push('helpful');
+    const toneStr = tones.length ? `Feels ${tones.join(' and ')}.` : '';
+    const chStr = topChannels.length ? `They live mostly in ${topChannels.join(' and ')}.` : '';
+    const themeStr = topUserThemes.length ? `Talk track leans ${topUserThemes.slice(0,3).join(', ')}.` : '';
+    const mentionStr = aboutMsgs.length
+      ? (mentionTone === 'positive' ? 'Crew callouts skew positive.' : (mentionTone === 'mixed' ? 'Crew chatter is a mix of props and pushback.' : 'Mentions are sparse.'))
+      : '';
+    const exampleStr = exShort ? `Example: “${exShort.replace(/^[‘’'“”"]|[‘’'“”"]$/g, '')}”` : '';
+    const closer = pickDifferent([
+      'Net take: solid presence, keeps the channel moving.',
+      'Bottom line: reliable voice when ops heat up.',
+      'TL;DR: consistent signal in the noise.',
+    ]);
+    return [
+      pickDifferent(openers),
+      `${adjectives.slice(0,2).join(' and ')} overall; ${lenLabel}.`,
+      [chStr, themeStr, toneStr, mentionStr].filter(Boolean).join(' '),
+      exampleStr,
+      closer,
+    ].filter(Boolean).join(' ');
+  } catch (e) {
+    console.error('buildUserOpinionSummary error:', e?.response?.data || e?.message || e);
+    return '';
+  }
+}
+
+// Build a brief org summary; prefer knowledge entries if available
+async function buildOrgSummary(name) {
+  try {
+    const label = String(name || '').trim();
+    // Try knowledge docs first
+    const rows = await listKnowledge({ category: 'about', section: 'org', limit: 1, order: 'created_at.desc' }).catch(()=>[]);
+    if (Array.isArray(rows) && rows.length) {
+      const r = rows[0];
+      const title = r.title || label;
+      const body = truncateText(String(r.content || ''), 700);
+      return `${title}:\n${body}`;
+    }
+    // Fallback minimal description
+    return `${label}: our Star Citizen org focused on coordinated operations, market intel, and piracy ops. Ask me for systems, stations, routes, or recent activity.`;
+  } catch {
+    return '';
   }
 }

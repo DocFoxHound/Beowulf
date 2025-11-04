@@ -65,7 +65,7 @@ async function editUser(userId, updatedUserData) {
 
 async function deleteUser(userId) {
     console.log("Deleting User")
-    const apiUrl = `${process.env.SERVER_URL}${process.env.API_MEMBERS}/${id}`; 
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_MEMBERS}/${userId}`; 
     try {
         const response = await axios.delete(apiUrl, {
             headers: {

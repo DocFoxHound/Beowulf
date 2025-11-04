@@ -14,6 +14,10 @@ const { UexCommoditiesSummaryModel } = require('./uex-commodities-summary');
 const { UexCommoditiesByTerminalModel } = require('./uex-commodities-by-terminal');
 const { UexCommoditiesModel } = require('./uex-commodities');
 const { UexCitiesModel } = require('./uex-cities');
+const { UsersModel } = require('./users');
+const { HitTrackerModel } = require('./hit-tracker');
+const { ChatLogsModel } = require('./chat-logs');
+const { PlayerStatsModel } = require('./player-stats');
 
 module.exports = {
   KnowledgeModel,
@@ -30,4 +34,8 @@ module.exports = {
   UexCommoditiesByTerminalModel,
   UexCommoditiesModel,
   UexCitiesModel,
+  UsersModel,
+  HitTrackerModel,
+  ChatLogsModel,
+  PlayerStatsModel,
 };

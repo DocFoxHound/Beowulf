@@ -38,4 +38,34 @@ function fromFlag(v) {
   return n >= 1;
 }
 
-module.exports = { limitStr, toIntLike, toFloat, toFlag01, fromFlag };
+function toIntArray(v) {
+  if (!Array.isArray(v)) return undefined;
+  const out = [];
+  for (const x of v) {
+    const n = toIntLike(x);
+    if (n === undefined) continue;
+    out.push(n);
+  }
+  return out;
+}
+
+function toStrArray(v) {
+  if (!Array.isArray(v)) return undefined;
+  const out = [];
+  for (const x of v) {
+    if (x === undefined || x === null) continue;
+    out.push(String(x));
+  }
+  return out;
+}
+
+function toJson(v) {
+  if (v === undefined || v === null) return undefined;
+  // Accept object/array or JSON string
+  if (typeof v === 'object') return v;
+  try { return JSON.parse(String(v)); } catch {
+    return undefined;
+  }
+}
+
+module.exports = { limitStr, toIntLike, toFloat, toFlag01, fromFlag, toIntArray, toStrArray, toJson };
