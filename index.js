@@ -46,6 +46,7 @@ const { handleNewGuildMember } = require('./common/new-user.js');
 const { handleSimpleWelcomeProspect, handleSimpleWelcomeGuest, handleSimpleJoin } = require("./common/inprocessing-verify-handle.js");
 const { refreshPlayerStatsView } = require('./api/playerStatsApi.js');
 const { removeProspectFromFriendlies } = require('./common/remove-prospect-from-friendly.js');
+const { syncSkillLevelsFromGuild, updateSkillOnMemberChange } = require('./common/skill-level-assigner.js');
 // Preloaders for location and market caches
 const { loadSystems } = require('./chatgpt/star-systems-answerer.js');
 const { loadStations } = require('./chatgpt/space-stations-answerer.js');
@@ -208,6 +209,8 @@ client.on("ready", async () => {
   preloadedDbTables = await preloadFromDb(); //leave on
   await removeProspectFromFriendlies(client);
   await refreshUserlist(client, openai) //actually leave this here
+  // Ensure SKILL_LEVEL_* roles are aligned at startup based on live Discord roles (RAPTOR/RAIDER)
+  try { await syncSkillLevelsFromGuild(client); } catch (e) { console.error('[Startup] Skill role sync failed:', e?.message || e); }
   try { await ingestDailyChatSummaries(client, openai); } catch (e) { console.error('Initial chat ingest failed:', e); }
   try { await ingestHitLogs(client, openai); } catch (e) { console.error('Initial hit ingest failed:', e); }
   try { await ingestPlayerStats(client); } catch (e) { console.error('Initial player-stats ingest failed:', e); }
@@ -421,6 +424,8 @@ client.on('guildMemberAdd', (member) => {
 
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
   try {
+    // Adjust SKILL_LEVEL_* role when RAPTOR/RAIDER prestige roles change
+    try { await updateSkillOnMemberChange(oldMember, newMember); } catch (e) { console.error('[SkillRoles] live update failed:', e?.message || e); }
     // ...existing code...
     // Fetch the user's existing data
     const user = await getUserById(newMember.user.id) || null;

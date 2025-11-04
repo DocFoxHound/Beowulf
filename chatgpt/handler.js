@@ -326,7 +326,7 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
 
     if (useLLMBanter) {
       try {
-        const banterStyle = 'Banter mode: respond briefly (1–2 sentences), friendly, avoid profanity, deflect insults politely, and don\'t over-explain. Use a casual tone.';
+        const banterStyle = 'Banter mode: respond briefly (1–2 sentences), friendly, avoid profanity, deflect insults politely, and don\'t over-explain. Use a casual tone but no role-play. Do not start with interjections like "Ah,", "Well,", "So,", "Okay,". No pirate jargon (ahoy, aye, matey, ye, booty, plunder, shanty, arr).';
         const txt = await runWithResponses({
           openai,
           formattedUserMessage: await formatDiscordMessage(message),
@@ -2103,8 +2103,8 @@ async function buildUserOpinionSummary(name, openai) {
           exShort ? `example: ${exShort.replace(/^[‘’'“”"]|[‘’'“”"]$/g, '')}` : null,
         ].filter(Boolean).join('\n');
 
-        const persona = 'RoboHound: witty, succinct, pirate-ops vibe; never toxic; no profanity; 2–4 sentences; confident but grounded.';
-        const guardrails = 'Use ONLY the provided facts. Do not invent achievements or relationships. No usernames beyond the target. No links. Keep it conversational, not a report.';
+        const persona = 'RoboHound: witty, succinct, operations-focused vibe; never toxic; no profanity; 2–4 sentences; confident but grounded. No role-play or pirate jargon. Avoid interjection openers.';
+        const guardrails = 'Use ONLY the provided facts. Do not invent achievements or relationships. No usernames beyond the target. No links. Keep it conversational, not a report. Answer directly; do not restate the request.';
         const txt = await runWithResponses({
           openai,
           formattedUserMessage: `Summarize ${display}.`,
