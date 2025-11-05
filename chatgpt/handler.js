@@ -343,16 +343,19 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
     const isBot = message.author.id === client.user.id;
     if (isBot) return;
 
-    // Ultra-fast quick-edit lane anywhere: if the user asks to edit value/SCU in plain text, try to resolve target hit and patch it.
+    // Ultra-fast quick-edit lane anywhere: only trigger when there's an explicit edit verb
     try {
-      const quick = parseQuickEdit(message.content || '');
-      if (quick) {
+      const contentStr = String(message.content || '');
+      const looksEditVerb = /(\b|^)(edit|update|change|fix|adjust|modify)(\b|$)/i.test(contentStr);
+      if (looksEditVerb) {
+        const quick = parseQuickEdit(contentStr);
+        if (quick) {
         // Resolve target hit: preference order -> current thread -> explicit id in text -> most recent hit by this user
         let hit = null;
         // If this channel is a thread that equals a hit thread_id
         try { hit = await getHitLogByThreadId(message.channelId); } catch {}
         if (!hit) {
-          const id = parseHitId(message.content || '');
+          const id = parseHitId(contentStr);
           if (id) {
             try { hit = await getHitLogByEntryId(id); } catch {}
           }
@@ -372,7 +375,7 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
         }
         if (!hit) {
           // No target: fall through to normal flows
-        } else {
+          } else {
           const ownerId = String(hit.user_id || '');
           const authorId = String(message.author?.id || '');
           if (!ownerId || ownerId !== authorId) {
@@ -409,6 +412,7 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
             await sendResponse(message, 'I could not update that right now. Try again shortly.', true);
           }
           return; // handled
+          }
         }
       }
     } catch (e) { /* non-fatal */ }
