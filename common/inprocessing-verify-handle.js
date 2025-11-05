@@ -219,7 +219,7 @@ async function handleSimpleJoin(interaction, client, openai){
     }
 
     // Create welcome message
-    const messageToBot = `Welcome ${dbUser.username} to IronPoint, the best Pirate crew in Star Citizen. Explain that we expect skill and creativity, as they're both needed to dominate. Ask if ${dbUser.username} is here to join as a member or as a guest, and what organization they belong to.`;
+    const messageToBot = `Welcome ${dbUser.username} to IronPoint, the best Pirate crew in Star Citizen. Explain that we expect skill and creativity, as they're both needed to dominate.`;
     let returnedMessage = "";
     try{
         returnedMessage = await notifyWelcomeForEmbed(dbUser, openai, client, messageToBot);

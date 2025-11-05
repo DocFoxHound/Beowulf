@@ -217,25 +217,50 @@ async function llmExtractHitFields(openai, content) {
     if ((process.env.HIT_LLM_EXTRACT || 'true').toLowerCase() === 'false') return null;
     const sys = 'You extract structured hit log details from casual chat. Output STRICT JSON with fields: { air_or_ground: "Air|Ground|Mixed|null", cargo: [{ name: string, scu: number }], video_link: string|null, title: string|null, story: string|null }. \n- Infer Air vs Ground vs Mixed from context; if unsure, null.\n- Parse cargo like "120 scu quant", "quant x 120 scu" into items. Sum duplicates. Use plain commodity names, no codes.\n- video_link: a URL if present, else null.\n- title/story: brief and clean; keep story under 280 chars.';
     const usr = `Message:\n${content}`;
-    const res = await openai.responses.create({
-      model: process.env.OPENAI_RESPONSES_MODEL || 'gpt-4o-mini',
-      temperature: 0.2,
-      response_format: { type: 'json_object' },
-      input: [
-        { role: 'system', content: sys },
-        { role: 'user', content: usr },
-      ],
-    });
-    const txt = res?.output?.[0]?.content?.[0]?.text || res?.output_text || '';
-    try {
-      const obj = JSON.parse(txt);
-      const cargo = Array.isArray(obj?.cargo) ? obj.cargo.map(i => ({ commodity_name: String(i.name||'').trim(), scuAmount: Number(i.scu)||0 })).filter(i=>i.commodity_name && i.scuAmount>0) : [];
-      const aog = obj?.air_or_ground && ['Air','Ground','Mixed'].includes(obj.air_or_ground) ? obj.air_or_ground : null;
-      const video = obj?.video_link && /^https?:\/\//i.test(obj.video_link) ? obj.video_link : null;
-      const title = obj?.title ? String(obj.title).slice(0, 80) : null;
-      const story = obj?.story ? String(obj.story).slice(0, 280) : null;
-      return { air_or_ground: aog, cargo, video_link: video, title, story };
-    } catch { return null; }
+    // Prefer Responses API when available; fall back to Chat Completions
+    if (openai?.responses?.create) {
+      const res = await openai.responses.create({
+        model: process.env.OPENAI_RESPONSES_MODEL || 'gpt-4o-mini',
+        temperature: 0.2,
+        response_format: { type: 'json_object' },
+        input: [
+          { role: 'system', content: sys },
+          { role: 'user', content: usr },
+        ],
+      });
+      const txt = res?.output?.[0]?.content?.[0]?.text || res?.output_text || '';
+      try {
+        const obj = JSON.parse(txt);
+        const cargo = Array.isArray(obj?.cargo) ? obj.cargo.map(i => ({ commodity_name: String(i.name||'').trim(), scuAmount: Number(i.scu)||0 })).filter(i=>i.commodity_name && i.scuAmount>0) : [];
+        const aog = obj?.air_or_ground && ['Air','Ground','Mixed'].includes(obj.air_or_ground) ? obj.air_or_ground : null;
+        const video = obj?.video_link && /^https?:\/\//i.test(obj.video_link) ? obj.video_link : null;
+        const title = obj?.title ? String(obj.title).slice(0, 80) : null;
+        const story = obj?.story ? String(obj.story).slice(0, 280) : null;
+        return { air_or_ground: aog, cargo, video_link: video, title, story };
+      } catch { return null; }
+    } else if (openai?.chat?.completions?.create) {
+      const resp = await openai.chat.completions.create({
+        model: process.env.OPENAI_RESPONSES_MODEL || process.env.KNOWLEDGE_AI_MODEL || 'gpt-4o-mini',
+        temperature: 0.2,
+        messages: [
+          { role: 'system', content: sys },
+          { role: 'user', content: usr },
+        ],
+      });
+      const out = resp?.choices?.[0]?.message?.content || '';
+      try {
+        const obj = JSON.parse(out);
+        const cargo = Array.isArray(obj?.cargo) ? obj.cargo.map(i => ({ commodity_name: String(i.name||'').trim(), scuAmount: Number(i.scu)||0 })).filter(i=>i.commodity_name && i.scuAmount>0) : [];
+        const aog = obj?.air_or_ground && ['Air','Ground','Mixed'].includes(obj.air_or_ground) ? obj.air_or_ground : null;
+        const video = obj?.video_link && /^https?:\/\//i.test(obj.video_link) ? obj.video_link : null;
+        const title = obj?.title ? String(obj.title).slice(0, 80) : null;
+        const story = obj?.story ? String(obj.story).slice(0, 280) : null;
+        return { air_or_ground: aog, cargo, video_link: video, title, story };
+      } catch { return null; }
+    } else {
+      // No compatible OpenAI client available
+      return null;
+    }
   } catch (e) {
     console.error('llmExtractHitFields failed:', e?.message || e);
     return null;
@@ -256,6 +281,17 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
     const isBot = message.author.id === client.user.id;
     if (isBot) return;
 
+  // Primary: LLM multi-tool agent handles all intents (hit, market, piracy advice, banter, etc.)
+  try {
+    if ((process.env.TOOL_AGENT_ENABLED || 'true').toLowerCase() !== 'false') {
+      const { runToolAgent } = require('./tool-agent');
+      const handled = await runToolAgent(message, client, openai);
+      if (handled) return; // Agent responded; skip legacy flow
+    }
+  } catch (e) {
+    console.error('tool-agent path failed:', e?.message || e);
+  }
+
   // Heuristic: treat questions/requests as info-seeking and retrieve org-wide snippets
   const looksInfoSeeking = /\b(what|how|why|where|when|who|rules?|policy|promotion|market|price|loadout|ship|quantanium|cargo|hit|hits|piracy|pirate|recent|lately|today|this\s+week|going\s+on)\b|\?/i.test(message.content || '');
   const asksRecentActivity = /(what\s+has\s+everyone\s+been\s+doing|what\s+is\s+everyone\s+doing|recent\s+activity|what\'s\s+been\s+going\s+on)/i.test(message.content || '');
@@ -274,8 +310,12 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
   const recentSnippet = await buildRecentConversationSnippet(message);
 
   // AI intent router (fast heuristic + optional LLM) to guide retrieval
-  const { routeIntent } = require('./intent-router');
-  const routed = await routeIntent(openai, formattedMessage);
+  // Legacy intent router (fallback only). Disable by default.
+  let routed = { intent: 'other', confidence: 0, filters: {} };
+  if ((process.env.LEGACY_INTENT_ROUTER || 'false').toLowerCase() === 'true') {
+    const { routeIntent } = require('./intent-router');
+    routed = await routeIntent(openai, formattedMessage);
+  }
   const isPiracyIntent = Boolean((routed?.intent || '').startsWith('piracy.'));
   const isDogfightingIntent = Boolean((routed?.intent || '').startsWith('dogfighting.'));
   const isPiracySpots = routed?.intent === 'piracy.spots';

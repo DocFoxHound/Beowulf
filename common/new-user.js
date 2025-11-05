@@ -1,5 +1,5 @@
 const { getUserById, createUser, editUser } = require('../api/userlistApi');
-const { verifyHandle, handleSimpleWelcomeGuest } = require('../common/inprocessing-verify-handle');
+const { verifyHandle, handleSimpleWelcomeGuest, handleSimpleJoin } = require('../common/inprocessing-verify-handle');
 const { notifyRejoinWelcome, notifyJoinMemberWelcome, notifyJoinGuestWelcome } = require('./bot-notify');
 
 // Helper to get the guild from client and .env
@@ -10,7 +10,7 @@ function getGuild(client) {
 
 async function handleNewGuildMember(member, client, openai) {
     const logChannel = process.env.LIVE_ENVIRONMENT === "true" ? process.env.ENTRY_LOG_CHANNEL : process.env.TEST_ENTRY_LOG_CHANNEL;
-    const friendlyRole = process.env.LIVE_ENVIRONMENT === "true" ? (process.env.FRIENDLY_ROLE || process.env.TEST_FRIENDLY_ROLE) : (process.env.TEST_FRIENDLY_ROLE || process.env.FRIENDLY_ROLE);
+    const newUserRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.NEW_USER_ROLE : process.env.TEST_NEW_USER_ROLE;
     const guild = getGuild(member.client);
     
     try {
@@ -45,25 +45,26 @@ async function handleNewGuildMember(member, client, openai) {
             actionMsg = `User ${member.user.username} has been successfully added to the Database.`;
         }
 
-        // Ensure Friendly role is applied for both new and returning users
-        if (!friendlyRole) {
-            console.warn(`[handleNewGuildMember] FRIENDLY_ROLE/TEST_FRIENDLY_ROLE not set. LIVE_ENVIRONMENT=${process.env.LIVE_ENVIRONMENT}`);
-        } else if (!member.roles.cache.has(friendlyRole)) {
+        // Ensure only New User role is applied on join
+        if (!newUserRole) {
+            console.warn(`[handleNewGuildMember] NEW_USER_ROLE/TEST_NEW_USER_ROLE not set. LIVE_ENVIRONMENT=${process.env.LIVE_ENVIRONMENT}`);
+        } else if (!member.roles.cache.has(newUserRole)) {
             try {
-                await member.roles.add(friendlyRole, 'Auto-assign Friendly role on join');
-                actionMsg += ` Friendly role applied.`;
-                // If this is a brand-new user, initiate the simple Guest welcome flow
-                if (isNewUser) {
-                    try {
-                        await handleSimpleWelcomeGuest({ user: member.user }, client, openai);
-                    } catch (welcomeErr) {
-                        console.error('[handleNewGuildMember] Failed to send simple guest welcome:', welcomeErr);
-                    }
-                }
+                await member.roles.add(newUserRole, 'Auto-assign New User on join');
+                actionMsg += ` Role applied: <@&${newUserRole}>.`;
             } catch (roleErr) {
-                const errMsg = `[handleNewGuildMember] Failed to add Friendly role (${friendlyRole}) to ${member.user.tag}: ${roleErr?.message || roleErr}`;
+                const errMsg = `[handleNewGuildMember] Failed to add New User role (${newUserRole}) to ${member.user.tag}: ${roleErr?.message || roleErr}`;
                 console.error(errMsg);
-                actionMsg += ` Failed to apply Friendly role.`;
+                actionMsg += ` Failed to apply New User role.`;
+            }
+        }
+
+        // Directly initiate welcome flow here to avoid unreliable role-update triggers
+        if (isNewUser) {
+            try {
+                await handleSimpleJoin(member, client, openai);
+            } catch (welcomeErr) {
+                console.error('[handleNewGuildMember] Failed to initiate simple join welcome:', welcomeErr);
             }
         }
 
