@@ -2,8 +2,71 @@ const { ChannelType, EmbedBuilder } = require("discord.js");
 const { getFleetById } = require("../api/userFleetApi"); // <-- Add this import
 const { editHitLog } = require("../api/hitTrackerApi"); // <-- Add this import
 
+// Simple in-memory de-duplication to prevent double posting the same hit
+const _postedHitCache = new Map(); // key -> timestamp
+const DEDUP_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+function getHitDedupKey(hitTrack) {
+    const idLike = hitTrack?.id || hitTrack?.hit_id || hitTrack?.db_id || hitTrack?.uuid;
+    if (idLike) return `id:${String(idLike)}`;
+    const user = hitTrack?.user_id || hitTrack?.username || hitTrack?.nickname || '';
+    const title = hitTrack?.title || '';
+    const ts = hitTrack?.timestamp || hitTrack?.created_at || '';
+    return `fallback:${String(user)}|${String(title)}|${String(ts)}`;
+}
+
+function isDuplicateHit(hitTrack) {
+    try {
+        // If thread already exists, don't post again
+        if (hitTrack && (hitTrack.thread_id || hitTrack.threadId)) return true;
+        const key = getHitDedupKey(hitTrack);
+        const now = Date.now();
+        // Clean old entries opportunistically
+        for (const [k, t] of _postedHitCache) {
+            if (now - t > DEDUP_TTL_MS) _postedHitCache.delete(k);
+        }
+        const ts = _postedHitCache.get(key);
+        if (ts && (now - ts) < DEDUP_TTL_MS) return true;
+        // Mark as seen (pending) to avoid race double-posts
+        _postedHitCache.set(key, now);
+        return false;
+    } catch {
+        return false;
+    }
+}
+
+// Ensure embed field values are always strings and within Discord limits
+function toEmbedValue(value, fallback = "N/A", limit = 1024) {
+    try {
+        if (value === null || value === undefined) return fallback;
+        let str;
+        if (typeof value === "string") {
+            str = value;
+        } else if (typeof value === "number" || typeof value === "boolean") {
+            str = String(value);
+        } else if (Array.isArray(value) || typeof value === "object") {
+            // Compact JSON for arrays/objects
+            str = JSON.stringify(value);
+        } else {
+            str = String(value);
+        }
+        if (str.length === 0) return fallback;
+        // Discord embed field value max length is 1024
+        if (str.length > limit) {
+            return str.slice(0, limit - 12) + "... (truncated)";
+        }
+        return str;
+    } catch {
+        return fallback;
+    }
+}
+
 async function handleHitPost(client, openai, hitTrack) {
     try {
+        // De-dup guard: skip if we've already posted this hit recently or it already has a thread
+        if (isDuplicateHit(hitTrack)) {
+            return;
+        }
         const channelId = process.env.LIVE_ENVIRONMENT === "true"
             ? process.env.HITTRACK_CHANNEL_ID
             : process.env.TEST_HITTRACK_CHANNEL_ID;
@@ -50,22 +113,20 @@ async function handleHitPost(client, openai, hitTrack) {
         // Create the embed
         const embed = new EmbedBuilder()
             .setTitle(`${hitTrack.nickname || hitTrack.username}: ${hitTrack.title}`)
-            .setDescription(hitTrack.story)
+            .setDescription(toEmbedValue(hitTrack.story, ""))
             .addFields(
-                { name: "User", value: `${hitTrack.nickname || hitTrack.username}`, inline: true },
-                { name: "Type of Piracy", value: hitTrack.type_of_piracy, inline: true },
-                { name: "Total Value", value: `${hitTrack.total_value}`, inline: true },
-                { name: "Total Cut Value", value: `${hitTrack.total_cut_value}`, inline: true },
-                { name: "Total SCU", value: `${hitTrack.total_scu}`, inline: true },
-                { name: "Air or Ground", value: hitTrack.air_or_ground, inline: true },
-                { name: "Patch", value: hitTrack.patch || "N/A", inline: true },
-                { name: "Assists", value: assistMentions, inline: true },
-                { name: "Fleet Activity", value: hitTrack.fleet_activity ? "Yes" : "No", inline: true },
-                { name: "Fleet Names", value: fleetNames.length > 0 ? fleetNames.join(", ") : "None", inline: true },
-                { name: "Victims", value: (hitTrack.victims || []).join(", ") || "None", inline: true },
-                { name: "Video Link", value: hitTrack.video_link || "N/A", inline: false },
-                { name: "Additional Media", value: (hitTrack.additional_media_links || []).join(", ") || "None", inline: false },
-                { name: "Timestamp", value: hitTrack.timestamp || "N/A", inline: false }
+                { name: "User", value: toEmbedValue(hitTrack.nickname || hitTrack.username), inline: true },
+                { name: "Hit ID", value: toEmbedValue(hitTrack.id), inline: true },
+                { name: "Type of Piracy", value: toEmbedValue(hitTrack.type_of_piracy), inline: true },
+                { name: "Total SCU", value: toEmbedValue(hitTrack.total_scu), inline: true },
+                { name: "Total Value", value: toEmbedValue(hitTrack.total_value), inline: true },
+                { name: "Total Cut Value", value: toEmbedValue(hitTrack.total_cut_value), inline: true },
+                { name: "Assists", value: toEmbedValue(assistMentions, "None"), inline: true },
+                { name: "Victims", value: toEmbedValue((hitTrack.victims || []).join(", "), "None"), inline: true },
+                { name: "Video Link", value: toEmbedValue(hitTrack.video_link, "N/A", 1024), inline: true },
+                { name: "Additional Media", value: toEmbedValue((hitTrack.additional_media_links || []).join(", "), "None"), inline: false },
+                { name: "Timestamp", value: toEmbedValue(hitTrack.timestamp), inline: true },
+                { name: "Cargo JSON", value: toEmbedValue(hitTrack.cargo), inline: false }
             )
             .setColor(0x0099ff);
 
@@ -107,9 +168,66 @@ async function handleHitPost(client, openai, hitTrack) {
         }
     } catch (error) {
         console.error(error);
+        // On failure, remove the dedup marker so a retry can succeed
+        try {
+            const key = getHitDedupKey(hitTrack);
+            _postedHitCache.delete(key);
+        } catch {}
     }
 }
 
 module.exports = {
     handleHitPost,
 }
+
+// --- Update posting helper: append an updated embed into existing thread ---
+function summarizeCargo(cargo) {
+    try {
+        const arr = Array.isArray(cargo) ? cargo : [];
+        if (!arr.length) return 'None';
+        return arr.map(c => `${Number(c.scuAmount||0)} SCU ${c.commodity_name || c.name || ''}`.trim()).join(', ');
+    } catch { return 'None'; }
+}
+
+async function handleHitPostUpdate(client, hitBefore, hitAfter) {
+    try {
+        const threadId = hitAfter?.thread_id || hitAfter?.threadId || hitBefore?.thread_id || hitBefore?.threadId;
+        if (!threadId) return;
+        const channel = await client.channels.fetch(threadId).catch(() => null);
+        if (!channel) return;
+
+        const changed = [];
+        const addChange = (label, fromVal, toVal, opts = {}) => {
+            const f = toEmbedValue(fromVal, '—', opts.limit || 512);
+            const t = toEmbedValue(toVal, '—', opts.limit || 512);
+            if (f !== t) changed.push({ name: label, value: `Before: ${f}\nAfter: ${t}`, inline: false });
+        };
+
+        addChange('Title', hitBefore?.title, hitAfter?.title, { limit: 256 });
+        addChange('Type', hitBefore?.air_or_ground, hitAfter?.air_or_ground);
+        addChange('Total Value', hitBefore?.total_value, hitAfter?.total_value);
+        addChange('Value Per Share', hitBefore?.total_cut_value, hitAfter?.total_cut_value);
+        addChange('Total SCU', hitBefore?.total_scu, hitAfter?.total_scu);
+        addChange('SCU Per Share', hitBefore?.total_cut_scu, hitAfter?.total_cut_scu);
+        addChange('Patch', hitBefore?.patch, hitAfter?.patch);
+        addChange('Assists', (hitBefore?.assists||[]).map(id=>`<@${id}>`).join(', ')||'None', (hitAfter?.assists||[]).map(id=>`<@${id}>`).join(', ')||'None');
+        addChange('Victims', (hitBefore?.victims||[]).join(', ')||'None', (hitAfter?.victims||[]).join(', ')||'None');
+        addChange('Cargo', summarizeCargo(hitBefore?.cargo), summarizeCargo(hitAfter?.cargo), { limit: 1024 });
+        addChange('Video Link', hitBefore?.video_link || 'None', hitAfter?.video_link || 'None');
+        if (toEmbedValue(hitBefore?.story, '').slice(0, 64) !== toEmbedValue(hitAfter?.story, '').slice(0, 64)) {
+            changed.push({ name: 'Story', value: 'Story was updated.', inline: false });
+        }
+
+        const header = new EmbedBuilder()
+            .setTitle(`Hit updated by ${hitAfter?.nickname || hitAfter?.username || 'Unknown'}`)
+            .setDescription(toEmbedValue(hitAfter?.title || '', ''))
+            .setColor(0x00cc99)
+            .addFields(changed.length ? changed : [{ name: 'No visible changes', value: 'No fields changed.', inline: false }]);
+
+        await channel.send({ embeds: [header] });
+    } catch (e) {
+        console.error('handleHitPostUpdate error:', e?.message || e);
+    }
+}
+
+module.exports.handleHitPostUpdate = handleHitPostUpdate;

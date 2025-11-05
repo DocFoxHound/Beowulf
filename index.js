@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, Collection, Events, ChannelType } = require("discord.js");
+const { Client, GatewayIntentBits, Collection, Events, ChannelType, Partials } = require("discord.js");
 const dotenv = require("dotenv");
 const { OpenAI } = require("openai");
 const fs = require('node:fs');
@@ -47,6 +47,7 @@ const { handleSimpleWelcomeProspect, handleSimpleWelcomeGuest, handleSimpleJoin 
 const { refreshPlayerStatsView } = require('./api/playerStatsApi.js');
 const { removeProspectFromFriendlies } = require('./common/remove-prospect-from-friendly.js');
 const { syncSkillLevelsFromGuild, updateSkillOnMemberChange } = require('./common/skill-level-assigner.js');
+const { makeMember, updateMemberOnMemberChange } = require('./common/make-member.js');
 // Preloaders for location and market caches
 const { loadSystems } = require('./chatgpt/star-systems-answerer.js');
 const { loadStations } = require('./chatgpt/space-stations-answerer.js');
@@ -129,6 +130,8 @@ const client = new Client({
     GatewayIntentBits.GuildEmojisAndStickers,
     GatewayIntentBits.DirectMessages, // Added intent for DMs
   ],
+  // Enable partials so we can handle uncached thread/channel/message events
+  partials: [Partials.Channel, Partials.Message, Partials.GuildMember, Partials.Reaction],
 });
 
 client.commands = new Collection();
@@ -155,6 +158,11 @@ for (const folder of commandFolders) {
 
 // Set channels
 channelIds = process.env.LIVE_ENVIRONMENT === "true" ? process.env.CHANNELS.split(",") : process.env.TEST_CHANNELS.split(",");
+// Ensure HITTRACK forum channel is included in allowed parent list
+try {
+  const hitForumId = process.env.LIVE_ENVIRONMENT === "true" ? process.env.HITTRACK_CHANNEL_ID : process.env.TEST_HITTRACK_CHANNEL_ID;
+  if (hitForumId && !channelIds.includes(hitForumId)) channelIds.push(hitForumId);
+} catch {}
 channelIdAndName = [];
 
 //json things to hold in memory
@@ -205,12 +213,33 @@ client.on("ready", async () => {
   })).filter(channel => channel.channelId);
   console.log(`Logged in as ${client.user.tag}!`);
 
+  // Auto-join active threads under our allowed forum channels so we receive message events inside them
+  try {
+    const forumChannels = channels.filter(ch => ch && ch.type === ChannelType.GuildForum);
+    for (const forum of forumChannels) {
+      try {
+        const active = await forum.threads.fetchActive();
+        for (const [id, thread] of active.threads) {
+          if (!thread.joined && thread.joinable) {
+            await thread.join().catch(() => {});
+          }
+        }
+      } catch (e) {
+        console.error(`[Threads] Failed to fetch/join active threads for forum ${forum?.id}:`, e?.message || e);
+      }
+    }
+  } catch (e) {
+    console.error('[Threads] Startup auto-join failed:', e?.message || e);
+  }
+
 
   preloadedDbTables = await preloadFromDb(); //leave on
   await removeProspectFromFriendlies(client);
   await refreshUserlist(client, openai) //actually leave this here
   // Ensure SKILL_LEVEL_* roles are aligned at startup based on live Discord roles (RAPTOR/RAIDER)
   // try { await syncSkillLevelsFromGuild(client); } catch (e) { console.error('[Startup] Skill role sync failed:', e?.message || e); }
+  // Ensure MEMBER role is aligned at startup based on CREW/MARAUDER/BLOODED
+  try { await makeMember(client); } catch (e) { console.error('[Startup] Member role sync failed:', e?.message || e); }
   try { await ingestDailyChatSummaries(client, openai); } catch (e) { console.error('Initial chat ingest failed:', e); }
   try { await ingestHitLogs(client, openai); } catch (e) { console.error('Initial hit ingest failed:', e); }
   try { await ingestPlayerStats(client); } catch (e) { console.error('Initial player-stats ingest failed:', e); }
@@ -332,9 +361,22 @@ client.on("messageCreate", async (message) => {
   //   }
   //   return;
   // }
-  if (!channelIds.includes(message.channelId) || !message.guild || message.system) {
-    return;
+  // Allow messages in: (a) our configured top-level channels OR (b) threads whose parent is one of those channels
+  if (!message.guild || message.system) return;
+  let inAllowedChannel = channelIds.includes(message.channelId);
+  const channel = message.channel;
+  const isThread = typeof channel?.isThread === 'function' ? channel.isThread() : (channel?.type === 11 || channel?.type === 12);
+  if (!inAllowedChannel && isThread) {
+    const parentId = channel?.parentId || channel?.parent?.id;
+    inAllowedChannel = parentId ? channelIds.includes(parentId) : false;
+    // Best effort: join the thread so we continue to receive events
+    if (inAllowedChannel) {
+      try {
+        if (channel.joinable && !channel.joined) await channel.join();
+      } catch {}
+    }
   }
+  if (!inAllowedChannel) return;
   // Optionally persist messages to the backend for retrieval scoring
   if ((process.env.SAVE_MESSAGES || 'false').toLowerCase() === 'true') {
     try { await saveMessage(message, client); } catch {}
@@ -379,6 +421,18 @@ client.on("messageCreate", async (message) => {
   // Otherwise keep legacy behavior
   // handleMessage(message, openai, client, preloadedDbTables);
 
+});
+
+// Auto-join new threads created under our allowed forum channels
+client.on(Events.ThreadCreate, async (thread) => {
+  try {
+    const parentId = thread?.parentId || thread?.parent?.id;
+    if (parentId && channelIds.includes(parentId)) {
+      if (thread.joinable && !thread.joined) await thread.join();
+    }
+  } catch (e) {
+    console.error('[Threads] Failed to join new thread:', e?.message || e);
+  }
 });
 
 client.on(Events.InteractionCreate, async interaction => {
@@ -426,6 +480,8 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
   try {
     // Adjust SKILL_LEVEL_* role when RAPTOR/RAIDER prestige roles change
     try { await updateSkillOnMemberChange(oldMember, newMember); } catch (e) { console.error('[SkillRoles] live update failed:', e?.message || e); }
+    // Ensure MEMBER role is aligned with CREW/MARAUDER/BLOODED changes
+    try { await updateMemberOnMemberChange(oldMember, newMember); } catch (e) { console.error('[MemberRole] live update failed:', e?.message || e); }
     // ...existing code...
     // Fetch the user's existing data
     const user = await getUserById(newMember.user.id) || null;
@@ -447,10 +503,6 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 
     // Check if user gained the verifiedRole
     const oldRoles = oldMember.roles.cache.map(role => role.id);
-    if (!oldRoles.includes(verifiedRole) && memberRoles.includes(verifiedRole) && memberRoles.includes(newUserRole)) {
-      // User just gained the verifiedRole
-      await handleSimpleJoin(newMember, client, openai);
-    }
     if (!oldRoles.includes(prospectRole) && memberRoles.includes(prospectRole) && memberRoles.includes(newUserRole)) {
       // User just gained the prospectRole
       await handleSimpleWelcomeProspect(newMember, client, openai);

@@ -7,6 +7,7 @@ const { getAllSummarizedItems, getAllSummarizedCommodities } = require('../api/u
 const { getAllGameVersions } = require('../api/gameVersionApi.js');
 const { handleHitPost } = require('../functions/post-new-hit.js');
 const { bestBuyLocations, bestSellLocations, spotFor, bestProfitRoutes, mostActiveTerminals, bestOverallProfitRoute } = require('./market-answerer');
+const { runWithResponses } = require('./responses-run.js');
 const { piracyAdviceForRoute } = require('./piracy-route-advice');
 
 // Lightweight per-user/channel session for multi-turn slot-filling
@@ -130,8 +131,9 @@ function getToolsSpec() {
               },
             },
             assists: { type: 'array', items: { type: 'string' } },
+            victims: { type: 'array', items: { type: 'string' }, description: 'Victim player names or orgs' },
             video_link: { type: 'string', nullable: true },
-            patch: { type: 'string', nullable: true },
+            patch: { type: 'string', nullable: true, description: 'Optional. Auto-fill with current game patch; do NOT ask the user for this.' },
           },
           required: ['air_or_ground', 'cargo'],
         },
@@ -224,7 +226,7 @@ function buildSystemPrompt() {
   return `You are RoboHound, a Discord bot for IronPoint operations. Judge the user's intent and either:
 - Answer directly in one or two short sentences (banter or simple info), or
 - Call exactly one tool with well-formed arguments.
-For hit logging: if details are missing (air/ground or cargo), ask a concise follow-up, then call create_hit when ready.
+For hit logging: if missing, ALWAYS ask the user to confirm whether the hit was Air, Ground, or Mixed, and collect cargo details. Prompt for victim names if mentioned or relevant. NEVER ask for patch/version; auto-fill the current patch.
 Keep replies short and professional. Avoid pirate slang.`;
 }
 
@@ -238,27 +240,83 @@ async function executeTool({ name, args, message, client, openai }) {
       const priceCatalog = await getPriceCatalog();
       const { enrichedCargo, totalValue, totalSCU } = await computeTotalsAndEnrichCargo(args.cargo, priceCatalog);
       const latestPatch = args.patch || await getLatestPatch();
+      // Build assists list first to compute shares correctly
+      // Build and scrub assists list (remove the bot if present)
+      const rawAssists = (Array.isArray(args.assists) && args.assists.length ? args.assists : mentionsFromContent(message.content)) || [];
+      const botId = client?.user?.id ? String(client.user.id) : null;
+      const assistsList = Array.from(new Set(rawAssists.filter(id => id && String(id) !== botId)));
+      const shares = Math.max(1, (assistsList?.length || 0) + 1);
+      const normalizedAOG = String(args.air_or_ground || '').trim().toLowerCase(); // 'air' | 'ground' | 'mixed'
+      const totalCutValue = Number(totalValue || 0) / shares;
+      const totalCutSCU = Number(totalSCU || 0) / shares;
+
+      // Generate a brief story from the user's message
+      let storyText = message.content || 'Logged via chat';
+      try {
+        const summary = await runWithResponses({
+          openai,
+          formattedUserMessage: `Summarize this hit as 2-3 concise sentences, neutral professional tone, no pirate slang. Include outcome and key cargo if relevant.\n\nUser description:\n${message.content || ''}`,
+          guildId: message.guildId || message.guild?.id,
+          channelId: message.channelId,
+          rank: message.member?.roles?.highest?.name || undefined,
+          contextSnippets: [
+            `Air/Ground: ${normalizedAOG || 'unknown'}`,
+            `Total SCU: ${Math.round(Number(totalSCU||0))}`,
+            `Cargo: ${(enrichedCargo||[]).map(c=>`${c.scuAmount} SCU ${c.commodity_name}`).join(', ')}`,
+          ],
+        });
+        if (typeof summary === 'string' && summary.trim()) storyText = summary.trim();
+      } catch {}
+
       const payload = {
         id: Date.now(),
         user_id: message.author?.id,
         username: message.author?.username,
         nickname: message.member?.nickname || null,
-        air_or_ground: args.air_or_ground,
+        air_or_ground: normalizedAOG || args.air_or_ground,
         cargo: enrichedCargo,
         total_value: Math.round(Number(totalValue || 0)),
-        total_cut_value: Math.round(Number(totalValue || 0) / (Number((args.assists||[]).length) + 1)),
+        total_cut_value: Math.round(totalCutValue * 100) / 100,
         total_scu: Math.round(Number(totalSCU || 0)),
+        total_cut_scu: Math.round(totalCutSCU * 100) / 100,
         patch: latestPatch || undefined,
-        assists: Array.isArray(args.assists) && args.assists.length ? args.assists : mentionsFromContent(message.content),
+        assists: assistsList,
+        victims: Array.isArray(args.victims) ? args.victims.filter(v=>v && String(v).trim()).map(String) : undefined,
         video_link: args.video_link || undefined,
         title: `Hit: ${Math.round(Number(totalSCU||0))} SCU ${enrichedCargo?.[0]?.commodity_name || ''}`.trim(),
-        story: message.content || 'Logged via chat',
+        story: storyText,
         type_of_piracy: args.air_or_ground,
         timestamp: new Date().toISOString(),
         fleet_activity: false,
       };
-      const created = await createHitLog(payload).catch(e => { throw new Error(e?.message || 'Failed to create hit'); });
-      try { await handleHitPost(client, openai, { ...payload, ...created }); } catch (e) { console.error('handleHitPost (tool-agent) failed:', e?.message || e); }
+      try {
+        if (process.env.DEBUG_HIT_LOGS === '1') {
+          const typeSummary = Object.fromEntries(Object.entries(payload).map(([k,v]) => [k, Array.isArray(v) ? 'array' : (v === null ? 'null' : typeof v)]));
+          console.log('[tool-agent] create_hit payload types:', JSON.stringify(typeSummary));
+          console.log('[tool-agent] create_hit payload snapshot:', JSON.stringify({
+            id: payload.id,
+            user_id: payload.user_id,
+            air_or_ground: payload.air_or_ground,
+            total_value: payload.total_value,
+            total_cut_value: payload.total_cut_value,
+            total_scu: payload.total_scu,
+            total_cut_scu: payload.total_cut_scu,
+            patch: payload.patch,
+            cargo_len: Array.isArray(payload.cargo) ? payload.cargo.length : undefined,
+            assists_len: Array.isArray(payload.assists) ? payload.assists.length : undefined,
+          }));
+        }
+      } catch {}
+      const created = await createHitLog(payload).catch(e => { console.error('[tool-agent] createHitLog threw:', e?.message || e); return null; });
+      if (!created) {
+        console.error('[tool-agent] createHitLog returned null (likely API 500). See previous logs for payload.');
+        return { ok: false, error: 'API createHitLog failed' };
+      }
+      try {
+        if (!created.thread_id && !created.threadId) {
+          await handleHitPost(client, openai, { ...payload, ...created });
+        }
+      } catch (e) { console.error('handleHitPost (tool-agent) failed:', e?.message || e); }
       return { ok: true, created };
     }
     if (name === 'market_best_buy') {

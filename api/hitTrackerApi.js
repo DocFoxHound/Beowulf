@@ -1,16 +1,94 @@
 const axios = require('axios');
 
+// Simple safe stringifier to avoid crashes on unexpected structures
+function safeStringify(obj) {
+    try { return JSON.stringify(obj); } catch { return String(obj); }
+}
+
+function digitsOnly(str) {
+    return String(str || '').replace(/\D+/g, '');
+}
+
+function normalizeAirOrGround(v) {
+    const s = String(v || '').trim().toLowerCase();
+    if (s.startsWith('a')) return 'air';
+    if (s.startsWith('g')) return 'ground';
+    if (s.startsWith('m')) return 'mixed';
+    return s || undefined;
+}
+
+function sanitizeHitPayload(input) {
+    const p = { ...(input || {}) };
+    // Normalize basic types
+    if (p.user_id !== undefined) p.user_id = digitsOnly(p.user_id);
+    if (p.id !== undefined && typeof p.id !== 'number') {
+        const n = Number(p.id); if (Number.isFinite(n)) p.id = Math.trunc(n);
+    }
+    if (p.timestamp instanceof Date) p.timestamp = p.timestamp.toISOString();
+    if (p.air_or_ground !== undefined) p.air_or_ground = normalizeAirOrGround(p.air_or_ground);
+    if (Array.isArray(p.assists)) p.assists = p.assists.map(digitsOnly).filter(Boolean);
+    if (Array.isArray(p.cargo)) {
+        p.cargo = p.cargo.map(c => ({
+            commodity_name: c?.commodity_name || c?.name || '',
+            commodity_code: c?.commodity_code || c?.code || undefined,
+            scuAmount: Number(c?.scuAmount || c?.scu || 0),
+            avg_price: Number(c?.avg_price || c?.price || 0),
+        }));
+    }
+    // Derive missing cuts if needed
+    const shares = Math.max(1, (Array.isArray(p.assists) ? p.assists.length : 0) + 1);
+    if (p.total_value !== undefined && p.total_cut_value === undefined) {
+        const cut = Number(p.total_value) / shares; p.total_cut_value = Math.round(cut * 100) / 100;
+    }
+    if (p.total_scu !== undefined && p.total_cut_scu === undefined) {
+        const cut = Number(p.total_scu) / shares; p.total_cut_scu = Math.round(cut * 100) / 100;
+    }
+    return p;
+}
+
 async function createHitLog(HitLogData) {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_HIT_TRACKR}`;
+    const headers = { 'Content-Type': 'application/json' };
+    // Preflight log for debugging malformed payloads
+        try {
+                const sanitized = sanitizeHitPayload(HitLogData);
+                if (process.env.DEBUG_HIT_LOGS === '1') {
+                    const typeSummary = Object.fromEntries(Object.entries(HitLogData || {}).map(([k,v]) => [k, Array.isArray(v) ? 'array' : (v === null ? 'null' : typeof v)]));
+                    console.log('[hitTrackerApi.createHitLog] URL:', apiUrl);
+                    console.log('[hitTrackerApi.createHitLog] Headers:', headers);
+                    console.log('[hitTrackerApi.createHitLog] Payload types:', safeStringify(typeSummary));
+                    console.log('[hitTrackerApi.createHitLog] Payload (truncated):', safeStringify({
+                        id: sanitized?.id,
+                        user_id: sanitized?.user_id,
+                        username: sanitized?.username,
+                        air_or_ground: sanitized?.air_or_ground,
+                        total_value: sanitized?.total_value,
+                        total_cut_value: sanitized?.total_cut_value,
+                        total_scu: sanitized?.total_scu,
+                        total_cut_scu: sanitized?.total_cut_scu,
+                        patch: sanitized?.patch,
+                        has_cargo: Array.isArray(sanitized?.cargo),
+                        cargo_len: Array.isArray(sanitized?.cargo) ? sanitized.cargo.length : undefined,
+                        assists_len: Array.isArray(sanitized?.assists) ? sanitized.assists.length : undefined,
+                    }));
+                }
+        } catch (preLogErr) {
+                if (process.env.DEBUG_HIT_LOGS === '1') console.warn('[hitTrackerApi.createHitLog] Failed to log preflight payload:', preLogErr?.message || preLogErr);
+        }
     try {
-        const response = await axios.post(apiUrl, HitLogData, {
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
+        const response = await axios.post(apiUrl, sanitizeHitPayload(HitLogData), { headers });
+                if (process.env.DEBUG_HIT_LOGS === '1') {
+                    console.log('[hitTrackerApi.createHitLog] Response status:', response.status, response.statusText);
+                    console.log('[hitTrackerApi.createHitLog] Response data summary:', safeStringify({
+                        id: response?.data?.id ?? response?.data?.entry_id ?? null,
+                        thread_id: response?.data?.thread_id ?? null,
+                        ok: !!response?.data,
+                    }));
+                }
         return response.data;  // Return the created HitLog data
     } catch (error) {
-        console.error('Error creating HitLog:', error.response ? error.response.data : error.message);
+        const errResp = error?.response;
+                console.error('[hitTrackerApi.createHitLog] Error creating HitLog:', safeStringify({ message: error?.message, status: errResp?.status, statusText: errResp?.statusText, data: errResp?.data }));
         return null;  // Return null if there's an error
     }
 }
@@ -58,6 +136,19 @@ async function getHitLogByEntryId(id) {
     } catch (error) {
         console.error('Error fetching HitLog by entry ID:', error.response ? error.response.data : error.message);
         return null; // Return null if there's an error
+    }
+}
+
+async function getHitLogByThreadId(thread_id) {
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_HIT_TRACKR}/thread`;
+    try {
+        const response = await axios.get(apiUrl, { params: { thread_id } });
+        const data = response.data;
+        if (Array.isArray(data)) return data[0] || null;
+        return data || null;
+    } catch (error) {
+        console.error('Error fetching HitLog by thread ID:', error.response ? error.response.data : error.message);
+        return null;
     }
 }
 
@@ -168,5 +259,6 @@ module.exports = {
     getAssistHitLogs,
     getAssistHitLogsByUserAndPatch,
     getHitLogByEntryId,
+    getHitLogByThreadId,
     getHitLogsByUserId,
 };

@@ -4,12 +4,12 @@ const { sendResponse } = require('../threads/send-response.js');
 const { runWithResponses } = require('./responses-run.js');
 const { getUserById } = require('../api/userlistApi.js');
 const { ChatLogsModel } = require('../api/models/chat-logs');
-const { getAllHitLogs } = require('../api/hitTrackerApi.js');
+const { getAllHitLogs, getHitLogByThreadId, getHitLogsByUserId, getHitLogByEntryId, editHitLog } = require('../api/hitTrackerApi.js');
 const { listKnowledge } = require('../api/knowledgeApi.js');
 const { createHitLog } = require('../api/hitTrackerApi.js');
 const { getAllGameVersions } = require('../api/gameVersionApi.js');
 const { getAllSummarizedItems, getAllSummarizedCommodities } = require('../api/uexApi.js');
-const { handleHitPost } = require('../functions/post-new-hit.js');
+const { handleHitPost, handleHitPostUpdate } = require('../functions/post-new-hit.js');
 
 // Lightweight memory to reduce repetitive quick-replies in banter flows
 const lastQuickReplies = new Map(); // key: channelId:userId -> { text, ts }
@@ -17,6 +17,7 @@ const lastQuickReplies = new Map(); // key: channelId:userId -> { text, ts }
 const lastMarketContext = new Map(); // key: channelId:userId -> { intent, item_name, location, ts }
 // Maintain conversational hit-drafts per user/channel to complete missing fields across messages
 const lastHitDrafts = new Map(); // key: channelId:userId -> { draft, awaiting, ts }
+const editHitSessions = new Map(); // key: threadChannelId -> { hit, patch, awaiting, ts, user_id }
 
 function marketContextKey(message) {
   return `${message.channelId}:${message.author?.id}`;
@@ -55,6 +56,17 @@ function getHitDraft(message) {
 function clearHitDraft(message) {
   const key = hitDraftKey(message);
   lastHitDrafts.delete(key);
+}
+
+function getEditSession(message) {
+  return editHitSessions.get(message.channelId) || null;
+}
+function rememberEditSession(message, sess) {
+  if (!sess) return;
+  editHitSessions.set(message.channelId, { ...sess, ts: Date.now() });
+}
+function clearEditSession(message) {
+  editHitSessions.delete(message.channelId);
 }
 
 // Helpers for hit parsing/valuation
@@ -129,6 +141,56 @@ async function getLatestPatch() {
     const latest = [...patches].sort((a,b) => (b.id||0) - (a.id||0))[0];
     return latest?.version || null;
   } catch { return null; }
+}
+
+// --- Quick edit parsing (single-message intents like "edit the total value to 14000") ---
+function parseQuickEdit(text) {
+  const raw = String(text || '');
+  // Remove mentions/channels/roles to avoid grabbing snowflake IDs
+  const cleaned = raw
+    .replace(/<@!?\d+>/g, '')
+    .replace(/<@&\d+>/g, '')
+    .replace(/<#\d+>/g, '')
+    .replace(/https?:\/\/\S+/gi, '');
+
+  // Prefer patterns where the number appears AFTER the target field keyword
+  const valAfter = cleaned.match(/(?:^|\b)(?:total\s*value|value)\s*(?:to|=|:)?\s*([0-9][0-9,]*(?:\.[0-9]+)?)/i);
+  if (valAfter) {
+    const n = Number(valAfter[1].replace(/,/g, ''));
+    if (Number.isFinite(n) && String(Math.trunc(n)).length < 13) {
+      return { field: 'total_value', value: Math.round(n) };
+    }
+  }
+  // Or the number appears BEFORE the keyword (e.g., "14000 value")
+  const valBefore = cleaned.match(/([0-9][0-9,]*(?:\.[0-9]+)?)\s*(?:total\s*value|value)\b/i);
+  if (valBefore) {
+    const n = Number(valBefore[1].replace(/,/g, ''));
+    if (Number.isFinite(n) && String(Math.trunc(n)).length < 13) {
+      return { field: 'total_value', value: Math.round(n) };
+    }
+  }
+
+  // SCU edits
+  const scuAfter = cleaned.match(/(?:^|\b)(?:total\s*scu|scu\s*total|total\s*units?|scu)\s*(?:to|=|:)?\s*([0-9][0-9,]*(?:\.[0-9]+)?)/i);
+  if (scuAfter) {
+    const n = Number(scuAfter[1].replace(/,/g, ''));
+    if (Number.isFinite(n) && String(Math.trunc(n)).length < 10) {
+      return { field: 'total_scu', value: Math.round(n) };
+    }
+  }
+  const scuBefore = cleaned.match(/([0-9][0-9,]*(?:\.[0-9]+)?)\s*(?:total\s*scu|scu\s*total|total\s*units?|scu)\b/i);
+  if (scuBefore) {
+    const n = Number(scuBefore[1].replace(/,/g, ''));
+    if (Number.isFinite(n) && String(Math.trunc(n)).length < 10) {
+      return { field: 'total_scu', value: Math.round(n) };
+    }
+  }
+  return null;
+}
+
+function parseHitId(text) {
+  const m = String(text || '').match(/\b(?:hit\s*#?|id\s*#?|#)(\d{3,})\b/i);
+  return m ? Number(m[1]) : null;
 }
 
 // Basic Levenshtein distance for fuzzy matching
@@ -281,15 +343,299 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
     const isBot = message.author.id === client.user.id;
     if (isBot) return;
 
+    // Ultra-fast quick-edit lane anywhere: if the user asks to edit value/SCU in plain text, try to resolve target hit and patch it.
+    try {
+      const quick = parseQuickEdit(message.content || '');
+      if (quick) {
+        // Resolve target hit: preference order -> current thread -> explicit id in text -> most recent hit by this user
+        let hit = null;
+        // If this channel is a thread that equals a hit thread_id
+        try { hit = await getHitLogByThreadId(message.channelId); } catch {}
+        if (!hit) {
+          const id = parseHitId(message.content || '');
+          if (id) {
+            try { hit = await getHitLogByEntryId(id); } catch {}
+          }
+        }
+        if (!hit) {
+          try {
+            const list = await getHitLogsByUserId(message.author?.id);
+            if (Array.isArray(list) && list.length) {
+              hit = list.slice().sort((a,b)=>{
+                const ta = new Date(a.created_at || a.createdAt || 0).getTime();
+                const tb = new Date(b.created_at || b.createdAt || 0).getTime();
+                if (tb !== ta) return tb - ta;
+                return (Number(b.id||0) - Number(a.id||0));
+              })[0];
+            }
+          } catch {}
+        }
+        if (!hit) {
+          // No target: fall through to normal flows
+        } else {
+          const ownerId = String(hit.user_id || '');
+          const authorId = String(message.author?.id || '');
+          if (!ownerId || ownerId !== authorId) {
+            await sendResponse(message, 'Only the original author can edit this hit.', true);
+            return;
+          }
+          // Build patch and recompute cuts based on current assists
+          const patch = {};
+          if (quick.field === 'total_value') {
+            patch.total_value = quick.value;
+            try {
+              const assists = Array.isArray(hit.assists) ? hit.assists : [];
+              const botId = client?.user?.id ? String(client.user.id) : null;
+              const cleanAssists = botId ? assists.filter(id => String(id) !== botId) : assists;
+              const shares = Math.max(1, (cleanAssists.length || 0) + 1);
+              patch.total_cut_value = Math.round((quick.value / shares) * 100) / 100;
+            } catch {}
+          }
+          if (quick.field === 'total_scu') {
+            patch.total_scu = quick.value;
+            try {
+              const assists = Array.isArray(hit.assists) ? hit.assists : [];
+              const botId = client?.user?.id ? String(client.user.id) : null;
+              const cleanAssists = botId ? assists.filter(id => String(id) !== botId) : assists;
+              const shares = Math.max(1, (cleanAssists.length || 0) + 1);
+              patch.total_cut_scu = Math.round((quick.value / shares) * 100) / 100;
+            } catch {}
+          }
+          const ok = await editHitLog(hit.id, patch).catch(()=>false);
+          if (ok) {
+            try { const { handleHitPostUpdate } = require('../functions/post-new-hit.js'); await handleHitPostUpdate(client, hit, { ...hit, ...patch }); } catch {}
+            await sendResponse(message, `Updated hit #${hit.id}: set ${quick.field.replace('_',' ')} to ${quick.value}.`, true);
+          } else {
+            await sendResponse(message, 'I could not update that right now. Try again shortly.', true);
+          }
+          return; // handled
+        }
+      }
+    } catch (e) { /* non-fatal */ }
+
+    // Fast-path: if user asks to edit/update and we're in a hit thread, start edit session BEFORE multi-tool agent
+    try {
+      const looksEditAsk = /(edit|update|fix|change)\s+(this\s+)?hit\b|^\s*(edit|update)\b/i.test(message.content || '');
+      if (looksEditAsk) {
+        let hit = await getHitLogByThreadId(message.channelId).catch(()=>null);
+        if (!hit) {
+          try {
+            const all = await getAllHitLogs();
+            if (Array.isArray(all)) {
+              hit = all.find(h => String(h.thread_id || h.threadId || '') === String(message.channelId));
+            }
+          } catch {}
+        }
+        if (hit && (String(hit.thread_id||'') === String(message.channelId))) {
+          const ownerId = String(hit.user_id || '');
+          const authorId = String(message.author?.id || '');
+          if (ownerId && ownerId === authorId) {
+            rememberEditSession(message, { hit, patch: {}, awaiting: 'field', user_id: ownerId });
+            await sendResponse(message, "You're the owner of this hit. What would you like to change? Options: value, SCU, cargo, type (air/ground/mixed), assists, victims, title, story, video. Reply 'submit' to save or 'cancel' to abort.", true);
+            return; // intercept so tool-agent doesn't start a new create flow
+          }
+        }
+      }
+    } catch (e) { /* non-fatal */ }
+
   // Primary: LLM multi-tool agent handles all intents (hit, market, piracy advice, banter, etc.)
   try {
     if ((process.env.TOOL_AGENT_ENABLED || 'true').toLowerCase() !== 'false') {
       const { runToolAgent } = require('./tool-agent');
       const handled = await runToolAgent(message, client, openai);
       if (handled) return; // Agent responded; skip legacy flow
+      // Fallback: if this looks like a hit logging ask, try the dedicated hit tool agent
+      const looksLikeHitAsk = /(\blog\s+(a\s+)?hit\b|\bhit\s+log\b|\blog\b.*\bhit\b|\b(scus?|units)\b.*\b(of|\d)|\bhit\b.*\bcargo\b|\bpiracy\b.*\bhit\b)/i.test(message.content || '');
+      if (looksLikeHitAsk) {
+        try {
+          const { runHitToolAgent } = require('./tool-hit-agent');
+          const hitHandled = await runHitToolAgent(message, client, openai);
+          if (hitHandled) return;
+        } catch (e2) {
+          console.error('tool-hit-agent fallback failed:', e2?.message || e2);
+        }
+      }
     }
   } catch (e) {
     console.error('tool-agent path failed:', e?.message || e);
+  }
+
+  // Edit-hit flow: if in a hit forum thread and user asks to edit/update, manage an edit session
+  try {
+    const looksEditAsk = /(edit|update|fix|change)\s+(this\s+)?hit\b|\bedit\b/i.test(message.content || '');
+    let sess = getEditSession(message);
+    if (!sess && (looksEditAsk || /\b(edit|update|change)\b/i.test(message.content || ''))) {
+      // Attempt to fetch hit by thread_id = channelId
+      let hit = await getHitLogByThreadId(message.channelId).catch(()=>null);
+      if (!hit) {
+        try {
+          const all = await getAllHitLogs();
+          if (Array.isArray(all)) {
+            hit = all.find(h => String(h.thread_id || h.threadId || '') === String(message.channelId));
+          }
+        } catch {}
+      }
+      if (hit && (String(hit.thread_id||'') === String(message.channelId))) {
+        const ownerId = String(hit.user_id || '');
+        const authorId = String(message.author?.id || '');
+        if (ownerId && ownerId === authorId) {
+          sess = { hit, patch: {}, awaiting: 'field', user_id: ownerId };
+          rememberEditSession(message, sess);
+          await sendResponse(message, "You're the owner of this hit. What would you like to change? Options: value, SCU, cargo, type (air/ground/mixed), assists, victims, title, story, video. Reply 'submit' to save or 'cancel' to abort.", true);
+          return;
+        } else if (ownerId) {
+          await sendResponse(message, 'Only the original author can edit this hit.', true);
+          // Do not start session
+        }
+      }
+    } else if (sess) {
+      // Session ongoing: interpret this message as an edit command/value
+      const text = String(message.content || '').trim();
+      const lower = text.toLowerCase();
+      if (/^(cancel|stop|abort)$/i.test(lower)) {
+        clearEditSession(message);
+        await sendResponse(message, 'Canceled. No changes were made.', true);
+        return;
+      }
+  if (/^(submit|save|apply)$/i.test(lower)) {
+        // finalize
+        const patch = { ...sess.patch };
+        // Recompute totals if cargo or assists changed
+        try {
+          let cargoChanged = Array.isArray(patch.cargo) && patch.cargo.length;
+          let assists = Array.isArray(patch.assists) ? patch.assists : sess.hit.assists || [];
+          // Remove bot id from assists
+          const botId = client?.user?.id ? String(client.user.id) : null;
+          if (botId) assists = assists.filter(id => String(id) !== botId);
+          if (cargoChanged) {
+            const priceCatalog = await getPriceCatalog();
+            const { enrichedCargo, totalValue, totalSCU } = await computeTotalsAndEnrichCargo(patch.cargo, priceCatalog);
+            patch.cargo = enrichedCargo;
+            const shares = Math.max(1, (assists.length || 0) + 1);
+            patch.total_value = Math.round(Number(totalValue||0));
+            patch.total_scu = Math.round(Number(totalSCU||0));
+            patch.total_cut_value = Math.round((Number(totalValue||0)/shares) * 100) / 100;
+            patch.total_cut_scu = Math.round((Number(totalSCU||0)/shares) * 100) / 100;
+          }
+        } catch (e) { console.error('edit recompute failed:', e?.message || e); }
+        // Build the final merged object for display/update post
+        const merged = { ...sess.hit, ...patch };
+        const ok = await editHitLog(sess.hit.id, patch).catch(()=>false);
+        if (ok) {
+          try { await handleHitPostUpdate(client, sess.hit, merged); } catch (e) { console.error('post update embed failed:', e?.message || e); }
+          clearEditSession(message);
+          await sendResponse(message, 'Updated the hit and posted the changes in the thread.', true);
+        } else {
+          await sendResponse(message, 'I could not update that right now. Try again shortly.', true);
+        }
+        return;
+      }
+      // Parse field-specific updates
+      let updated = false;
+      // cargo: look for explicit prefix or parse SCU patterns
+      if (/^cargo\s*[:=-]/i.test(text) || /(\d+\s*(?:scu|units?)\b)/i.test(text)) {
+        const list = extractCargoFromText(text.replace(/^cargo\s*[:=-]/i,''));
+        if (list.length) { sess.patch.cargo = list; updated = true; }
+        else { await sendResponse(message, "I didn't catch the cargo. Example: 'cargo: 120 scu quantanium, 50 scu scrap'", true); return; }
+      }
+      // type
+      if (/^(type|air|ground|mixed)\b/i.test(lower)) {
+        const type = detectAirOrGround(text) || (/\bmixed\b/i.test(text) ? 'Mixed' : null) || (/\bair\b/i.test(text) ? 'Air' : null) || (/\bground\b|\bfps\b|\bfoot\b/i.test(text) ? 'Ground' : null);
+        if (type) { sess.patch.air_or_ground = type; updated = true; } else { await sendResponse(message, "Please specify 'Air', 'Ground', or 'Mixed'.", true); return; }
+      }
+      // totals: total value, total SCU, and optionally cut values
+      const numFrom = (s) => {
+        const m = String(s||'').match(/([0-9][0-9,]*(?:\.[0-9]+)?)/);
+        if (!m) return null; const n = Number(m[1].replace(/,/g, '')); return Number.isFinite(n) ? n : null;
+      };
+      // total value
+      if (/(^|\b)(total\s*value|value)\b/i.test(text)) {
+        const val = numFrom(text);
+        if (val !== null) {
+          sess.patch.total_value = Math.round(val);
+          // Recompute cut value based on current assists if present
+          try {
+            const assists = Array.isArray(sess.patch.assists) ? sess.patch.assists : (Array.isArray(sess.hit.assists) ? sess.hit.assists : []);
+            const botId = client?.user?.id ? String(client.user.id) : null;
+            const cleanAssists = botId ? assists.filter(id => String(id) !== botId) : assists;
+            const shares = Math.max(1, (cleanAssists.length || 0) + 1);
+            sess.patch.total_cut_value = Math.round((val / shares) * 100) / 100;
+          } catch {}
+          updated = true;
+        }
+      }
+      // total SCU
+      if (/(^|\b)(total\s*scu|scu\s*total|total\s*units?)\b/i.test(text)) {
+        const scu = numFrom(text);
+        if (scu !== null) {
+          sess.patch.total_scu = Math.round(scu);
+          try {
+            const assists = Array.isArray(sess.patch.assists) ? sess.patch.assists : (Array.isArray(sess.hit.assists) ? sess.hit.assists : []);
+            const botId = client?.user?.id ? String(client.user.id) : null;
+            const cleanAssists = botId ? assists.filter(id => String(id) !== botId) : assists;
+            const shares = Math.max(1, (cleanAssists.length || 0) + 1);
+            sess.patch.total_cut_scu = Math.round((scu / shares) * 100) / 100;
+          } catch {}
+          updated = true;
+        }
+      }
+      // direct cut fields, if specified
+      if (/(^|\b)(cut\s*value|value\s*per\s*(?:player|person|share))\b/i.test(text)) {
+        const v = numFrom(text); if (v !== null) { sess.patch.total_cut_value = Math.round(v * 100) / 100; updated = true; }
+      }
+      if (/(^|\b)(cut\s*scu|scu\s*per\s*(?:player|person|share))\b/i.test(text)) {
+        const v = numFrom(text); if (v !== null) { sess.patch.total_cut_scu = Math.round(v * 100) / 100; updated = true; }
+      }
+      // assists via mentions
+      if (/^assists?\s*[:=-]/i.test(text) || /<@!?\d+>/.test(text)) {
+        const ids = extractMentionsFromContent(text);
+        if (ids.length) { sess.patch.assists = ids; updated = true; }
+      }
+      // victims
+      if (/^victims?\s*[:=-]/i.test(text)) {
+        const body = text.replace(/^victims?\s*[:=-]/i,'');
+        const arr = body.split(/[;,\n]+/).map(s=>s.trim()).filter(Boolean).slice(0, 16);
+        if (arr.length) { sess.patch.victims = arr; updated = true; }
+      }
+      // title
+      if (/^title\s*[:=-]/i.test(text)) {
+        const t = text.replace(/^title\s*[:=-]/i,'').trim().slice(0, 120);
+        if (t) { sess.patch.title = t; updated = true; }
+      }
+      // story (or regenerate)
+      if (/^story\s*[:=-]/i.test(text) || /^regenerate\b/i.test(lower)) {
+        const explicit = /^story\s*[:=-]/i.test(text) ? text.replace(/^story\s*[:=-]/i,'').trim() : '';
+        if (explicit) { sess.patch.story = explicit.slice(0, 1000); updated = true; }
+        else {
+          try {
+            const summary = await runWithResponses({
+              openai,
+              formattedUserMessage: `Summarize this hit as 2-3 concise sentences, neutral professional tone. Use no pirate slang.\n\nOriginal:\n${sess.hit.story || ''}\n\nUpdate notes:\n${message.content}`,
+              guildId: message.guild?.id,
+              channelId: message.channelId,
+              rank: deriveRankLabel(message.member) || null,
+              contextSnippets: [],
+            });
+            if (summary && summary.trim()) { sess.patch.story = summary.trim(); updated = true; }
+          } catch {}
+        }
+      }
+      // video
+      if (/^video\s*[:=-]/i.test(text) || /https?:\/\//i.test(text)) {
+        const v = extractVideoLink(text);
+        if (v) { sess.patch.video_link = v; updated = true; }
+      }
+      if (updated) {
+        rememberEditSession(message, sess);
+        await sendResponse(message, "Noted. You can add more changes or type 'submit' to save.", true);
+        return;
+      } else {
+        await sendResponse(message, "Tell me what to change: value, SCU, cargo, type, assists, victims, title, story, or video. Or type 'submit' to save.", true);
+        return;
+      }
+    }
+  } catch (e) {
+    console.error('edit-hit flow failed:', e?.message || e);
   }
 
   // Heuristic: treat questions/requests as info-seeking and retrieve org-wide snippets
@@ -620,7 +966,11 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
         rememberHitDraft(message, draft); // keep for retry
         return;
       }
-      try { await handleHitPost(client, openai, { ...payload, ...created }); } catch (e) { console.error('handleHitPost failed:', e?.message || e); }
+      try {
+        if (!created.thread_id && !created.threadId) {
+          await handleHitPost(client, openai, { ...payload, ...created });
+        }
+      } catch (e) { console.error('handleHitPost failed:', e?.message || e); }
       clearHitDraft(message);
       await sendResponse(
         message,
