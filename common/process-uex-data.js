@@ -223,6 +223,9 @@ function delay(ms) {
 async function sendToDb(title, data) {
     try {
         const dataArray = Array.isArray(data) ? data : [data];
+        // Safe lowercase helper (avoids calling toLowerCase on undefined/null)
+        const lc = (s) => String(s ?? '').toLowerCase();
+        const DEBUG = (process.env.UEX_DEBUG_LOG || 'false').toLowerCase() === 'true';
         for (const item of dataArray) {
             if (item.data && Array.isArray(item.data)) {
                 switch (title) {
@@ -291,28 +294,27 @@ async function sendToDb(title, data) {
                             if (d.price_buy === 0 && d.price_sell === 0) {
                                 let sumItems = 0;
                                 let sumPrice = 0;
-                                let averageSoFar = 0;
-                                let averageLow = 0;
-                                let averageHigh = 0;
-                                marketplaceArray.forEach((item) => {
-                                    if (item.title.toLowerCase().includes(d.name.toLowerCase()) || item.description.toLowerCase().includes(d.name.toLowerCase())) {
-                                        averageSoFar = sumPrice / sumItems;
-                                        averageLow = 0.1 * averageSoFar;
-                                        averageHigh = 5 * averageSoFar;
-                                        if(sumItems === 0){
-                                            sumItems++;
-                                            sumPrice += item.price;
-                                        }
-                                        if (item.price > averageLow && item.price < averageHigh) {
-                                            sumItems++;
-                                            sumPrice += item.price;
-                                        }
+                                for (const m of marketplaceArray) {
+                                    const matches = (lc(m.title).includes(lc(d.name)) || lc(m.description).includes(lc(d.name)));
+                                    if (!matches) continue;
+                                    // First matching item seeds average window
+                                    if (sumItems === 0) {
+                                        sumItems = 1;
+                                        sumPrice = Number(m.price) || 0;
+                                        continue;
                                     }
-                                });
-
-                                const avgPrice = sumPrice / sumItems;
-                                summaryCommodity.price_buy_avg = avgPrice;
-                                summaryCommodity.price_sell_avg = avgPrice;
+                                    const averageSoFar = sumPrice / sumItems;
+                                    const averageLow = 0.1 * averageSoFar;
+                                    const averageHigh = 5 * averageSoFar;
+                                    const price = Number(m.price) || 0;
+                                    if (price > averageLow && price < averageHigh) {
+                                        sumItems++;
+                                        sumPrice += price;
+                                    }
+                                }
+                                const avgPrice = sumItems > 0 ? (sumPrice / sumItems) : 0;
+                                summaryCommodity.price_buy_avg = avgPrice || 0;
+                                summaryCommodity.price_sell_avg = avgPrice || 0;
                             }
                             await UEX.createSummarizedCommodity(summaryCommodity);
                             await UEX.createCommodity(d);
@@ -334,21 +336,22 @@ async function sendToDb(title, data) {
                                     sellDivide++;
                                 }
                             }
-                            let avgBuy = totalBuy / buyDivide;
-                            let avgSell = totalSell / sellDivide;
+                            let avgBuy = buyDivide ? (totalBuy / buyDivide) : 0;
+                            let avgSell = sellDivide ? (totalSell / sellDivide) : 0;
 
                             if (d.price_buy === 0 && d.price_sell === 0) {
-                                sumItems = 0;
-                                sumPrice = 0;
-                                for (const e of marketplaceArray) {
-                                    if (e.title.toLowerCase().includes(d.name.toLowerCase())) {
+                                let sumItems = 0;
+                                let sumPrice = 0;
+                                for (const m of marketplaceArray) {
+                                        // Prefer commodity_name when present (d.name might not exist in this dataset)
+                                    if (lc(m.title).includes(lc(d.commodity_name || d.name))) {
                                         sumItems++;
-                                        sumPrice += e.price;
+                                        sumPrice += Number(m.price) || 0;
                                     }
                                 }
-                                const avgPrice = sumPrice / sumItems;
-                                avgBuy = avgPrice;
-                                avgSell = avgPrice;
+                                const avgPrice = sumItems > 0 ? (sumPrice / sumItems) : 0;
+                                avgBuy = avgPrice || 0;
+                                avgSell = avgPrice || 0;
                             }
                             const terminalCommodity = {
                                 id: d.id,
@@ -395,21 +398,22 @@ async function sendToDb(title, data) {
                                     sellDivide++;
                                 }
                             }
-                            let avgBuy = totalBuy / buyDivide;
-                            let avgSell = totalSell / sellDivide;
+                            let avgBuy = buyDivide ? (totalBuy / buyDivide) : 0;
+                            let avgSell = sellDivide ? (totalSell / sellDivide) : 0;
 
                             if (d.price_buy === 0 && d.price_sell === 0) {
-                                sumItems = 0;
-                                sumPrice = 0;
-                                for (const e of marketplaceArray) {
-                                    if (e.title.toLowerCase().includes(d.name.toLowerCase())) {
+                                let sumItems = 0;
+                                let sumPrice = 0;
+                                for (const m of marketplaceArray) {
+                                    // Prefer item_name when present (d.name might not exist in this dataset)
+                                    if (lc(m.title).includes(lc(d.item_name || d.name))) {
                                         sumItems++;
-                                        sumPrice += e.price;
+                                        sumPrice += Number(m.price) || 0;
                                     }
                                 }
-                                const avgPrice = sumPrice / sumItems;
-                                avgBuy = avgPrice;
-                                avgSell = avgPrice;
+                                const avgPrice = sumItems > 0 ? (sumPrice / sumItems) : 0;
+                                avgBuy = avgPrice || 0;
+                                avgSell = avgPrice || 0;
                             }
 
                             const terminalItem = {
