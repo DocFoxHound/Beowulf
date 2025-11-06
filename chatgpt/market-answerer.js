@@ -1,6 +1,6 @@
 // Market and item answerers built atop the data-cache. Always return { text, meta? }.
 
-const { maybeLoadOnce, refreshFromDb, findItem, whereItemAvailable, summarizeMovement, getCache, getRelations } = require('./data-cache');
+const { maybeLoadOnce, refreshFromDb, findItem, whereItemAvailable, summarizeMovement, getCache, getRelations, getMeta } = require('./data-cache');
 
 function fmtNum(n) { const x = Number(n || 0); return isFinite(x) ? Math.round(x).toLocaleString() : String(n); }
 
@@ -45,7 +45,23 @@ function renderLocations(rows, { top = 5, mode = 'buy' }) {
       : 'No sell prices found.';
   }
   const ordered = scored.sort((a, b) => mode === 'buy' ? a.score - b.score : b.score - a.score).slice(0, top);
-  const lines = ordered.map(r => `- ${r.location}: ${mode === 'buy' ? 'buy' : 'sell'} at ${fmtNum(mode === 'buy' ? r.buy : r.sell)} ${r.currency || 'aUEC'}`);
+  const lines = ordered.map(r => {
+    const price = mode === 'buy' ? r.buy : r.sell;
+    const markerBits = [];
+    if (r.avg_snapshot) markerBits.push('avg');
+    const sellReports = Number(r.price_sell_users_rows || 0);
+    const buyReports = Number(r.price_buy_users_rows || 0);
+    if (sellReports > 0 || buyReports > 0) markerBits.push(`reports sell ${fmtNum(sellReports)} / buy ${fmtNum(buyReports)}`);
+    if (mode === 'buy') {
+      if (isFinite(Number(r.scu_buy_max))) markerBits.push(`cap ${fmtNum(r.scu_buy_max)} SCU/tx`);
+      else if (isFinite(Number(r.scu_buy))) markerBits.push(`stock ${fmtNum(r.scu_buy)} SCU`);
+    } else {
+      if (isFinite(Number(r.scu_sell_max))) markerBits.push(`cap ${fmtNum(r.scu_sell_max)} SCU/tx`);
+      else if (isFinite(Number(r.scu_sell_stock))) markerBits.push(`stock ${fmtNum(r.scu_sell_stock)} SCU`);
+    }
+    const marker = markerBits.length ? ` (${markerBits.join('; ')})` : '';
+    return `- ${r.location}: ${mode === 'buy' ? 'buy' : 'sell'} at ${fmtNum(price)} ${r.currency || 'aUEC'}${marker}`;
+  });
   return lines.join('\n');
 }
 
@@ -59,6 +75,74 @@ module.exports = {
       refreshFromDb().catch(()=>{});
     }
     return true;
+  },
+  // System-scoped buy helper: ranks best buys within a specific star system
+  async bestBuyLocationsInSystem({ name, system, top = 5, areaType = null }) {
+    await ensureData();
+    const item = findItem(name) || { name };
+    const rowsAll = pickRowsForItem(item.name, null, areaType);
+    const sys = String(system || '').trim().toLowerCase();
+    const rows = rowsAll.filter(r => String(r.star_system_name || r.location || '').toLowerCase().includes(sys));
+    const header = `Best buy locations for ${item.name} in ${system}:`;
+    let body = renderLocations(rows, { top, mode: 'buy' });
+    const hasBuy = Array.isArray(rows) && rows.some(r => isFinite(Number(r.buy)) && Number(r.buy) > 0);
+    if (hasBuy) return { text: [header, body].filter(Boolean).join('\n') };
+    // Fallback: average price guidance if summaries exist
+    try {
+      const d = getCache();
+      const summaries = ([]).concat(d.itemsSummary || [], d.commoditiesSummary || []);
+      const nm = String(item.name || '').trim().toLowerCase();
+      const summary = summaries.find(r => String(r.commodity_name || '').trim().toLowerCase() === nm);
+      const avgBuy = summary ? Number(summary.price_buy_avg) || 0 : 0;
+      const avgSell = summary ? Number(summary.price_sell_avg) || 0 : 0;
+      const avgLine = avgBuy > 0 ? `Approx average buy price: ${Math.round(avgBuy).toLocaleString()} aUEC${avgSell>0?` (avg sell ${Math.round(avgSell).toLocaleString()} aUEC)`:''}` : 'No price average available yet.';
+      body = [avgLine, 'Structured terminal-level buy prices not loaded yet.', 'Load UEX/market tables for precise per-terminal buy prices.'].join('\n');
+    } catch {}
+    return { text: [header, body].filter(Boolean).join('\n') };
+  },
+  // Combined profit suggestion: pick lowest buy and highest sell (different locations), optionally scoped by system
+  async combinedProfitSuggestion({ name, system = null, areaType = null, quantity = null }) {
+    await ensureData();
+    const item = findItem(name) || { name };
+    const rowsAll = pickRowsForItem(item.name, null, areaType);
+    const sys = String(system || '').trim().toLowerCase();
+    const rows = sys ? rowsAll.filter(r => String(r.star_system_name || r.location || '').toLowerCase().includes(sys)) : rowsAll;
+    const buys = rows.filter(r => isFinite(Number(r.buy)) && Number(r.buy) > 0).sort((a,b)=>Number(a.buy)-Number(b.buy));
+    const sells = rows.filter(r => isFinite(Number(r.sell)) && Number(r.sell) > 0).sort((a,b)=>Number(b.sell)-Number(a.sell));
+    const header = `Profit suggestion for ${item.name}${system?` in ${system}`:''}:`;
+    if (!buys.length || !sells.length) {
+      return { text: `${header}\nI need both buy and sell prices to suggest a route. Load UEX/market tables or wait for terminal snapshots.` };
+    }
+    let best = null, bestMargin = -Infinity;
+    const maxCandidates = 6;
+    for (let i=0;i<Math.min(maxCandidates,buys.length);i++) {
+      for (let j=0;j<Math.min(maxCandidates,sells.length);j++) {
+        const b = buys[i], s = sells[j];
+        if (!b || !s) continue;
+        if (String(b.location) === String(s.location)) continue; // need movement
+        const margin = Number(s.sell) - Number(b.buy);
+        if (margin <= 0) continue;
+        if (margin > bestMargin) {
+          bestMargin = margin;
+          best = { buyAt: b.location, buy: b.buy, sellAt: s.location, sell: s.sell, margin, buyAvg: !!b.avg_snapshot, sellAvg: !!s.avg_snapshot };
+        }
+      }
+    }
+    if (!best) return { text: `${header}\nNo positive margin found among current price rows.` };
+    const qty = Number(quantity || 0);
+    const total = qty > 0 ? qty * Number(best.margin) : null;
+    const avgTag = (rAvg) => rAvg ? ' (avg)' : '';
+    const line = `Buy at ${best.buyAt} for ${fmtNum(best.buy)} aUEC${avgTag(best.buyAvg)}, sell at ${best.sellAt} for ${fmtNum(best.sell)} aUEC${avgTag(best.sellAvg)} — margin ${fmtNum(best.margin)} aUEC${qty>0?` per SCU; total ~${fmtNum(total)} aUEC for ${fmtNum(qty)} SCU`:''}.`;
+    // Provide alternates (next top 2 sells if different locations)
+    const altSells = sells
+      .filter(s => String(s.location) !== String(best.sellAt))
+      .slice(0,2)
+      .map(s => {
+        const m = Number(s.sell) - Number(best.buy);
+        const mTot = qty > 0 ? m * qty : null;
+        return `Alt sell: ${s.location} @ ${fmtNum(s.sell)} aUEC${s.avg_snapshot?' (avg)':''}${m>0?` — margin ${fmtNum(m)} aUEC${qty>0?` (total ~${fmtNum(mTot)})`:''}`:''}`;
+      });
+    return { text: [header, line, ...altSells].join('\n') };
   },
   // Compute best overall profit routes across all commodities/items, constrained by location if provided
   async bestOverallProfitRoute({ top = 5, location = null } = {}) {
@@ -219,7 +303,130 @@ module.exports = {
     const rows = pickRowsForItem(item.name, location, areaType);
     const scopeBit = areaType ? ` (${areaType})` : '';
     const header = `Best sell locations for ${item.name}${location ? ` near ${location}` : ''}${scopeBit}:`;
-    const body = renderLocations(rows, { top, mode: 'sell' });
+    let body = renderLocations(rows, { top, mode: 'sell' });
+    // If we actually have any sell values, keep the rendered list and skip fallback guidance entirely
+    const hasSell = Array.isArray(rows) && rows.some(r => isFinite(Number(r.sell)) && Number(r.sell) > 0);
+    if (hasSell) {
+      return { text: [header, body].filter(Boolean).join('\n') };
+    }
+    // Graceful fallback: if we have no structured per-terminal sell prices, attempt an aggregate + heuristic suggestion
+    if (/structured market data/i.test(body) || /No sell prices found\./i.test(body)) {
+      try {
+        const d = getCache();
+        const meta = (typeof getMeta === 'function') ? getMeta() : null;
+        // Attempt summary-level average price
+        const summaries = ([]).concat(d.itemsSummary || [], d.commoditiesSummary || []);
+        const nm = String(item.name || '').trim().toLowerCase();
+        const summary = summaries.find(r => String(r.commodity_name || '').trim().toLowerCase() === nm);
+        const avgSell = summary ? Number(summary.price_sell_avg) || 0 : 0;
+        const avgBuy = summary ? Number(summary.price_buy_avg) || 0 : 0;
+        // Use refinery yields for heuristic "likely terminals" (high yield locations often co-located with trade terminals)
+        const yields = (d.refineryYields || []).filter(r => String(r.commodity_name || '').toLowerCase().includes(nm));
+        yields.sort((a,b)=>Number(b.value||0)-Number(a.value||0));
+        const takeYields = yields.slice(0, Math.max(3, Math.min(8, top)));
+        const locStr = (r) => r.terminal_name || r.space_station_name || r.outpost_name || r.city_name || r.moon_name || r.planet_name || r.star_system_name || 'Unknown';
+        const fmtPct = (v) => isFinite(Number(v)) && Number(v) > 0 ? `${Math.round(Number(v))}%` : '—';
+        const yieldLines = takeYields.map(r => `- ${locStr(r)}: refinery yield ${fmtPct(r.value)}`);
+        // If we can produce any heuristic lines, replace body with fallback guidance
+        const avgLine = avgSell > 0 ? `Approx average sell price: ${Math.round(avgSell).toLocaleString()} aUEC${avgBuy>0?` (avg buy ${Math.round(avgBuy).toLocaleString()} aUEC)`:''}` : 'No price average available yet.';
+        const configHint = (meta && meta.uex && meta.uex.configOk === false) ? ` (UEX API not configured: ${meta.uex.configError})` : '';
+        const guidanceIntro = 'Structured terminal-level sell prices not loaded yet' + configHint + '.';
+        if (avgSell > 0 || yieldLines.length) {
+          body = [guidanceIntro, avgLine, yieldLines.length ? 'Potential sell locations (yield heuristic):' : null, yieldLines.length ? yieldLines.join('\n') : null, 'Load full UEX/market tables for precise per-terminal sell prices.'].filter(Boolean).join('\n');
+        } else {
+          // Absolute fallback: static well-known trade hubs (kept minimal; adjust when dynamic data loads)
+          const hubs = ['MIC-L5', 'ARC-L1', 'MIC-L2', 'Magnus Gateway', 'ARC-L2'];
+          body = [guidanceIntro, 'Try major trade/refinery hubs while data loads:', ...hubs.map(h => `- ${h}`), 'Load UEX/market tables for precise per-terminal sell prices.'].join('\n');
+        }
+      } catch (e) {
+        // Keep original body if fallback logic fails
+        if (process.env.DEBUG_MARKET_FALLBACK === 'true') console.error('bestSellLocations fallback failed:', e?.message || e);
+      }
+    }
+    return { text: [header, body].filter(Boolean).join('\n') };
+  },
+  // Terminal detail for a specific item at a specific terminal (by name), optionally scoped by system
+  async terminalDetail({ name, terminal, system = null, areaType = null }) {
+    await ensureData();
+    const item = findItem(name) || { name };
+    const rowsAll = pickRowsForItem(item.name, null, areaType);
+    const rel = (typeof getRelations === 'function') ? getRelations() : null;
+    const n = (s) => String(s || '').trim().toLowerCase();
+    const tQuery = n(terminal);
+    const sys = n(system);
+    const scoreRow = (r) => {
+      if (!r) return -1;
+      // System filter first
+      if (sys && !n(r.star_system_name || r.location || '').includes(sys)) return -1;
+      const loc = n(r.location);
+      let score = 0;
+      if (loc.includes(tQuery)) score = Math.max(score, 1);
+      const tId = r.id_terminal != null ? String(r.id_terminal) : null;
+      const tName = tId && rel && rel.terminalsById ? rel.terminalsById[tId]?.name : null;
+      if (tName) {
+        const tn = n(tName);
+        if (tn === tQuery) score = Math.max(score, 3);
+        else if (tn.includes(tQuery) || tQuery.includes(tn)) score = Math.max(score, 2);
+      }
+      return score;
+    };
+    const scored = rowsAll.map(r => ({ r, s: scoreRow(r) })).filter(x => x.s > 0);
+    if (!scored.length) {
+      const scope = system ? ` in ${system}` : '';
+      return { text: `No data for ${item.name} at ${terminal}${scope} yet.` };
+    }
+    scored.sort((a,b)=>b.s - a.s);
+    const row = scored[0].r;
+    const header = `Terminal details — ${item.name} at ${terminal}${system?` in ${system}`:''}:`;
+    const avgTagBuy = row.avg_snapshot && isFinite(Number(row.buy)) ? ' (avg)' : '';
+    const avgTagSell = row.avg_snapshot && isFinite(Number(row.sell)) ? ' (avg)' : '';
+    const buyLine = isFinite(Number(row.buy)) && Number(row.buy) > 0
+      ? `Buy: ${fmtNum(row.buy)} aUEC${avgTagBuy}${Number(row.price_buy_users_rows||0)>0?`, reports ${fmtNum(Number(row.price_buy_users_rows||0))}`:''}${isFinite(Number(row.scu_buy_max))?`, cap ${fmtNum(row.scu_buy_max)} SCU/tx`: (isFinite(Number(row.scu_buy))?`, stock ${fmtNum(row.scu_buy)} SCU`: '')}`
+      : 'Buy: —';
+    const sellLine = isFinite(Number(row.sell)) && Number(row.sell) > 0
+      ? `Sell: ${fmtNum(row.sell)} aUEC${avgTagSell}${Number(row.price_sell_users_rows||0)>0?`, reports ${fmtNum(Number(row.price_sell_users_rows||0))}`:''}${isFinite(Number(row.scu_sell_max))?`, cap ${fmtNum(row.scu_sell_max)} SCU/tx`: (isFinite(Number(row.scu_sell_stock))?`, stock ${fmtNum(row.scu_sell_stock)} SCU`: '')}`
+      : 'Sell: —';
+    const confidence = row.avg_snapshot ? 'Note: values marked (avg) are aggregated from recent user reports, not direct per-transaction prices.' : null;
+    return { text: [header, `- ${buyLine}`, `- ${sellLine}`, confidence].filter(Boolean).join('\n') };
+  },
+  // System-scoped sell helper: ranks best sells within a specific star system
+  async bestSellLocationsInSystem({ name, system, top = 5, areaType = null }) {
+    await ensureData();
+    const item = findItem(name) || { name };
+    const rowsAll = pickRowsForItem(item.name, null, areaType);
+    const sys = String(system || '').trim().toLowerCase();
+    const rows = rowsAll.filter(r => String(r.star_system_name || r.location || '').toLowerCase().includes(sys));
+    const header = `Best sell locations for ${item.name} in ${system}:`;
+    let body = renderLocations(rows, { top, mode: 'sell' });
+    const hasSell = Array.isArray(rows) && rows.some(r => isFinite(Number(r.sell)) && Number(r.sell) > 0);
+    if (hasSell) return { text: [header, body].filter(Boolean).join('\n') };
+    // Fallback mirrors bestSellLocations
+    try {
+      const d = getCache();
+      const meta = (typeof getMeta === 'function') ? getMeta() : null;
+      const summaries = ([]).concat(d.itemsSummary || [], d.commoditiesSummary || []);
+      const nm = String(item.name || '').trim().toLowerCase();
+      const summary = summaries.find(r => String(r.commodity_name || '').trim().toLowerCase() === nm);
+      const avgSell = summary ? Number(summary.price_sell_avg) || 0 : 0;
+      const avgBuy = summary ? Number(summary.price_buy_avg) || 0 : 0;
+      const yields = (d.refineryYields || []).filter(r => String(r.commodity_name || '').toLowerCase().includes(nm) && String(r.star_system_name || '').toLowerCase().includes(sys));
+      yields.sort((a,b)=>Number(b.value||0)-Number(a.value||0));
+      const takeYields = yields.slice(0, Math.max(3, Math.min(8, top)));
+      const locStr = (r) => r.terminal_name || r.space_station_name || r.outpost_name || r.city_name || r.moon_name || r.planet_name || r.star_system_name || 'Unknown';
+      const fmtPct = (v) => isFinite(Number(v)) && Number(v) > 0 ? `${Math.round(Number(v))}%` : '—';
+      const yieldLines = takeYields.map(r => `- ${locStr(r)}: refinery yield ${fmtPct(r.value)}`);
+      const avgLine = avgSell > 0 ? `Approx average sell price: ${Math.round(avgSell).toLocaleString()} aUEC${avgBuy>0?` (avg buy ${Math.round(avgBuy).toLocaleString()} aUEC)`:''}` : 'No price average available yet.';
+      const configHint = (meta && meta.uex && meta.uex.configOk === false) ? ` (UEX API not configured: ${meta.uex.configError})` : '';
+      const guidanceIntro = 'Structured terminal-level sell prices not loaded yet' + configHint + '.';
+      if (avgSell > 0 || yieldLines.length) {
+        body = [guidanceIntro, avgLine, yieldLines.length ? `Potential sell locations in ${system} (yield heuristic):` : null, yieldLines.length ? yieldLines.join('\n') : null, 'Load full UEX/market tables for precise per-terminal sell prices.'].filter(Boolean).join('\n');
+      } else {
+        const hubs = ['MIC-L5', 'ARC-L1', 'MIC-L2', 'Magnus Gateway', 'ARC-L2'];
+        body = [guidanceIntro, `Try major trade/refinery hubs in ${system} while data loads:`, ...hubs.map(h => `- ${h}`), 'Load UEX/market tables for precise per-terminal sell prices.'].join('\n');
+      }
+    } catch (e) {
+      if (process.env.DEBUG_MARKET_FALLBACK === 'true') console.error('bestSellLocationsInSystem fallback failed:', e?.message || e);
+    }
     return { text: [header, body].filter(Boolean).join('\n') };
   },
   async spotFor({ name, top = 6, location = null, areaType = null }) {

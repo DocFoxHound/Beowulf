@@ -231,3 +231,32 @@ async function handleHitPostUpdate(client, hitBefore, hitAfter) {
 }
 
 module.exports.handleHitPostUpdate = handleHitPostUpdate;
+
+// --- Deletion helper: append a deletion embed into existing thread ---
+async function handleHitPostDelete(client, hit) {
+    try {
+        const threadId = hit?.thread_id || hit?.threadId;
+        if (!threadId) return; // Nothing to post into
+        const channel = await client.channels.fetch(threadId).catch(() => null);
+        if (!channel) return;
+
+        const embed = new EmbedBuilder()
+            .setTitle(`Hit deleted by ${hit?.nickname || hit?.username || 'Unknown'}`)
+            .setDescription('This hit has been removed from the database. The thread is preserved for historical context and discussion.')
+            .addFields(
+                { name: 'Hit ID', value: toEmbedValue(hit?.id), inline: true },
+                { name: 'Type', value: toEmbedValue(hit?.air_or_ground || hit?.type_of_piracy), inline: true },
+                { name: 'Total Value (aUEC)', value: toEmbedValue(hit?.total_value), inline: true },
+                { name: 'Total SCU', value: toEmbedValue(hit?.total_scu), inline: true },
+                { name: 'Assists', value: toEmbedValue(Array.isArray(hit?.assists) && hit.assists.length ? hit.assists.map(id=>`<@${id}>`).join(', ') : 'None'), inline: true },
+                { name: 'Original Timestamp', value: toEmbedValue(hit?.timestamp || hit?.created_at), inline: true },
+            )
+            .setColor(0xcc0000);
+
+        await channel.send({ embeds: [embed] });
+    } catch (e) {
+        console.error('handleHitPostDelete error:', e?.message || e);
+    }
+}
+
+module.exports.handleHitPostDelete = handleHitPostDelete;

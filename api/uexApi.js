@@ -1177,6 +1177,204 @@ async function deleteAllRefineryYields() {
     }
 }
 
+//--------------------------------------------
+//        ITEM CATEGORIES CONTROLLER          
+//--------------------------------------------
+
+async function getAllItemCategories() {
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/itemcategories/`;
+    try {
+        const response = await axios.get(apiUrl);
+        return response.data;
+    } catch (error) {
+        console.error('[UEX][itemcategories] list error:', error?.response?.data || error?.message);
+        return null;
+    }
+}
+
+async function getItemCategoryById(id){
+    const apiUrl = process.env.SERVER_URL;
+    try {
+        const response = await axios.get(`${apiUrl}${process.env.API_EXP_GER}/itemcategories/${id}`);
+        return response.data;
+    } catch (error) {
+        return null;
+    }
+}
+
+async function createOrUpdateItemCategory(data) {
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/itemcategories`;
+    try {
+        await axios.get(`${apiUrl}/${data.id}`);
+        await axios.put(`${apiUrl}/${data.id}`, data, { headers: { 'Content-Type': 'application/json' }, timeout: REQ_TIMEOUT });
+    } catch (error) {
+        if (error.response && error.response.status === 404) {
+            try {
+                await axios.post(apiUrl, data, { headers: { 'Content-Type': 'application/json' }, timeout: REQ_TIMEOUT });
+            } catch (e) {
+                console.error('[UEX][itemcategories] create failed:', e?.response?.data || e?.message);
+                throw e;
+            }
+        } else {
+            console.error('[UEX][itemcategories] upsert error:', error?.response?.data || error?.message);
+        }
+    }
+}
+
+async function createItemCategory(data) {
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/itemcategories`;
+    try {
+        await axios.post(apiUrl, data, { headers: { 'Content-Type': 'application/json' }, timeout: REQ_TIMEOUT });
+        return true;
+    } catch (error) {
+        console.error('[UEX][itemcategories] create failed:', error?.response?.data || error?.message);
+        return false;
+    }
+}
+
+async function deleteAllItemCategories() {
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/itemcategories`;
+    try {
+        await axios.delete(apiUrl);
+        return true;
+    } catch (error) {
+        console.error('[UEX][itemcategories] delete-all failed:', error?.response?.data || error?.message);
+        return false;
+    }
+}
+
+//--------------------------------------------
+//                 ITEMS CONTROLLER          
+//--------------------------------------------
+
+async function getAllItems() {
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/items/`;
+    try {
+        const response = await axios.get(apiUrl);
+        return response.data;
+    } catch (error) {
+        console.error('[UEX][items] list error:', error?.response?.data || error?.message);
+        return null;
+    }
+}
+
+async function getItemById(id){
+    const apiUrl = process.env.SERVER_URL;
+    try {
+        const response = await axios.get(`${apiUrl}${process.env.API_EXP_GER}/items/${id}`);
+        return response.data;
+    } catch (error) {
+        return null;
+    }
+}
+
+async function createOrUpdateItem(data) {
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/items`;
+    try {
+        await axios.get(`${apiUrl}/${data.id}`);
+        await axios.put(`${apiUrl}/${data.id}`, data, { headers: { 'Content-Type': 'application/json' }, timeout: REQ_TIMEOUT });
+    } catch (error) {
+        if (error.response && error.response.status === 404) {
+            try {
+                await axios.post(apiUrl, data, { headers: { 'Content-Type': 'application/json' }, timeout: REQ_TIMEOUT });
+            } catch (e) {
+                console.error('[UEX][items] create failed:', e?.response?.data || e?.message);
+                throw e;
+            }
+        } else {
+            console.error('[UEX][items] upsert error:', error?.response?.data || error?.message);
+        }
+    }
+}
+
+async function createItem(data) {
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/items`;
+    try {
+        await axios.post(apiUrl, data, { headers: { 'Content-Type': 'application/json' }, timeout: REQ_TIMEOUT });
+        return true;
+    } catch (error) {
+        console.error('[UEX][items] create failed:', error?.response?.data || error?.message);
+        return false;
+    }
+}
+
+async function deleteAllItems() {
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/items`;
+    try {
+        await axios.delete(apiUrl);
+        return true;
+    } catch (error) {
+        console.error('[UEX][items] delete-all failed:', error?.response?.data || error?.message);
+        return false;
+    }
+}
+
+//--------------------------------------------
+//           MARKET AVERAGES CONTROLLER      
+//--------------------------------------------
+
+async function getAllMarketAverages() {
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/marketaverages/`;
+    try {
+        const response = await axios.get(apiUrl);
+        return response.data;
+    } catch (error) {
+        console.error('[UEX][marketaverages] list error:', error?.response?.data || error?.message);
+        return null;
+    }
+}
+
+async function getMarketAverageById(id){
+    const apiUrl = process.env.SERVER_URL;
+    try {
+        const response = await axios.get(`${apiUrl}${process.env.API_EXP_GER}/marketaverages/${id}`);
+        return response.data;
+    } catch (error) {
+        return null;
+    }
+}
+
+async function createOrUpdateMarketAverage(data) {
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/marketaverages`;
+    try {
+        await axios.get(`${apiUrl}/${data.id}`);
+        await axios.put(`${apiUrl}/${data.id}`, data, { headers: { 'Content-Type': 'application/json' }, timeout: REQ_TIMEOUT });
+    } catch (error) {
+        if (error.response && error.response.status === 404) {
+            try {
+                await axios.post(apiUrl, data, { headers: { 'Content-Type': 'application/json' }, timeout: REQ_TIMEOUT });
+            } catch (e) {
+                console.error('[UEX][marketaverages] create failed:', e?.response?.data || e?.message);
+                throw e;
+            }
+        } else {
+            console.error('[UEX][marketaverages] upsert error:', error?.response?.data || error?.message);
+        }
+    }
+}
+
+async function createMarketAverage(data) {
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/marketaverages`;
+    try {
+        await axios.post(apiUrl, data, { headers: { 'Content-Type': 'application/json' }, timeout: REQ_TIMEOUT });
+        return true;
+    } catch (error) {
+        console.error('[UEX][marketaverages] create failed:', error?.response?.data || error?.message);
+        return false;
+    }
+}
+
+async function deleteAllMarketAverages() {
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/marketaverages`;
+    try {
+        await axios.delete(apiUrl);
+        return true;
+    } catch (error) {
+        console.error('[UEX][marketaverages] delete-all failed:', error?.response?.data || error?.message);
+        return false;
+    }
+}
+
 module.exports = {
     getAllCities,
     getCityById,
@@ -1255,4 +1453,22 @@ module.exports = {
     createOrUpdateRefineryYield,
     createRefineryYield,
     deleteAllRefineryYields,
+    // Item Categories
+    getAllItemCategories,
+    getItemCategoryById,
+    createOrUpdateItemCategory,
+    createItemCategory,
+    deleteAllItemCategories,
+    // Items
+    getAllItems,
+    getItemById,
+    createOrUpdateItem,
+    createItem,
+    deleteAllItems,
+    // Market Averages
+    getAllMarketAverages,
+    getMarketAverageById,
+    createOrUpdateMarketAverage,
+    createMarketAverage,
+    deleteAllMarketAverages,
 };

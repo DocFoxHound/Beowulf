@@ -2,6 +2,7 @@ const axios = require('axios');
 const UEX = require('../api/uexApi');
 
 let marketplaceArray = []; // Declare marketplaceArray outside the function to persist data
+let categoriesArray = [];   // Cache item categories for items iteration
 
 async function processUEXData(whichTable){
     console.log(`Updating UEX ${whichTable} Items`)
@@ -10,10 +11,14 @@ async function processUEXData(whichTable){
     let allTerminals;
     let totalTerminals = 0;
     const DEBUG = (process.env.UEX_DEBUG_LOG || 'false').toLowerCase() === 'true';
+    const SKIP_TERMINALS = (process.env.UEX_SKIP_TERMINALS || 'false').toLowerCase() === 'true';
     const apiKey = `?api_key=${encodeURIComponent(process.env.UEX_CORP_API_TOKEN)}`
     if(whichTable === "all"){
         apiUrls.push({url: `https://api.uexcorp.space/2.0/cities${apiKey}`, title: "cities", iterate: false});
-        apiUrls.push({url: `https://api.uexcorp.space/2.0/marketplace_listings${apiKey}}`, title: "marketplace", iterate: false});
+        // marketplace_averages replaces marketplace_listings entirely
+        apiUrls.push({url: `https://api.uexcorp.uk/2.0/marketplace_averages_all${apiKey}`, title: "marketplace_averages", iterate: false});
+        apiUrls.push({url: `https://api.uexcorp.uk/2.0/categories${apiKey}`, title: "item_categories", iterate: false});
+        apiUrls.push({url: `https://api.uexcorp.uk/2.0/items?id_category=`, title: "items", iterate: true});
         apiUrls.push({url: `https://api.uexcorp.space/2.0/commodities${apiKey}`, title: "commodities", iterate: false});
         apiUrls.push({url: `https://api.uexcorp.space/2.0/commodities_prices_all${apiKey}`, title: "commodities_by_terminal", iterate: false});
         apiUrls.push({url: `https://api.uexcorp.space/2.0/items_prices_all${apiKey}`, title: "items_by_terminal", iterate: false});
@@ -28,13 +33,15 @@ async function processUEXData(whichTable){
     }else if(whichTable === "cities"){
         apiUrls.push({url: `https://api.uexcorp.space/2.0/cities${apiKey}`, title: "cities", iterate: false});
     }else if(whichTable === "commodities"){
-        apiUrls.push({url: `https://api.uexcorp.space/2.0/marketplace_listings${apiKey}}`, title: "marketplace", iterate: false});
+        apiUrls.push({url: `https://api.uexcorp.uk/2.0/marketplace_averages_all${apiKey}`, title: "marketplace_averages", iterate: false});
         apiUrls.push({url: `https://api.uexcorp.space/2.0/commodities${apiKey}`, title: "commodities", iterate: false});
     }else if(whichTable === "commodities_by_terminal"){
-        apiUrls.push({url: `https://api.uexcorp.space/2.0/marketplace_listings${apiKey}`, title: "marketplace", iterate: false});
+        apiUrls.push({url: `https://api.uexcorp.uk/2.0/marketplace_averages_all${apiKey}`, title: "marketplace_averages", iterate: false});
         apiUrls.push({url: `https://api.uexcorp.space/2.0/commodities_prices_all${apiKey}`, title: "commodities_by_terminal", iterate: false});
     }else if(whichTable === "items_by_terminal"){
-        apiUrls.push({url: `https://api.uexcorp.space/2.0/marketplace_listings${apiKey}`, title: "marketplace", iterate: false});
+        apiUrls.push({url: `https://api.uexcorp.uk/2.0/marketplace_averages_all${apiKey}`, title: "marketplace_averages", iterate: false});
+        apiUrls.push({url: `https://api.uexcorp.uk/2.0/categories${apiKey}`, title: "item_categories", iterate: false});
+        apiUrls.push({url: `https://api.uexcorp.uk/2.0/items?id_category=`, title: "items", iterate: true});
         apiUrls.push({url: `https://api.uexcorp.space/2.0/items_prices_all${apiKey}`, title: "items_by_terminal", iterate: false});
     }else if(whichTable === "outposts"){
         apiUrls.push({url: `https://api.uexcorp.space/2.0/outposts${apiKey}`, title: "outposts", iterate: false});
@@ -51,7 +58,7 @@ async function processUEXData(whichTable){
     }else if(whichTable === "terminals"){
         apiUrls.push({url: `https://api.uexcorp.space/2.0/terminals${apiKey}`, title: "terminals", iterate: false});
     }else if(whichTable === "terminal_prices"){
-        apiUrls.push({url: `https://api.uexcorp.space/2.0/marketplace_listings${apiKey}`, title: "marketplace", iterate: false});
+        apiUrls.push({url: `https://api.uexcorp.uk/2.0/marketplace_averages_all${apiKey}`, title: "marketplace_averages", iterate: false});
         apiUrls.push({url: `https://api.uexcorp.space/2.0/commodities${apiKey}`, title: "commodities", iterate: false});
         apiUrls.push({url: `https://api.uexcorp.space/2.0/terminals${apiKey}`, title: "terminals", iterate: false});
         apiUrls.push({url: `https://api.uexcorp.space/2.0/commodities_prices?id_terminal=`, title: "terminal_prices", iterate: true});
@@ -64,10 +71,18 @@ async function processUEXData(whichTable){
         apiUrls.push({url: `https://api.uexcorp.space/2.0/moons${apiKey}`, title: "moons", iterate: false});
         apiUrls.push({url: `https://api.uexcorp.uk/2.0/refineries_yields${apiKey}`, title: "refineries_yields", iterate: false}); 
     }
+    // Optional: skip terminal-related endpoints entirely for debugging/testing (env: UEX_SKIP_TERMINALS=true)
+    if (SKIP_TERMINALS) {
+        const beforeCount = apiUrls.length;
+        apiUrls = apiUrls.filter(e => ![
+            'terminals', 'terminal_prices', 'commodities_by_terminal', 'items_by_terminal'
+        ].includes(e.title));
+        if (DEBUG) console.log(`[UEX] SKIP_TERMINALS active -> filtered ${beforeCount - apiUrls.length} terminal-related endpoints out of ${beforeCount}`);
+    }
     // Defer deletions: we'll clear tables right before inserting the freshly fetched data for each category
 
     for (const api of apiUrls) {
-        if(api.iterate === false && api.title !== "ships" && api.title !== "vehicles"){
+    if(api.iterate === false && api.title !== "ships" && api.title !== "vehicles"){
             await delay(2000); // Wait for 2 seconds to abide rate limits
             try {
                 const response = await axios.get(api.url, {
@@ -96,7 +111,7 @@ async function processUEXData(whichTable){
                 console.error(`[UEX][fetch][error] title=${api.title} url=${api.url} status=${status} msg=${error?.message}`);
                 if (DEBUG) console.error(`[UEX][fetch][error][body]`, body);
             }
-        }else if(api.title === "ships"){
+    }else if(api.title === "ships"){
             try{
                 const ships = await axios.get(api.url);
                 const vehicles = await axios.get(`https://api.uexcorp.space/2.0/vehicles${apiKey}`);
@@ -118,7 +133,7 @@ async function processUEXData(whichTable){
 
 
             
-        }else if (api.title === "terminal_prices"){
+    }else if (api.title === "terminal_prices"){
             totalTerminals = allTerminals.data.length;
             let individualTerminalData = [];
             const totalCount = allTerminals.data.length;
@@ -156,6 +171,46 @@ async function processUEXData(whichTable){
             console.log(`[UEX][terminal_prices] completed: ok=${successCount}, fail=${failCount}`);
             await clearTablesForTitle(api.title);
             await sendToDb(api.title, individualTerminalData);  
+        } else if (api.title === 'items') {
+            // Iterate over categories and fetch items per category with throttling
+            // Ensure we have categories loaded; if not, try to fetch on the fly
+            if (!Array.isArray(categoriesArray) || categoriesArray.length === 0) {
+                try {
+                    const catResp = await axios.get(`https://api.uexcorp.uk/2.0/categories${apiKey}`);
+                    categoriesArray = catResp.data?.data || [];
+                } catch (e) {
+                    console.error('[UEX][items] failed to prefetch categories:', e?.response?.status, e?.message);
+                    categoriesArray = [];
+                }
+            }
+            const totalCount = categoriesArray.length;
+            let processed = 0, ok = 0, fail = 0;
+            const allItemsData = [];
+            console.log(`[UEX][items] starting per-category fetch: total=${totalCount}`);
+            for (const cat of categoriesArray) {
+                await delay(1050);
+                const url = `${api.url}${encodeURIComponent(cat.id)}${apiKey}`;
+                try {
+                    const response = await axios.get(url);
+                    const data = response.data;
+                    if (DEBUG) {
+                        const count = Array.isArray(data?.data) ? data.data.length : 'n/a';
+                        console.log(`[UEX][fetch] items GET ok category=${cat.id} status=${response.status} count=${count}`);
+                    }
+                    allItemsData.push(data);
+                    ok++;
+                } catch (e) {
+                    console.error(`[UEX][fetch][error] title=items category=${cat?.id} status=${e?.response?.status} msg=${e?.message}`);
+                    fail++;
+                }
+                processed++;
+                if (processed % 20 === 0 || processed === totalCount) {
+                    console.log(`[UEX][items] progress: ${processed}/${totalCount} done (ok=${ok}, fail=${fail})`);
+                }
+            }
+            console.log(`[UEX][items] completed: ok=${ok}, fail=${fail}`);
+            await clearTablesForTitle(api.title);
+            await sendToDb(api.title, allItemsData);
         }
     }
     console.log(`Finished processUEXData`)
@@ -181,8 +236,48 @@ async function sendToDb(title, data) {
                             await UEX.createMoon(d);
                         }
                         break;
-                    case "marketplace":
-                        marketplaceArray = item.data; // Populate marketplaceArray
+                    case "marketplace_averages":
+                        // Replace marketplace listings entirely; expect item.data is array of averages
+                        marketplaceArray = item.data; // Each element should have fields used for price estimation
+                        // Persist averages to DB if supported
+                        if (Array.isArray(item.data)) {
+                            for (const d of item.data) {
+                                // Sanitize market average payload (avoid invalid uuid: "")
+                                const payload = { ...d };
+                                if (!payload.item_uuid || String(payload.item_uuid).trim() === '') delete payload.item_uuid;
+                                try {
+                                    await UEX.createMarketAverage(payload);
+                                } catch (e) {
+                                    if (DEBUG) console.error('[UEX][db][error] market_average create failed:', e?.response?.status, e?.message);
+                                }
+                                // ALSO populate summarized items table directly from marketplace averages.
+                                // Mapping: summarized_items.id -> d.id_item (fallback d.id), commodity_name -> d.item_name,
+                                // price_buy_avg -> d.price_buy, price_sell_avg -> d.price_sell
+                                const sid = d.id_item != null ? d.id_item : d.id; // prefer explicit id_item
+                                if (sid != null && d.item_name) {
+                                    const summarized = {
+                                        id: sid,
+                                        commodity_name: d.item_name,
+                                        price_buy_avg: d.price_buy != null ? d.price_buy : 0,
+                                        price_sell_avg: d.price_sell != null ? d.price_sell : (d.price_buy != null ? d.price_buy : 0),
+                                    };
+                                    try {
+                                        // Use upsert to avoid duplicate-id validation errors
+                                        await UEX.createOrUpdateSummarizedItem(summarized);
+                                    } catch (e2) {
+                                        if (DEBUG) console.error('[UEX][db][error] summarized_item from market_average failed:', e2?.response?.status, e2?.message);
+                                    }
+                                }
+                            }
+                        }
+                        break;
+                    case "item_categories":
+                        categoriesArray = item.data || [];
+                        for(const d of categoriesArray){
+                            try { await UEX.createItemCategory(d); } catch(e){ if (DEBUG) console.error('[UEX][db][error] item_category create failed:', e?.response?.status, e?.message); }
+                        }
+                        break;
+                    case "marketplace_averages": // already handled above (dup safeguard)
                         break;
                     case "commodities":
                         // console.log("Marketplace Array:", marketplaceArray); // Verify marketplaceArray is populated
@@ -333,7 +428,12 @@ async function sendToDb(title, data) {
                                 price_sell_avg: avgSell || 0
                             };
                             await UEX.createTerminalItem(terminalItem);
-                            await UEX.createSummarizedItem(summaryItem);
+                            // Use upsert to avoid validation errors when summary already exists
+                            if (UEX.createOrUpdateSummarizedItem) {
+                                await UEX.createOrUpdateSummarizedItem(summaryItem);
+                            } else {
+                                await UEX.createSummarizedItem(summaryItem);
+                            }
                         }
                         break;
                     case "outposts":
@@ -385,6 +485,18 @@ async function sendToDb(title, data) {
                     case "refineries_yields":
                         for (const d of item.data) {
                             await UEX.createRefineryYield(d);
+                        }
+                        break;
+                    case "items":
+                        // Iterated items per category already shaped as {data: [...]} from iterative fetch
+                        for(const d of item.data){
+                            // Sanitize blank uuid (postgres uuid type rejects empty string)
+                            const payload = { ...d };
+                            if (!payload.uuid || String(payload.uuid).trim() === '') delete payload.uuid;
+                            try { await UEX.createItem(payload); } catch(e){
+                                const status = e?.response?.status;
+                                console.error(`[UEX][db][error] items create failed id=${d?.id} name=${d?.name} status=${status} msg=${e?.message}`);
+                            }
                         }
                         break;
                 }
@@ -449,6 +561,15 @@ async function clearTablesForTitle(label){
             case 'ships':
                 await UEX.deleteAllShips();
                 break;
+            case 'item_categories':
+                await UEX.deleteAllItemCategories();
+                break;
+            case 'items':
+                await UEX.deleteAllItems();
+                break;
+            case 'marketplace_averages':
+                await UEX.deleteAllMarketAverages();
+                break;
             default:
                 // marketplace, game_version, or any non-persisted
                 break;
@@ -478,6 +599,10 @@ async function clearTablesForPlannedRun(titles){
         await runDelete('commodities_by_terminal', [UEX.deleteAllTerminalCommodities, UEX.deleteAllSummarizedCommodities]);
         await runDelete('items_by_terminal', [UEX.deleteAllTerminalItems, UEX.deleteAllSummarizedItems]);
         await runDelete('commodities', [UEX.deleteAllCommodities, UEX.deleteAllSummarizedCommodities]);
+        // New UEX datasets added to pipeline
+        await runDelete('item_categories', UEX.deleteAllItemCategories);
+        await runDelete('items', UEX.deleteAllItems);
+        await runDelete('marketplace_averages', UEX.deleteAllMarketAverages);
         await runDelete('terminals', UEX.deleteAllTerminals);
         await runDelete('cities', UEX.deleteAllCities);
         await runDelete('outposts', UEX.deleteAllOutposts);
@@ -487,7 +612,7 @@ async function clearTablesForPlannedRun(titles){
         await runDelete('moons', UEX.deleteAllMoons);
         await runDelete('refineries_yields', UEX.deleteAllRefineryYields);
         await runDelete('ships', UEX.deleteAllShips);
-        // Skip marketplace/game_version as they aren't persisted here
+        // Skip game_version here (not persisted by this loader)
     }catch(e){
         console.error('[UEX] Failed to clear tables for planned run:', e?.message || e);
     }

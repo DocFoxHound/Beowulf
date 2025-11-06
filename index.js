@@ -234,12 +234,12 @@ client.on("ready", async () => {
 
 
   preloadedDbTables = await preloadFromDb(); //leave on
-  await removeProspectFromFriendlies(client);
+  // await removeProspectFromFriendlies(client);
   await refreshUserlist(client, openai) //actually leave this here
   // Ensure SKILL_LEVEL_* roles are aligned at startup based on live Discord roles (RAPTOR/RAIDER)
   // try { await syncSkillLevelsFromGuild(client); } catch (e) { console.error('[Startup] Skill role sync failed:', e?.message || e); }
   // Ensure MEMBER role is aligned at startup based on CREW/MARAUDER/BLOODED
-  try { await makeMember(client); } catch (e) { console.error('[Startup] Member role sync failed:', e?.message || e); }
+  // try { await makeMember(client); } catch (e) { console.error('[Startup] Member role sync failed:', e?.message || e); }
   try { await ingestDailyChatSummaries(client, openai); } catch (e) { console.error('Initial chat ingest failed:', e); }
   try { await ingestHitLogs(client, openai); } catch (e) { console.error('Initial hit ingest failed:', e); }
   try { await ingestPlayerStats(client); } catch (e) { console.error('Initial player-stats ingest failed:', e); }

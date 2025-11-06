@@ -31,10 +31,14 @@ module.exports = {
             const channelId = process.env.LIVE_ENVIRONMENT === "true" ? process.env.AUDIT_CHANNEL : process.env.TEST_AUDIT_CHANNEL; // Replace with actual channel ID
             const channel = await client.channels.fetch(channelId);
             const logRecord = await getHitLogByEntryId(hitLog); // Fetch the kill log record
-            if(interaction.user.id !== logRecord.user_id){
+            // Allow: original author, Blooded, or moderator (already passed)
+            const isLive = process.env.LIVE_ENVIRONMENT === "true";
+            const bloodedRoleId = process.env[isLive ? 'BLOODED_ROLE' : 'TEST_BLOODED_ROLE'];
+            const hasBlooded = bloodedRoleId ? interaction.member?.roles?.cache?.has(bloodedRoleId) : false;
+            if(interaction.user.id !== logRecord.user_id && !hasBlooded){
                 const originalCreator = await getUserById(logRecord.user_id);
                 return interaction.reply({ 
-                    content: `Only ${originalCreator.username} or a Marauder+ can delete this black box: (${logRecord.id}).`, 
+                    content: `Only the original author, Blooded, or a moderator can delete this hit (${logRecord.id}).`, 
                     ephemeral: false 
                 });
             }

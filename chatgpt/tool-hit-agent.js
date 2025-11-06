@@ -177,6 +177,20 @@ async function runHitToolAgent(message, client, openai) {
           },
         },
       },
+      {
+        type: 'function',
+        function: {
+          name: 'delete_hit',
+          description: 'Delete a piracy hit-log entry by its numeric ID if and only if the requesting user is the original author.',
+          parameters: {
+            type: 'object',
+            properties: {
+              id: { type: 'number', description: 'The numeric ID of the hit to delete.' }
+            },
+            required: ['id']
+          }
+        }
+      }
     ];
 
     // System: coach the model to do slot-filling then tool call
@@ -184,6 +198,8 @@ async function runHitToolAgent(message, client, openai) {
 - Judge intent yourself.
 - For hit logging, ALWAYS confirm whether the hit was Air, Ground, or Mixed. Collect cargo details. Ask for victim names if mentioned or relevant. Then call create_hit once ready.
 - Never ask the user for the patch/version. You will auto-fill the current patch from the game versions.
+- For deletion requests like 'delete hit 123' or 'remove my hit', only proceed if the user clearly specifies the hit ID. If missing, ask for the ID. You may call delete_hit when confident.
+- If user tries to delete a hit they didn't author, respond that only the original author can delete it and DO NOT call delete_hit.
 - If the message is NOT about creating/logging a piracy hit, reply with exactly this token and nothing else: __NO_HIT__
 - Keep replies short and professional. Avoid pirate slang.`;
 
@@ -321,6 +337,44 @@ async function runHitToolAgent(message, client, openai) {
             } catch (e) { console.error('handleHitPost (tool agent) failed:', e?.message || e); }
 
             messages.push({ role: 'tool', tool_call_id: call.id, name, content: JSON.stringify({ ok: true, created }) });
+          } else if (name === 'delete_hit') {
+            const id = args.id;
+            if (!id || !Number.isFinite(Number(id))) {
+              messages.push({ role: 'tool', tool_call_id: call.id, name, content: JSON.stringify({ ok: false, error: 'Missing or invalid hit ID.' }) });
+              continue;
+            }
+            let hit = null;
+            try { hit = await require('../api/hitTrackerApi.js').getHitLogByEntryId(id); } catch {}
+            if (!hit) {
+              messages.push({ role: 'tool', tool_call_id: call.id, name, content: JSON.stringify({ ok: false, error: 'Hit not found.' }) });
+              continue;
+            }
+            const ownerId = String(hit.user_id || '');
+            const authorId = String(message.author?.id || '');
+            // Blooded role permission check (mirrors handler.js)
+            let blooded = false;
+            try {
+              const isLive = process.env.LIVE_ENVIRONMENT === 'true';
+              const roleId = process.env[isLive ? 'BLOODED_ROLE' : 'TEST_BLOODED_ROLE'];
+              const member = message.member;
+              if (roleId && member?.roles?.cache?.has(roleId)) blooded = true;
+            } catch {}
+            if (!ownerId || (ownerId !== authorId && !blooded)) {
+              messages.push({ role: 'tool', tool_call_id: call.id, name, content: JSON.stringify({ ok: false, error: 'Not authorized. Need owner or Blooded role.' }) });
+              continue;
+            }
+            const { deleteHitLog } = require('../api/hitTrackerApi.js');
+            const ok = await deleteHitLog(id).catch(()=>false);
+            if (ok) {
+              // Post deletion embed into thread, if exists
+              try {
+                const { handleHitPostDelete } = require('../functions/post-new-hit.js');
+                await handleHitPostDelete(client, hit);
+              } catch (e) { console.error('delete_hit post embed failed:', e?.message || e); }
+              messages.push({ role: 'tool', tool_call_id: call.id, name, content: JSON.stringify({ ok: true, deleted: { id } }) });
+            } else {
+              messages.push({ role: 'tool', tool_call_id: call.id, name, content: JSON.stringify({ ok: false, error: 'Deletion failed.' }) });
+            }
           } else {
             messages.push({ role: 'tool', tool_call_id: call.id, name, content: JSON.stringify({ ok: false, error: `Unknown tool ${name}` }) });
           }

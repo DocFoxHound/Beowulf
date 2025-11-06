@@ -4,12 +4,15 @@ const { sendResponse } = require('../threads/send-response.js');
 const { runWithResponses } = require('./responses-run.js');
 const { getUserById } = require('../api/userlistApi.js');
 const { ChatLogsModel } = require('../api/models/chat-logs');
-const { getAllHitLogs, getHitLogByThreadId, getHitLogsByUserId, getHitLogByEntryId, editHitLog } = require('../api/hitTrackerApi.js');
+const { getAllHitLogs, getHitLogByThreadId, getHitLogsByUserId, getHitLogByEntryId, editHitLog, deleteHitLog } = require('../api/hitTrackerApi.js');
 const { listKnowledge } = require('../api/knowledgeApi.js');
 const { createHitLog } = require('../api/hitTrackerApi.js');
 const { getAllGameVersions } = require('../api/gameVersionApi.js');
 const { getAllSummarizedItems, getAllSummarizedCommodities } = require('../api/uexApi.js');
 const { handleHitPost, handleHitPostUpdate } = require('../functions/post-new-hit.js');
+const { handleHitPostDelete } = require('../functions/post-new-hit.js');
+// Cache helpers for categories/items and fallback summaries
+const { maybeLoadOnce: cacheMaybeLoadOnce, refreshFromUex: cacheRefreshFromUex, getCache } = require('./data-cache');
 
 // Lightweight memory to reduce repetitive quick-replies in banter flows
 const lastQuickReplies = new Map(); // key: channelId:userId -> { text, ts }
@@ -69,6 +72,17 @@ function clearEditSession(message) {
   editHitSessions.delete(message.channelId);
 }
 
+// Permission helper: Blooded role elevated rights
+function hasBloodedRole(member) {
+  try {
+    if (!member?.roles?.cache) return false;
+    const isLive = process.env.LIVE_ENVIRONMENT === 'true';
+    const roleId = process.env[isLive ? 'BLOODED_ROLE' : 'TEST_BLOODED_ROLE'];
+    if (!roleId) return false;
+    return member.roles.cache.has(roleId);
+  } catch { return false; }
+}
+
 // Helpers for hit parsing/valuation
 const normalizeName = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
@@ -78,7 +92,25 @@ async function getPriceCatalog() {
       getAllSummarizedCommodities(),
       getAllSummarizedItems(),
     ]);
-    const list = ([]).concat(commodities || [], items || []);
+    let list = ([]).concat(commodities || [], items || []);
+    // Fallback to in-memory cache summaries if API/DB returns nothing
+    if (!list.length) {
+      try {
+        await cacheMaybeLoadOnce();
+        const cache = getCache();
+        const cs = Array.isArray(cache?.commoditiesSummary) ? cache.commoditiesSummary : [];
+        const is = Array.isArray(cache?.itemsSummary) ? cache.itemsSummary : [];
+        list = ([]).concat(cs, is);
+        if (!list.length) {
+          // Try a direct UEX refresh as last resort
+          await cacheRefreshFromUex();
+          const cache2 = getCache();
+          const cs2 = Array.isArray(cache2?.commoditiesSummary) ? cache2.commoditiesSummary : [];
+          const is2 = Array.isArray(cache2?.itemsSummary) ? cache2.itemsSummary : [];
+          list = ([]).concat(cs2, is2);
+        }
+      } catch {}
+    }
     const map = new Map();
     for (const it of list) {
       const key = normalizeName(it.commodity_name || it.name);
@@ -343,7 +375,7 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
     const isBot = message.author.id === client.user.id;
     if (isBot) return;
 
-    // Ultra-fast quick-edit lane anywhere: only trigger when there's an explicit edit verb
+  // Ultra-fast quick-edit lane anywhere: only trigger when there's an explicit edit verb
     try {
       const contentStr = String(message.content || '');
       const looksEditVerb = /(\b|^)(edit|update|change|fix|adjust|modify)(\b|$)/i.test(contentStr);
@@ -378,8 +410,8 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
           } else {
           const ownerId = String(hit.user_id || '');
           const authorId = String(message.author?.id || '');
-          if (!ownerId || ownerId !== authorId) {
-            await sendResponse(message, 'Only the original author can edit this hit.', true);
+          if (!ownerId || (ownerId !== authorId && !hasBloodedRole(message.member))) {
+            await sendResponse(message, 'Only the original author or Blooded role can edit this hit.', true);
             return;
           }
           // Build patch and recompute cuts based on current assists
@@ -417,6 +449,54 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
       }
     } catch (e) { /* non-fatal */ }
 
+    // Quick delete lane: recognize "delete/remove hit" and act if owner
+    try {
+      const contentStr = String(message.content || '');
+      const looksDeleteVerb = /(\b|^)(delete|remove|erase|drop)(\b|$)/i.test(contentStr) && /(\bhit\b|\bhit\s*#?\d+)/i.test(contentStr);
+      if (looksDeleteVerb) {
+        // Resolve target hit: prefer current thread, then explicit id, then most recent by user
+        let hit = null;
+        try { hit = await getHitLogByThreadId(message.channelId); } catch {}
+        if (!hit) {
+          const id = parseHitId(contentStr);
+          if (id) {
+            try { hit = await getHitLogByEntryId(id); } catch {}
+          }
+        }
+        if (!hit) {
+          try {
+            const list = await getHitLogsByUserId(message.author?.id);
+            if (Array.isArray(list) && list.length) {
+              hit = list.slice().sort((a,b)=>{
+                const ta = new Date(a.created_at || a.createdAt || 0).getTime();
+                const tb = new Date(b.created_at || b.createdAt || 0).getTime();
+                if (tb !== ta) return tb - ta;
+                return (Number(b.id||0) - Number(a.id||0));
+              })[0];
+            }
+          } catch {}
+        }
+        if (!hit) {
+          await sendResponse(message, "I couldn't find a hit to delete. Try this inside the hit's thread or say 'delete hit #<id>'.", true);
+          return; // handled
+        }
+        const ownerId = String(hit.user_id || '');
+        const authorId = String(message.author?.id || '');
+        if (!ownerId || (ownerId !== authorId && !hasBloodedRole(message.member))) {
+          await sendResponse(message, 'Only the original author or Blooded role can delete this hit.', true);
+          return; // handled
+        }
+        const ok = await deleteHitLog(hit.id).catch(()=>false);
+        if (ok) {
+          try { await handleHitPostDelete(client, hit); } catch (e) { console.error('post delete embed failed:', e?.message || e); }
+          await sendResponse(message, `Removed hit #${hit.id} from the database. The thread remains for history.`, true);
+        } else {
+          await sendResponse(message, 'I could not delete that right now. Try again shortly.', true);
+        }
+        return; // handled
+      }
+    } catch (e) { /* non-fatal */ }
+
     // Fast-path: if user asks to edit/update and we're in a hit thread, start edit session BEFORE multi-tool agent
     try {
       const looksEditAsk = /(edit|update|fix|change)\s+(this\s+)?hit\b|^\s*(edit|update)\b/i.test(message.content || '');
@@ -433,9 +513,9 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
         if (hit && (String(hit.thread_id||'') === String(message.channelId))) {
           const ownerId = String(hit.user_id || '');
           const authorId = String(message.author?.id || '');
-          if (ownerId && ownerId === authorId) {
+          if (ownerId && (ownerId === authorId || hasBloodedRole(message.member))) {
             rememberEditSession(message, { hit, patch: {}, awaiting: 'field', user_id: ownerId });
-            await sendResponse(message, "You're the owner of this hit. What would you like to change? Options: value, SCU, cargo, type (air/ground/mixed), assists, victims, title, story, video. Reply 'submit' to save or 'cancel' to abort.", true);
+            await sendResponse(message, "You have permission to edit this hit. What would you like to change? Options: value, SCU, cargo, type (air/ground/mixed), assists, victims, title, story, video. Reply 'submit' to save or 'cancel' to abort.", true);
             return; // intercept so tool-agent doesn't start a new create flow
           }
         }
@@ -482,13 +562,13 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
       if (hit && (String(hit.thread_id||'') === String(message.channelId))) {
         const ownerId = String(hit.user_id || '');
         const authorId = String(message.author?.id || '');
-        if (ownerId && ownerId === authorId) {
+        if (ownerId && (ownerId === authorId || hasBloodedRole(message.member))) {
           sess = { hit, patch: {}, awaiting: 'field', user_id: ownerId };
           rememberEditSession(message, sess);
-          await sendResponse(message, "You're the owner of this hit. What would you like to change? Options: value, SCU, cargo, type (air/ground/mixed), assists, victims, title, story, video. Reply 'submit' to save or 'cancel' to abort.", true);
+          await sendResponse(message, "You have permission to edit this hit. What would you like to change? Options: value, SCU, cargo, type (air/ground/mixed), assists, victims, title, story, video. Reply 'submit' to save or 'cancel' to abort.", true);
           return;
         } else if (ownerId) {
-          await sendResponse(message, 'Only the original author can edit this hit.', true);
+          await sendResponse(message, 'Only the original author or Blooded role can edit this hit.', true);
           // Do not start session
         }
       }
@@ -984,7 +1064,6 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
       return;
     } catch (e) {
       console.error('piracy.hit.create handling failed:', e?.response?.data || e?.message || e);
-      // fall through to normal flow
     }
   }
 
@@ -1217,6 +1296,22 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
             console.error('market follow-up reuse failed:', e?.response?.data || e?.message || e);
           }
         }
+      }
+    }
+  } catch {}
+
+  // Follow-up after variant clarification: if previous reply asked to specify a variant/piece, and the user only says
+  // something like "buy locations" or repeats generic ask without a slot/variant, prompt again with guidance.
+  try {
+    const text = String(message.content || '').trim();
+    const lower = text.toLowerCase();
+    const looksGenericBuySell = /^(buy|sell)\s*(locations?)?$/i.test(text) || /^(where\s+to\s+buy|best\s+buy|best\s+sell)$/i.test(lower);
+    if (looksGenericBuySell) {
+      const key = marketContextKey(message);
+      const prev = lastMarketContext.get(key);
+      if (prev && prev.intent === 'clarify.variants' && prev.item_name) {
+        await sendResponse(message, `Please specify the exact piece or variant for "${prev.item_name}" (e.g., helmet, chest, or the named variant) so I can list buy locations.`, true);
+        return;
       }
     }
   } catch {}

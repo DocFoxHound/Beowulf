@@ -67,15 +67,17 @@ function parseMarketQuery(text) {
     if (/(habitation|hab)/.test(t)) feats.add('habitation');
     return Array.from(feats);
   }
-  // Extract crude item name — take phrase after 'for' or 'of' or leading token
+  // Extract crude item name — take phrase after 'for', 'of', 'find', or leading token
   let item = null;
   // After buy/sell
   const mBuy = s.match(/\bbuy\s+([a-z0-9 '\-]{2,40}?)(?:\s+(?:in|at|near|for)\b|$)/i);
   const mSell = s.match(/\bsell\s+([a-z0-9 '\-]{2,40}?)(?:\s+(?:in|at|near|for)\b|$)/i);
   const mFor = s.match(/\b(?:for|of)\s+([a-z0-9 '\-]{2,40})/i);
+  const mFind = s.match(/\bfind\s+(?:the\s+)?([a-z0-9 '\-]{2,40})(?=\b(?:in|at|near|on|with|that|which)\b|[?.,!]|$)/i);
   if (mBuy) item = (mBuy[1] || '').trim();
   else if (mSell) item = (mSell[1] || '').trim();
   else if (mFor) item = (mFor[1] || '').trim();
+  else if (mFind) item = (mFind[1] || '').trim();
   // Extract location like 'in X', 'near X', 'at X', 'on X' (stop at with/have/that/which)
   let location = null;
   const mLoc = s.match(/\b(?:in|near|at|on)\s+([a-z0-9 '\-]{2,40}?)(?=\s+(?:with|have|that|which)\b|[?.,!]|$)/i);
@@ -168,6 +170,7 @@ async function autoAnswerMarketQuestion({ query, top = 5 }) {
   refreshFromDb().catch(()=>{});
 
   const q = parseMarketQuery(query);
+  // Note: variant/armor set disambiguation now handled by LLM using market_catalog tool; router stays lean.
   // Refinery yields intent: defer to market-answerer summarizer
   if (q.intent === 'refinery_yields') {
     try {
@@ -182,17 +185,37 @@ async function autoAnswerMarketQuestion({ query, top = 5 }) {
   if (q.intent === 'best_buy' && q.item_name) {
     const { lines } = summarizePricesForItem(q.item_name, { location: q.location, mode: 'buy', top });
     const where = q.location ? ` near ${q.location}` : '';
-    return { text: [`Best buy locations for ${q.item_name}${where}:`, lines.length ? lines.join('\n') : 'No buy prices found.'].join('\n'), meta: { routed: 'best_buy' } };
+    if (!lines.length) {
+      return { text: `I couldn't find buy prices for "${q.item_name}"${where}. If this is an armor set or brand, specify the exact piece/variant (e.g., helmet/chest) or ask me to show the catalog using: 'catalog for ${q.item_name}'.`, meta: { routed: 'best_buy.empty' } };
+    }
+    return { text: [`Best buy locations for ${q.item_name}${where}:`, lines.join('\n')].join('\n'), meta: { routed: 'best_buy' } };
   }
   if (q.intent === 'best_sell' && q.item_name) {
     const { lines } = summarizePricesForItem(q.item_name, { location: q.location, mode: 'sell', top });
     const where = q.location ? ` near ${q.location}` : '';
-    return { text: [`Best sell locations for ${q.item_name}${where}:`, lines.length ? lines.join('\n') : 'No sell prices found.'].join('\n'), meta: { routed: 'best_sell' } };
+    if (lines.length) {
+      return { text: [`Best sell locations for ${q.item_name}${where}:`, lines.join('\n')].join('\n'), meta: { routed: 'best_sell' } };
+    }
+    // Fallback: delegate to market-answerer to use heuristic/summary when no direct prices
+    try {
+      const { bestSellLocations } = require('./market-answerer');
+      const ans = await bestSellLocations({ name: q.item_name, top, location: q.location });
+      const text = ans?.text || '';
+      if (!text) {
+        return { text: `I couldn't find sell prices for "${q.item_name}"${where}. If this is an armor set or brand, specify the exact piece/variant (e.g., helmet/chest) or ask me to show the catalog using: 'catalog for ${q.item_name}'.`, meta: { routed: 'best_sell.empty' } };
+      }
+      return { text, meta: { routed: 'best_sell.fallback' } };
+    } catch {
+      return { text: `I couldn't find sell prices for "${q.item_name}"${where}. If this is an armor set or brand, specify the exact piece/variant (e.g., helmet/chest) or ask me to show the catalog using: 'catalog for ${q.item_name}'.`, meta: { routed: 'best_sell.empty' } };
+    }
   }
   if (q.intent === 'spot' && q.item_name) {
     const { lines } = summarizePricesForItem(q.item_name, { location: q.location, mode: 'spot', top: Math.max(3, top) });
     const where = q.location ? ` near ${q.location}` : '';
-    return { text: [`Spot prices for ${q.item_name}${where}:`, lines.length ? lines.join('\n') : 'No spot prices available yet.'].join('\n'), meta: { routed: 'spot' } };
+    if (!lines.length) {
+      return { text: `No spot prices available yet for "${q.item_name}"${where}. If you're asking about an armor set/brand, please specify the exact piece/variant (helmet/chest/legs/etc.) or ask me for the catalog using: 'catalog for ${q.item_name}'.`, meta: { routed: 'spot.empty' } };
+    }
+    return { text: [`Spot prices for ${q.item_name}${where}:`, lines.join('\n')].join('\n'), meta: { routed: 'spot' } };
   }
   if (q.intent === 'route' && q.from && q.to) {
     // Leave cross-system route computation to existing tool-agent route function if available; here provide a brief acknowledgment.

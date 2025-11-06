@@ -7,7 +7,7 @@ const { getHitLogsByPatch, getAllHitLogs } = require('../api/hitTrackerApi.js');
 const { getAllSummarizedItems, getAllSummarizedCommodities } = require('../api/uexApi.js');
 const { getAllGameVersions } = require('../api/gameVersionApi.js');
 const { handleHitPost } = require('../functions/post-new-hit.js');
-const { bestBuyLocations, bestSellLocations, spotFor, bestProfitRoutes, mostActiveTerminals, bestOverallProfitRoute, mostMovement, summarizeMarket } = require('./market-answerer');
+const { bestBuyLocations, bestSellLocations, spotFor, bestProfitRoutes, mostActiveTerminals, bestOverallProfitRoute, mostMovement, summarizeMarket, bestBuyLocationsInSystem, bestSellLocationsInSystem, combinedProfitSuggestion, terminalDetail } = require('./market-answerer');
 const { runWithResponses } = require('./responses-run.js');
 const { piracyAdviceForRoute } = require('./piracy-route-advice');
 const { getTopKFromKnowledgePiracy } = require('./retrieval');
@@ -131,6 +131,21 @@ function getToolsSpec() {
     {
       type: 'function',
       function: {
+        name: 'market_catalog',
+        description: 'Retrieve a slice of the cached item catalog and item categories for disambiguation. Provide optional prefix or keyword to filter. Use when user asks broadly for an armor set or vague item (e.g., just brand/set).',
+        parameters: {
+          type: 'object',
+          properties: {
+            prefix: { type: 'string', nullable: true, description: 'Optional case-insensitive prefix/keyword to narrow item names (e.g., Morozov)' },
+            limit: { type: 'integer', minimum: 1, maximum: 200, default: 60 },
+          },
+          required: [],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
         name: 'create_hit',
         description: 'Create a piracy hit-log entry. Ask the user for missing fields first.',
         parameters: {
@@ -207,6 +222,23 @@ function getToolsSpec() {
             top: { type: 'integer', minimum: 1, maximum: 10, default: 5 },
           },
           required: ['item_name'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'market_terminal_detail',
+        description: 'Detailed view for a single terminal about a specific item: prices, report counts, and SCU caps/stock. Use when user asks for reports or SCU volume at a named terminal.',
+        parameters: {
+          type: 'object',
+          properties: {
+            item_name: { type: 'string' },
+            terminal: { type: 'string', description: 'Terminal name or label (e.g., CRU-L5, MIC-L2, Shubin SCD-1)' },
+            system: { type: 'string', nullable: true, description: 'Optional star system to disambiguate (e.g., Stanton)' },
+            area_type: { type: 'string', nullable: true, enum: ['terminal','station','outpost','city','planet'] },
+          },
+          required: ['item_name', 'terminal'],
         },
       },
     },
@@ -311,13 +343,35 @@ function getToolsSpec() {
 }
 
 function buildSystemPrompt(extraContext = '') {
-  return `You are RoboHound, a Discord bot for IronPoint operations. Judge the user's intent and either:
-- Answer directly in one or two short sentences (banter or simple info), or
+  return `You are RoboHound, a Discord bot for IronPoint operations. Judge intent and either:
+- Answer directly in one or two short sentences (banter or simple info), OR
 - Call exactly one tool with well-formed arguments.
-For hit logging: if missing, ALWAYS ask the user to confirm whether the hit was Air, Ground, or Mixed, and collect cargo details. Prompt for victim names if mentioned or relevant. NEVER ask for patch/version; auto-fill the current patch.
-For market questions, determine the specific intent: best buy, best sell, spot prices, profit routes, refinery yields (refining/mining/ores), or activity (visitation frequency). If the user wants both pricing (buy/sell) and routes, prefer calling market_summary to keep everything consistent. Extract the item/commodity name and any location or area-type constraint (terminals, stations, outposts, moons). If the item is unclear, choose the closest known name; ask a brief clarification only when truly ambiguous. If the phrasing is broad or ambiguous, call market_auto with the raw question and let it choose the dataset/metric. For refining/mining/ore yield questions, call market_auto.
-Data source: market tools read from a local cache of UEX-derived tables (terminals, stations, outposts, prices, refinery yields, user reports). Do not hallucinate values; rely on tool outputs.
-Piracy advice: If the user asks for advice related to piracy (tactics, routes, ambush/snare, boarding), first decide if endpoints are present—if yes, call piracy_advice_for_route. If the user asks broadly for pirate spots/hotspots or where we’ve been pirating lately, call piracy_hotspots (optionally pass a system/location if mentioned). If the user asks for the most recent hits or latest hits, call piracy_recent_hits (do not ask for patch; assume the latest). If neither applies, answer briefly using the provided CONTEXT below.
+
+Hit logging: If missing, ALWAYS ask whether the hit was Air, Ground, or Mixed, and collect cargo details. Prompt for victims if relevant. NEVER ask for patch/version; auto-fill the current patch.
+
+Market questions:
+1. Determine intent: best buy, best sell, spot prices, profit routes, refinery yields (refining/mining/ores), or activity.
+2. If the user wants both pricing (buy/sell) and routes, prefer market_summary.
+3. Item/commodity disambiguation MUST be LLM-driven: first normalize the user’s raw name (trim, lowercase). If unclear or could map to multiple items/variants (armor sets, gear families), call market_catalog with a prefix (e.g., brand or set) to retrieve candidates. Then:
+   - If a close match exists (string similarity or semantic proximity) but confidence < ~0.85, ask the user to confirm: “Did you mean <A>, <B>, or something else?”.
+   - If only one plausible candidate remains, proceed automatically.
+   - Do NOT guess silently if multiple are plausible—ask for clarification briefly.
+4. For misspellings (e.g., “Quantainium” vs “Quantanium”), attempt correction via catalog comparison BEFORE tool calls. If you correct, explicitly acknowledge once: “Assuming you meant Quantanium.”
+5. If phrasing is broad or ambiguous, call market_auto with the raw question.
+6. For refining/mining/ore yield questions, call market_auto.
+
+ Terminal/quantity-specific queries:
+ - If the user asks about a specific terminal’s report counts or SCU buy/sell volume/capacity for an item (e.g., “how many reports of X sold at CRU-L5?” or “what’s the total SCU sell volume at MIC-L2?”), call market_terminal_detail with item_name and terminal (optionally pass system if mentioned). The tool returns prices, report counts (price_buy_users_rows, price_sell_users_rows), and SCU caps/stock (scu_buy_max, scu_sell_max, scu_buy, scu_sell_stock). When the prices are averages, mention that explicitly by noting “(avg)” and include a brief confidence note.
+
+Similarity guidance (LLM internal, do NOT expose formula): consider edit distance, token overlap, and semantic embedding. Favor exact token match > prefix > high semantic similarity. Reject candidates whose similarity is clearly lower than the best by a large margin (delta > 0.25).
+
+Never hallucinate numeric market data—only report tool outputs. If tool output lacks structured per-terminal prices, you may summarize fallback guidance but do not invent terminals.
+
+Piracy:
+- If endpoints specified (from X to Y) and user seeks tactics/advice, call piracy_advice_for_route.
+- If asking broadly for hotspots or where pirating occurs lately, call piracy_hotspots (pass system/location if mentioned).
+- If asking for recent hits, call piracy_recent_hits (auto patch; don’t ask user).
+If none fit, answer briefly using CONTEXT.
 ${extraContext ? `\nCONTEXT (snippets from org chat and knowledge—use as grounding, do not cite verbatim):\n${extraContext}` : ''}
 Keep replies short and professional. Avoid pirate slang.`;
 }
@@ -329,6 +383,38 @@ async function executeTool({ name, args, message, client, openai }) {
       if (!args.query) return { ok: false, error: 'query required' };
       const ans = await autoAnswerMarketQuestion({ query: args.query, top: Number(args.top || 6) });
       return { ok: true, text: ans.text, meta: ans.meta };
+    }
+    if (name === 'market_catalog') {
+      const { getCache } = require('./data-cache');
+      const cache = getCache();
+      const norm = (s) => String(s||'').trim().toLowerCase();
+      const prefix = norm(args?.prefix || '');
+      const limit = Math.max(1, Math.min(200, Number(args?.limit || 60)));
+      const items = Array.isArray(cache?.itemsCatalog) ? cache.itemsCatalog : [];
+      const cats = Array.isArray(cache?.itemCategories) ? cache.itemCategories : [];
+      // Filter items by prefix/keyword (in name or category_name)
+      let filtered = items;
+      if (prefix) {
+        filtered = items.filter(it => {
+          const name = norm(it?.name);
+          const cat = norm(it?.category_name || '');
+          const section = norm(it?.section || '');
+          return name.includes(prefix) || cat.includes(prefix) || section.includes(prefix);
+        });
+      }
+      // Map to compact shape
+      const rows = filtered.slice(0, limit).map(it => ({
+        id: it.id,
+        name: it.name,
+        category: it.category_name || null,
+        section: it.section || null,
+        type: it.type || null,
+        is_commodity: Boolean(it.is_commodity),
+        is_harvestable: Boolean(it.is_harvestable),
+      }));
+      // Categories compact list
+      const categories = cats.map(c => ({ id: c.id, name: c.name, type: c.type, section: c.section, is_game_related: Boolean(c.is_game_related), is_mining: Boolean(c.is_mining) }));
+      return { ok: true, json: { items: rows, categories } };
     }
     if (name === 'create_hit') {
       const missing = [];
@@ -419,12 +505,28 @@ async function executeTool({ name, args, message, client, openai }) {
     }
     if (name === 'market_best_buy') {
       if (!args.item_name) return { ok: false, error: 'item_name required' };
-      const ans = await bestBuyLocations({ name: args.item_name, top: Number(args.top || 5), location: args.location || null, areaType: args.area_type || null });
+      // System-aware routing: if location looks like a star system, prefer system-scoped helper
+      const locRaw = args.location || '';
+      const locNorm = String(locRaw).trim().toLowerCase();
+      const looksSystem = /stanton|pyro|nyx|terra|hurston|microtech|arcCorp|crusader/.test(locNorm);
+      const ans = looksSystem
+        ? await bestBuyLocationsInSystem({ name: args.item_name, system: locRaw, top: Number(args.top || 5), areaType: args.area_type || null })
+        : await bestBuyLocations({ name: args.item_name, top: Number(args.top || 5), location: args.location || null, areaType: args.area_type || null });
       return { ok: true, text: ans.text };
     }
     if (name === 'market_best_sell') {
       if (!args.item_name) return { ok: false, error: 'item_name required' };
-      const ans = await bestSellLocations({ name: args.item_name, top: Number(args.top || 5), location: args.location || null, areaType: args.area_type || null });
+      const locRaw = args.location || '';
+      const locNorm = String(locRaw).trim().toLowerCase();
+      const looksSystem = /stanton|pyro|nyx|terra|hurston|microtech|arcCorp|crusader/.test(locNorm);
+      const ans = looksSystem
+        ? await bestSellLocationsInSystem({ name: args.item_name, system: locRaw, top: Number(args.top || 5), areaType: args.area_type || null })
+        : await bestSellLocations({ name: args.item_name, top: Number(args.top || 5), location: args.location || null, areaType: args.area_type || null });
+      return { ok: true, text: ans.text };
+    }
+    if (name === 'market_terminal_detail') {
+      if (!args.item_name || !args.terminal) return { ok: false, error: 'item_name and terminal required' };
+      const ans = await terminalDetail({ name: args.item_name, terminal: args.terminal, system: args.system || null, areaType: args.area_type || null });
       return { ok: true, text: ans.text };
     }
     if (name === 'market_spot') {
@@ -438,7 +540,23 @@ async function executeTool({ name, args, message, client, openai }) {
         const ans = await bestOverallProfitRoute({ top: Number(args.top || 5), location: args.location || null });
         return { ok: true, text: ans.text };
       }
-      const ans = await bestProfitRoutes({ name: args.item_name, top: Number(args.top || 5), location: args.location || null, areaType: args.area_type || null });
+      // If user passes location that's a system and wants a single-item profit suggestion, prefer combined suggestion (simpler route)
+      const locRaw = args.location || '';
+      const locNorm = String(locRaw).trim().toLowerCase();
+      const looksSystem = /stanton|pyro|nyx|terra|hurston|microtech|arcCorp|crusader/.test(locNorm);
+      // Parse SCU quantity from the user's message to scale margins
+      const parseScu = (text) => {
+        try {
+          const t = String(text || '');
+          const matches = Array.from(t.matchAll(/(\d+(?:\.\d+)?)\s*scu\b/ig)).map(m => Number(m[1]));
+          if (matches.length) return Math.max(...matches.filter(n => isFinite(n)));
+          return null;
+        } catch { return null; }
+      };
+      const quantity = parseScu(message?.content || '');
+      const ans = looksSystem
+        ? await combinedProfitSuggestion({ name: args.item_name, system: locRaw, quantity })
+        : await bestProfitRoutes({ name: args.item_name, top: Number(args.top || 5), location: args.location || null, areaType: args.area_type || null });
       return { ok: true, text: ans.text };
     }
     if (name === 'market_summary') {

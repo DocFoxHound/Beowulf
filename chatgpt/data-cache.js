@@ -1,13 +1,17 @@
 // Lightweight in-memory cache for structured world/market data
 // Works without DB loaded; will gracefully return empty results.
 
+// Load environment variables for standalone CLI runs (e.g., test scripts)
+try { require('dotenv').config(); } catch {}
+
 const fs = require('fs');
 const path = require('path');
 const { pool } = require('../db/pool');
 // Optional UEX models (HTTP-backed). We'll lazy-fallback to these when DB/JSON are empty.
 let UexStarSystemsModel, UexPlanetsModel, UexMoonsModel, UexSpaceStationsModel, UexOutpostsModel,
     UexCitiesModel, UexTerminalModel, UexCommoditiesByTerminalModel, UexItemsByTerminalModel,
-    UexCommoditiesSummaryModel, UexItemsSummaryModel, UexTerminalPricesModel, UexRefineryYieldsModel;
+    UexCommoditiesSummaryModel, UexItemsSummaryModel, UexTerminalPricesModel, UexRefineryYieldsModel,
+    UexItemCategoriesModel, UexItemsModel;
 try {
   ({ UexStarSystemsModel } = require('../api/models/uex-star-systems'));
   ({ UexPlanetsModel } = require('../api/models/uex-planets'));
@@ -22,14 +26,25 @@ try {
   ({ UexItemsSummaryModel } = require('../api/models/uex-items-summary'));
   ({ UexTerminalPricesModel } = require('../api/models/uex-terminal-prices'));
   ({ UexRefineryYieldsModel } = require('../api/models/uex-refinery-yields'));
+  ({ UexItemCategoriesModel } = require('../api/models/uex-item-categories'));
+  ({ UexItemsModel } = require('../api/models/uex-items'));
 } catch (e) {
   // If any model fails to load (e.g., missing file or env), we simply won't use the UEX fallback.
 }
 
 const state = {
   loadedAt: 0,
+  meta: {
+    uex: {
+      configOk: null,        // null = unchecked, boolean after validation
+      configError: null,      // string reason when configOk === false
+      warned: false,          // guard to avoid log spam
+    }
+  },
   data: {
     items: [],           // { name, code, type }
+    itemCategories: [],  // { id, type, section, name }
+    itemsCatalog: [],    // UEX items: { id, name, slug, id_category, category_name, section, type, flags }
     prices: [],          // { item, location, buy, sell, currency, ts }
     locations: [],       // { name, type: 'station'|'outpost'|'planet'|'moon', parent, system, orbit }
     systems: [],         // { id, name, code, live, default, visible, factions, jurisdiction }
@@ -141,9 +156,18 @@ function collectFeatures(obj = {}) {
 // Fallback: load structured world data from UEX HTTP API via models
 async function refreshFromUex() {
   if (!UexStarSystemsModel || !UexPlanetsModel || !UexSpaceStationsModel || !UexOutpostsModel) return false;
+  // Validate config once before any HTTP calls to avoid repeated "Invalid URL" spam
+  validateUexConfigOnce();
+  if (state.meta.uex.configOk === false) {
+    if (!state.meta.uex.warned) {
+      console.warn(`[UEX] disabled: ${state.meta.uex.configError} (set SERVER_URL and API_EXP_GER env vars; example: SERVER_URL=https://your-host API_EXP_GER=/api/v1)`);
+      state.meta.uex.warned = true;
+    }
+    return false;
+  }
   try {
     // Fetch in parallel (gracefully handle optional models)
-    const [sysRows, planetRows, moonRows, stationRows, outpostRows, cityRows, terminalRows, cbtRows, ibtRows, csRows, isRows, tpRows, ryRows] = await Promise.all([
+    const [sysRows, planetRows, moonRows, stationRows, outpostRows, cityRows, terminalRows, cbtRows, ibtRows, csRows, isRows, tpRows, ryRows, icRows, itRows] = await Promise.all([
       UexStarSystemsModel.list().catch(()=>[]),
       UexPlanetsModel.list().catch(()=>[]),
       (UexMoonsModel?.list ? UexMoonsModel.list().catch(()=>[]) : Promise.resolve([])),
@@ -157,6 +181,8 @@ async function refreshFromUex() {
       (UexItemsSummaryModel?.list ? UexItemsSummaryModel.list().catch(()=>[]) : Promise.resolve([])),
       (UexTerminalPricesModel?.list ? UexTerminalPricesModel.list().catch(()=>[]) : Promise.resolve([])),
       (UexRefineryYieldsModel?.list ? UexRefineryYieldsModel.list().catch(()=>[]) : Promise.resolve([])),
+      (UexItemCategoriesModel?.list ? UexItemCategoriesModel.list().catch(()=>[]) : Promise.resolve([])),
+      (UexItemsModel?.list ? UexItemsModel.list().catch(()=>[]) : Promise.resolve([])),
     ]);
 
     // Map to simplified cache shapes used by answerers and relations
@@ -231,6 +257,14 @@ async function refreshFromUex() {
       moon: r.moon_name || undefined,
       id_moon: r.id_moon,
     })).filter(c => c.name && c.id);
+    const itemCategories = (icRows || []).map(r => ({
+      id: r.id,
+      type: r.type,
+      section: r.section,
+      name: r.name,
+      is_game_related: Boolean(r.is_game_related),
+      is_mining: Boolean(r.is_mining),
+    })).filter(c => c.id && c.name);
     const terminals = (terminalRows || []).map(r => ({
       id: r.id,
       name: r.name || r.nickname || r.code || undefined,
@@ -290,6 +324,24 @@ async function refreshFromUex() {
       price_buy_avg: r.price_buy_avg,
       price_sell_avg: r.price_sell_avg,
     }));
+    // Build quick category lookup for mapping items
+    const itemCatById = Object.create(null);
+    for (const c of itemCategories) itemCatById[String(c.id)] = c;
+    const itemsCatalog = (itRows || []).map(r => ({
+      id: r.id,
+      name: r.name || r.slug || undefined,
+      slug: r.slug || undefined,
+      id_category: r.id_category,
+      category_name: (r.id_category != null ? itemCatById[String(r.id_category)]?.name : undefined) || r.category || undefined,
+      section: r.section || (r.id_category != null ? itemCatById[String(r.id_category)]?.section : undefined),
+      type: r.type || (r.id_category != null ? itemCatById[String(r.id_category)]?.type : undefined),
+      // flags
+      is_commodity: Boolean(r.is_commodity),
+      is_harvestable: Boolean(r.is_harvestable),
+      is_exclusive_pledge: Boolean(r.is_exclusive_pledge),
+      is_exclusive_subscriber: Boolean(r.is_exclusive_subscriber),
+      is_exclusive_concierge: Boolean(r.is_exclusive_concierge),
+    })).filter(i => i.id && i.name);
     const terminalPrices = (tpRows || []).map(r => ({ ...r }));
     const refineryYields = (ryRows || []).map(r => ({
       id: r.id,
@@ -328,6 +380,7 @@ async function refreshFromUex() {
       items, prices, locations,
       systems, planets, moons, stations, outposts,
       cities, terminals, commoditiesByTerminal, itemsByTerminal, commoditiesSummary, itemsSummary, terminalPrices,
+      itemCategories, itemsCatalog,
       refineryYields,
       transactions,
     };
@@ -339,23 +392,72 @@ async function refreshFromUex() {
   }
 }
 
+function validateUexConfigOnce() {
+  if (state.meta.uex.configOk !== null) return; // already validated
+  const base = process.env.SERVER_URL || '';
+  const exp = process.env.API_EXP_GER || '';
+  const errors = [];
+  if (!/^https?:\/\//i.test(base)) errors.push('SERVER_URL missing or not an http(s) URL');
+  if (!exp) errors.push('API_EXP_GER missing');
+  else if (!exp.startsWith('/')) errors.push('API_EXP_GER should start with / (e.g., /api/v1)');
+  if (errors.length) {
+    state.meta.uex.configOk = false;
+    state.meta.uex.configError = errors.join('; ');
+  } else {
+    state.meta.uex.configOk = true;
+  }
+}
+
 function normalize(s) { return String(s || '').trim().toLowerCase(); }
 function fuzzyMatch(hay, needle) {
   hay = normalize(hay); needle = normalize(needle);
   if (!needle) return false;
   return hay.includes(needle);
 }
+// Simple Levenshtein distance for tolerant matching (handles minor misspellings like "quantainium")
+// Levenshtein-based similarity used previously for backend fuzzy matching.
+// Retained but gated: when ENABLE_BACKEND_FUZZY env var is not '1', we avoid altering match decisions
+// and let the LLM perform fuzzy disambiguation via market_catalog instead.
+function editDistance(a, b) {
+  a = normalize(a); b = normalize(b);
+  const m = a.length, n = b.length;
+  if (m === 0) return n; if (n === 0) return m;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,      // deletion
+        dp[i][j - 1] + 1,      // insertion
+        dp[i - 1][j - 1] + cost // substitution
+      );
+    }
+  }
+  return dp[m][n];
+}
+function isSimilar(a, b) {
+  if (process.env.ENABLE_BACKEND_FUZZY !== '1') return false; // disabled to defer fuzzy logic to LLM layer
+  a = normalize(a); b = normalize(b);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  if (fuzzyMatch(a, b) || fuzzyMatch(b, a)) return true;
+  const dist = editDistance(a, b);
+  const threshold = Math.max(2, Math.ceil(Math.min(a.length, b.length) / 6));
+  return dist <= threshold;
+}
 
 function findItem(name) {
   const n = normalize(name);
   // Prefer explicit items table
-  const byItems = state.data.items.find(i => normalize(i.name) === n) || state.data.items.find(i => fuzzyMatch(i.name, n));
+  const byItems = state.data.items.find(i => normalize(i.name) === n) || state.data.items.find(i => fuzzyMatch(i.name, n) || isSimilar(i.name, n));
   if (byItems) return byItems;
   // Fallback to summarized item names
-  const byItemSummary = (state.data.itemsSummary || []).find(r => normalize(r.commodity_name) === n) || (state.data.itemsSummary || []).find(r => fuzzyMatch(r.commodity_name, n));
+  const byItemSummary = (state.data.itemsSummary || []).find(r => normalize(r.commodity_name) === n) || (state.data.itemsSummary || []).find(r => fuzzyMatch(r.commodity_name, n) || isSimilar(r.commodity_name, n));
   if (byItemSummary) return { name: byItemSummary.commodity_name, type: 'item' };
   // Fallback to summarized commodity names (e.g., Laranite)
-  const byCommoditySummary = (state.data.commoditiesSummary || []).find(r => normalize(r.commodity_name) === n) || (state.data.commoditiesSummary || []).find(r => fuzzyMatch(r.commodity_name, n));
+  const byCommoditySummary = (state.data.commoditiesSummary || []).find(r => normalize(r.commodity_name) === n) || (state.data.commoditiesSummary || []).find(r => fuzzyMatch(r.commodity_name, n) || isSimilar(r.commodity_name, n));
   if (byCommoditySummary) return { name: byCommoditySummary.commodity_name, type: 'commodity' };
   return null;
 }
@@ -394,7 +496,7 @@ function whereItemAvailable(itemName) {
   // Commodities
   for (const r of state.data.commoditiesByTerminal || []) {
     const nm = normalize(r.commodity_name);
-    if (!(nm === n || fuzzyMatch(nm, n))) continue;
+    if (!(nm === n || fuzzyMatch(nm, n) || isSimilar(nm, n))) continue;
     const t = terminalsById[String(r.id_terminal)] || null;
     out.push({
       item: r.commodity_name,
@@ -413,12 +515,15 @@ function whereItemAvailable(itemName) {
       id_outpost: t?.id_outpost,
       id_city: t?.id_city,
       id_moon: t?.id_moon,
+      // Stock/volume fields when present on relation rows
+      scu_buy: r.scu_buy != null ? Number(r.scu_buy) : undefined,
+      scu_sell_stock: r.scu_sell_stock != null ? Number(r.scu_sell_stock) : undefined,
     });
   }
   // Items
   for (const r of state.data.itemsByTerminal || []) {
     const nm = normalize(r.item_name);
-    if (!(nm === n || fuzzyMatch(nm, n))) continue;
+    if (!(nm === n || fuzzyMatch(nm, n) || isSimilar(nm, n))) continue;
     const t = terminalsById[String(r.id_terminal)] || null;
     out.push({
       item: r.item_name,
@@ -438,7 +543,64 @@ function whereItemAvailable(itemName) {
       id_moon: t?.id_moon,
     });
   }
-  return out;
+  // Terminal average price snapshots (include when we have no explicit per-terminal price row or want averages)
+  for (const r of state.data.terminalPrices || []) {
+    const nm = normalize(r.commodity_name);
+    if (!(nm === n || fuzzyMatch(nm, n) || isSimilar(nm, n))) continue;
+    const t = terminalsById[String(r.id_terminal)] || null;
+    // Prefer avg values; fall back to single price fields
+    const buyVal = r.price_buy_avg != null ? Number(r.price_buy_avg) : (r.price_buy != null ? Number(r.price_buy) : undefined);
+    const sellVal = r.price_sell_avg != null ? Number(r.price_sell_avg) : (r.price_sell != null ? Number(r.price_sell) : undefined);
+    out.push({
+      item: r.commodity_name,
+      location: makeLocString(t) || (r.terminal_name || r.space_station_name || r.outpost_name || r.city_name || r.planet_name || r.star_system_name || 'Unknown'),
+      buy: buyVal,
+      sell: sellVal,
+      currency: 'aUEC',
+      ts: undefined,
+      id_terminal: t?.id || r.id_terminal,
+      id_star_system: t?.id_star_system,
+      star_system_name: t?.system || r.star_system_name,
+      id_planet: t?.id_planet,
+      planet_name: t?.planet || r.planet_name,
+      id_space_station: t?.id_space_station,
+      id_outpost: t?.id_outpost,
+      id_city: t?.id_city,
+      id_moon: t?.id_moon,
+      avg_snapshot: true,
+      // Carry over user report counts when present
+      price_buy_users_rows: r.price_buy_users_rows,
+      price_sell_users_rows: r.price_sell_users_rows,
+      // Max per-transaction capacities if present
+      scu_buy_max: r.scu_buy_max != null ? Number(r.scu_buy_max) : undefined,
+      scu_sell_max: r.scu_sell_max != null ? Number(r.scu_sell_max) : undefined,
+    });
+  }
+  // Deduplicate by (item + location); keep highest sell and lowest buy for utility
+  const byKey = new Map();
+  for (const r of out) {
+    const key = `${normalize(r.item)}||${normalize(r.location)}`;
+    const prev = byKey.get(key);
+    if (!prev) { byKey.set(key, r); continue; }
+    const merged = { ...prev };
+    if (isFinite(Number(r.sell)) && ( !isFinite(Number(merged.sell)) || Number(r.sell) > Number(merged.sell))) merged.sell = r.sell;
+    if (isFinite(Number(r.buy)) && ( !isFinite(Number(merged.buy)) || Number(r.buy) < Number(merged.buy))) merged.buy = r.buy;
+    // Prefer having avg_snapshot flag if available
+    merged.avg_snapshot = merged.avg_snapshot || r.avg_snapshot;
+    // Keep max of user report counts if present
+    if (r.price_sell_users_rows != null) {
+      const a = Number(merged.price_sell_users_rows || 0);
+      const b = Number(r.price_sell_users_rows || 0);
+      merged.price_sell_users_rows = Math.max(a, b);
+    }
+    if (r.price_buy_users_rows != null) {
+      const a = Number(merged.price_buy_users_rows || 0);
+      const b = Number(r.price_buy_users_rows || 0);
+      merged.price_buy_users_rows = Math.max(a, b);
+    }
+    byKey.set(key, merged);
+  }
+  return Array.from(byKey.values());
 }
 
 function listByType(type) {
@@ -496,6 +658,8 @@ function buildRelations() {
   const citiesById = toMap(d.cities, 'id');
   const outpostsById = toMap(d.outposts, 'id');
   const terminalsById = toMap(d.terminals, 'id');
+  const itemCategoriesById = toMap(d.itemCategories, 'id');
+  const itemsById = toMap(d.itemsCatalog, 'id');
 
   const systemChildren = Object.create(null);
   const planetChildren = Object.create(null);
@@ -583,6 +747,8 @@ function buildRelations() {
     citiesById,
     outpostsById,
     terminalsById,
+    itemCategoriesById,
+    itemsById,
     systemChildren,
     planetChildren,
     stationChildren,
@@ -596,9 +762,33 @@ function buildRelations() {
       cities: byName(d.cities),
       outposts: byName(d.outposts),
       terminals: byName(d.terminals),
+      itemCategories: byName(d.itemCategories),
+      items: byName(d.itemsCatalog),
     },
     terminalRefs,
   };
+}
+
+// Convenience helpers for items and categories
+function listItemCategories() {
+  return Array.isArray(state.data.itemCategories) ? state.data.itemCategories : [];
+}
+function listItems() {
+  return Array.isArray(state.data.itemsCatalog) ? state.data.itemsCatalog : [];
+}
+function findCategory(nameOrId) {
+  const rel = state.relations || {};
+  if (nameOrId == null) return null;
+  const id = Number(nameOrId);
+  if (Number.isFinite(id) && rel.itemCategoriesById && rel.itemCategoriesById[String(id)]) return rel.itemCategoriesById[String(id)];
+  const nm = (String(nameOrId || '').trim().toLowerCase());
+  const cid = rel.byName?.itemCategories?.[nm];
+  return (cid != null && rel.itemCategoriesById) ? rel.itemCategoriesById[String(cid)] : null;
+}
+function itemsInCategory(category) {
+  const cat = findCategory(category);
+  if (!cat) return [];
+  return listItems().filter(it => String(it.id_category) === String(cat.id));
 }
 
 module.exports = {
@@ -606,10 +796,17 @@ module.exports = {
   refreshFromDb,
   // Expose UEX refresh for manual forcing if needed
   refreshFromUex,
+  // Meta (health flags)
+  getMeta: () => state.meta,
   getCache: () => state.data,
   getRelations: () => state.relations,
   findItem,
   whereItemAvailable,
   listByType,
   summarizeMovement,
+  // New: expose categories/items helpers
+  listItemCategories,
+  listItems,
+  findCategory,
+  itemsInCategory,
 };

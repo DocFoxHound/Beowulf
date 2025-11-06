@@ -16,6 +16,9 @@ const { UexCommoditiesByTerminalModel } = require('./uex-commodities-by-terminal
 const { UexCommoditiesModel } = require('./uex-commodities');
 const { UexRefineryYieldsModel } = require('./uex-refinery-yields');
 const { UexCitiesModel } = require('./uex-cities');
+const { UexItemCategoriesModel } = require('./uex-item-categories');
+const { UexItemsModel } = require('./uex-items');
+const { UexMarketAveragesModel } = require('./uex-market-averages');
 const { UsersModel } = require('./users');
 const { HitTrackerModel } = require('./hit-tracker');
 const { ChatLogsModel } = require('./chat-logs');
@@ -38,6 +41,9 @@ module.exports = {
   UexCommoditiesModel,
   UexRefineryYieldsModel,
   UexCitiesModel,
+  UexItemCategoriesModel,
+  UexItemsModel,
+  UexMarketAveragesModel,
   UsersModel,
   HitTrackerModel,
   ChatLogsModel,
