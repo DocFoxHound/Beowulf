@@ -19,11 +19,13 @@ async function downloadUEXData(){
     apiUrls.push({url: `https://api.uexcorp.space/2.0/outposts${apiKey}`, title: "outposts", iterate: false});
     apiUrls.push({url: `https://api.uexcorp.space/2.0/space_stations${apiKey}`, title: "space_stations", iterate: false});
     apiUrls.push({url: `https://api.uexcorp.space/2.0/cities${apiKey}`, title: "cities", iterate: false});
+    apiUrls.push({url: `https://api.uexcorp.uk/2.0/refineries_yields${apiKey}`, title: "refineries_yields", iterate: false}); 
+    apiUrls.push({url: `https://api.uexcorp.space/2.0/moons${apiKey}`, title: "moons", iterate: false});
     apiUrls.push({url: `https://api.uexcorp.space/2.0/commodities_prices?id_terminal=`, title: "terminal_prices", iterate: true}); //this needs to be iterated
 
     for (const api of apiUrls) {
         if(api.iterate === false){
-            await delay(2000); // Wait for 1 second, since we can only do 60 calls in 60 seconds
+            await delay(2000); // Throttle: ~30 calls/min to stay under rate limits
             try{
                 const response = await axios.get(api.url);
                 const data = response.data;
@@ -31,14 +33,11 @@ async function downloadUEXData(){
                     allTerminals = data;
                 }
                 //save as a JSON file
-                const filePath = path.join(`./UEX/${api.title}.json`);
-                fs.writeFile(filePath, JSON.stringify(data, null, 2), (err) => {
-                    if (err) {
-                        console.error('Error writing file:', err);
-                        return;
-                    }
+                const dir = path.join('./UEX');
+                try { await fs.mkdir(dir, { recursive: true }); } catch (e) {}
+                const filePath = path.join(dir, `${api.title}.json`);
+                await fs.writeFile(filePath, JSON.stringify(data, null, 2));
                 console.log(`Data successfully saved to ${filePath}`);
-                });    
             }catch(error){
                 console.log(`Error in getting UEX data: ${error}`)
             }
@@ -58,14 +57,11 @@ async function downloadUEXData(){
                 individualTerminalData.push(data);
             }
             // Save as a JSON file
-            const filePath = path.join(`./UEX/${api.title}.json`);
-            fs.writeFile(filePath, JSON.stringify(individualTerminalData, null, 2), (err) => {
-                if (err) {
-                    console.error('Error writing file:', err);
-                    return;
-                }
-                console.log(`Data successfully saved to ${filePath}`);
-            });      
+            const dir = path.join('./UEX');
+            try { await fs.mkdir(dir, { recursive: true }); } catch (e) {}
+            const filePath = path.join(dir, `${api.title}.json`);
+            await fs.writeFile(filePath, JSON.stringify(individualTerminalData, null, 2));
+            console.log(`Data successfully saved to ${filePath}`);
         }
     }
     console.log("Finished updating UEX Items.")

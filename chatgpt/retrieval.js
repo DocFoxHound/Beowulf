@@ -167,7 +167,49 @@ async function getTopK({ query, k = 5, sources = ['messages'], openai, guildId, 
   return unique.slice(0, k);
 }
 
+// Targeted piracy-focused retrieval from messages: prefers piracy-related content and channels
+function looksPiracyText(s) {
+  try {
+    const lc = String(s || '').toLowerCase();
+    return /(piracy|pirate|interdict|snare|hit\b|board|ambush|camp|loot|hauler|freighter|qt|quantum|armistice|security|fps|ground raid|tractor|cutlass|corsair|mule|salvage)/.test(lc);
+  } catch { return false; }
+}
+
+async function getTopKPiracyMessages(query, k = 5) {
+  try {
+    const data = await getMessages();
+    if (!Array.isArray(data) || data.length === 0) return [];
+    const qTokens = tokenize(query).filter(t => t.length > 2);
+    const now = Date.now();
+    // Score with piracy bias and recency
+    const scored = [];
+    for (const d of data) {
+      const base = scoreDoc(qTokens, d, now);
+      if (base <= 0 && !looksPiracyText(d?.content || d?.text || '')) continue;
+      let s = base;
+      // piracy keyword boost
+      if (looksPiracyText(d?.content || d?.text || '')) s += 1.2;
+      // channel name hints
+      const ch = String(d?.channelName || d?.channel || '').toLowerCase();
+      if (/advice|piracy|ops|hit/.test(ch)) s += 0.4;
+      // longer informative lines get a small boost
+      const len = String(d?.content || d?.text || '').length;
+      if (len > 120) s += 0.1;
+      if (s > 0) scored.push({ d, s });
+    }
+    const top = scored
+      .sort((a, b) => b.s - a.s)
+      .slice(0, Math.max(1, k))
+      .map(x => toSnippet(x.d));
+    return top;
+  } catch (e) {
+    console.error('getTopKPiracyMessages error:', e?.message || e);
+    return [];
+  }
+}
+
 module.exports = {
   getTopK,
   getTopKFromKnowledgePiracy,
+  getTopKPiracyMessages,
 };

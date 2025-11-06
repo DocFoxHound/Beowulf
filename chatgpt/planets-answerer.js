@@ -35,7 +35,7 @@ module.exports = {
       p.factions ? `Factions: ${Array.isArray(p.factions) ? p.factions.join(', ') : String(p.factions)}` : null,
       p.jurisdiction ? `Jurisdiction: ${p.jurisdiction}` : null,
     ].filter(Boolean);
-    // Relationship enrichment: list child stations/outposts/cities and terminal count
+    // Relationship enrichment: list child moons/stations/outposts/cities and terminal count
     try {
       const rel = getRelations ? getRelations() : null;
       const pid = (p && typeof p.id === 'number') ? p.id : (rel?.byName?.planets?.[String(p.name || '').trim().toLowerCase()] ?? null);
@@ -43,15 +43,17 @@ module.exports = {
       if (rel && isNumericId) {
         const pc = rel.planetChildren?.[String(pid)] || {};
         const nameOf = (type, id) => {
-          const map = type==='station'? rel.stationsById : type==='city'? rel.citiesById : type==='outpost'? rel.outpostsById : null;
+          const map = type==='moon'? rel.moonsById : type==='station'? rel.stationsById : type==='city'? rel.citiesById : type==='outpost'? rel.outpostsById : null;
           const row = map ? map[String(id)] : null;
           return row?.name || null;
         };
         const capList = (arr, type, n=8) => (Array.isArray(arr)?arr:[]).map(id => nameOf(type, id)).filter(Boolean).slice(0,n);
+        const moons = capList(pc.moons, 'moon');
         const stations = capList(pc.stations, 'station');
         const outposts = capList(pc.outposts, 'outpost');
         const cities = capList(pc.cities, 'city');
         const tCount = Array.isArray(pc.terminals) ? pc.terminals.length : 0;
+        if (moons.length) lines.push(`Moons: ${moons.join(', ')}`);
         if (stations.length) lines.push(`Stations: ${stations.join(', ')}`);
         if (outposts.length) lines.push(`Outposts: ${outposts.join(', ')}`);
         if (cities.length) lines.push(`Cities: ${cities.join(', ')}`);

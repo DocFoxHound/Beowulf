@@ -7,6 +7,7 @@ function filterOutposts(filters = {}) {
   let rows = outposts || [];
   if (filters.system_name) rows = rows.filter(o => String(o.system || '').toLowerCase().includes(String(filters.system_name).toLowerCase()));
   if (filters.planet_name) rows = rows.filter(o => String(o.planet || '').toLowerCase().includes(String(filters.planet_name).toLowerCase()));
+  if (filters.moon_name) rows = rows.filter(o => String(o.moon || '').toLowerCase().includes(String(filters.moon_name).toLowerCase()));
   if (filters.is_default) rows = rows.filter(o => o.default);
   return rows;
 }
@@ -32,6 +33,7 @@ module.exports = {
       `Outpost: ${o.name}`,
       o.system ? `System: ${o.system}` : null,
       o.planet ? `Planet: ${o.planet}` : null,
+      o.moon ? `Moon: ${o.moon}` : null,
       Array.isArray(o.features) && o.features.length ? `Features: ${o.features.join(', ')}` : null,
     ].filter(Boolean);
     // Relations: terminals attached to this outpost
@@ -70,17 +72,17 @@ module.exports = {
     await ensure();
     const rows = filterOutposts(filters).slice(0, top);
     if (!rows.length) return { text: 'No outposts in cache yet.' };
-    return { text: ['Outposts:', ...rows.map(o => `- ${o.name}${o.system?` — ${o.system}`:''}${o.planet?` (${o.planet})`:''}`)].join('\n') };
+  return { text: ['Outposts:', ...rows.map(o => `- ${o.name}${o.system?` — ${o.system}`:''}${o.moon?` (${o.moon})`:(o.planet?` (${o.planet})`:``)}`)].join('\n') };
   },
   async searchOutposts({ query = '', top = 12, location_name = null } = {}) {
     await ensure();
     const q = String(query || '').toLowerCase();
     const { outposts } = getCache();
     let rows = (outposts || []).filter(o => String(o.name || '').toLowerCase().includes(q));
-    if (location_name) rows = rows.filter(o => [o.system, o.planet].some(v => String(v||'').toLowerCase().includes(String(location_name).toLowerCase())));
+  if (location_name) rows = rows.filter(o => [o.system, o.planet, o.moon].some(v => String(v||'').toLowerCase().includes(String(location_name).toLowerCase())));
     rows = rows.slice(0, top);
     if (!rows.length) return { text: 'No matching outposts found.' };
-    return { text: ['Matches:', ...rows.map(o => `- ${o.name}${o.system?` — ${o.system}`:''}${o.planet?` (${o.planet})`:''}`)].join('\n') };
+  return { text: ['Matches:', ...rows.map(o => `- ${o.name}${o.system?` — ${o.system}`:''}${o.moon?` (${o.moon})`:(o.planet?` (${o.planet})`:``)}`)].join('\n') };
   },
   async recentOutpostChanges() { return { text: 'No outpost change log available yet.' }; },
   async outpostFactionSummary() { return { text: 'Outpost faction summary requires populated faction data.' }; },

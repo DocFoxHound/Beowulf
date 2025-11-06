@@ -5,12 +5,13 @@ const fs = require('fs');
 const path = require('path');
 const { pool } = require('../db/pool');
 // Optional UEX models (HTTP-backed). We'll lazy-fallback to these when DB/JSON are empty.
-let UexStarSystemsModel, UexPlanetsModel, UexSpaceStationsModel, UexOutpostsModel,
+let UexStarSystemsModel, UexPlanetsModel, UexMoonsModel, UexSpaceStationsModel, UexOutpostsModel,
     UexCitiesModel, UexTerminalModel, UexCommoditiesByTerminalModel, UexItemsByTerminalModel,
-    UexCommoditiesSummaryModel, UexItemsSummaryModel, UexTerminalPricesModel;
+    UexCommoditiesSummaryModel, UexItemsSummaryModel, UexTerminalPricesModel, UexRefineryYieldsModel;
 try {
   ({ UexStarSystemsModel } = require('../api/models/uex-star-systems'));
   ({ UexPlanetsModel } = require('../api/models/uex-planets'));
+  ({ UexMoonsModel } = require('../api/models/uex-moons'));
   ({ UexSpaceStationsModel } = require('../api/models/uex-space-stations'));
   ({ UexOutpostsModel } = require('../api/models/uex-outposts'));
   ({ UexCitiesModel } = require('../api/models/uex-cities'));
@@ -20,6 +21,7 @@ try {
   ({ UexCommoditiesSummaryModel } = require('../api/models/uex-commodities-summary'));
   ({ UexItemsSummaryModel } = require('../api/models/uex-items-summary'));
   ({ UexTerminalPricesModel } = require('../api/models/uex-terminal-prices'));
+  ({ UexRefineryYieldsModel } = require('../api/models/uex-refinery-yields'));
 } catch (e) {
   // If any model fails to load (e.g., missing file or env), we simply won't use the UEX fallback.
 }
@@ -141,9 +143,10 @@ async function refreshFromUex() {
   if (!UexStarSystemsModel || !UexPlanetsModel || !UexSpaceStationsModel || !UexOutpostsModel) return false;
   try {
     // Fetch in parallel (gracefully handle optional models)
-    const [sysRows, planetRows, stationRows, outpostRows, cityRows, terminalRows, cbtRows, ibtRows, csRows, isRows, tpRows] = await Promise.all([
+    const [sysRows, planetRows, moonRows, stationRows, outpostRows, cityRows, terminalRows, cbtRows, ibtRows, csRows, isRows, tpRows, ryRows] = await Promise.all([
       UexStarSystemsModel.list().catch(()=>[]),
       UexPlanetsModel.list().catch(()=>[]),
+      (UexMoonsModel?.list ? UexMoonsModel.list().catch(()=>[]) : Promise.resolve([])),
       UexSpaceStationsModel.list().catch(()=>[]),
       UexOutpostsModel.list().catch(()=>[]),
       (UexCitiesModel?.list ? UexCitiesModel.list().catch(()=>[]) : Promise.resolve([])),
@@ -153,6 +156,7 @@ async function refreshFromUex() {
       (UexCommoditiesSummaryModel?.list ? UexCommoditiesSummaryModel.list().catch(()=>[]) : Promise.resolve([])),
       (UexItemsSummaryModel?.list ? UexItemsSummaryModel.list().catch(()=>[]) : Promise.resolve([])),
       (UexTerminalPricesModel?.list ? UexTerminalPricesModel.list().catch(()=>[]) : Promise.resolve([])),
+      (UexRefineryYieldsModel?.list ? UexRefineryYieldsModel.list().catch(()=>[]) : Promise.resolve([])),
     ]);
 
     // Map to simplified cache shapes used by answerers and relations
@@ -178,14 +182,29 @@ async function refreshFromUex() {
       factions: r.faction_name ? [r.faction_name] : undefined,
       jurisdiction: r.jurisdiction_name || undefined,
     }));
+    const moons = (moonRows || []).map(r => ({
+      id: r.id,
+      name: r.name,
+      code: r.code,
+      system: r.star_system_name || undefined,
+      planet: r.planet_name || undefined,
+      id_star_system: r.id_star_system,
+      id_planet: r.id_planet,
+      id_orbit: r.id_orbit,
+      live: Boolean(r.is_available_live || r.is_available),
+      default: Boolean(r.is_default),
+      visible: Boolean(r.is_visible),
+    })).filter(m => m.name && m.id);
     const stations = (stationRows || []).map(r => ({
       id: r.id,
       name: r.name || r.nickname || undefined,
       system: r.star_system_name || undefined,
       planet: r.planet_name || undefined,
+      moon: r.moon_name || undefined,
       orbit: r.orbit_name || undefined,
       id_star_system: r.id_star_system,
       id_planet: r.id_planet,
+      id_moon: r.id_moon,
       id_city: r.id_city,
       default: Boolean(r.is_default),
       features: collectFeatures(r),
@@ -195,8 +214,10 @@ async function refreshFromUex() {
       name: r.name || r.nickname || undefined,
       system: r.star_system_name || undefined,
       planet: r.planet_name || undefined,
+      moon: r.moon_name || undefined,
       id_star_system: r.id_star_system,
       id_planet: r.id_planet,
+      id_moon: r.id_moon,
       default: Boolean(r.is_default),
       features: collectFeatures(r),
     })).filter(o => o.name && o.id);
@@ -207,14 +228,18 @@ async function refreshFromUex() {
       planet: r.planet_name || undefined,
       id_star_system: r.id_star_system,
       id_planet: r.id_planet,
+      moon: r.moon_name || undefined,
+      id_moon: r.id_moon,
     })).filter(c => c.name && c.id);
     const terminals = (terminalRows || []).map(r => ({
       id: r.id,
       name: r.name || r.nickname || r.code || undefined,
       system: r.star_system_name || undefined,
       planet: r.planet_name || undefined,
+      moon: r.moon_name || undefined,
       id_star_system: r.id_star_system,
       id_planet: r.id_planet,
+      id_moon: r.id_moon,
       id_space_station: r.id_space_station,
       id_outpost: r.id_outpost,
       id_city: r.id_city,
@@ -266,17 +291,44 @@ async function refreshFromUex() {
       price_sell_avg: r.price_sell_avg,
     }));
     const terminalPrices = (tpRows || []).map(r => ({ ...r }));
+    const refineryYields = (ryRows || []).map(r => ({
+      id: r.id,
+      id_commodity: r.id_commodity,
+      commodity_name: r.commodity_name,
+      value: r.value != null ? Number(r.value) : undefined,
+      value_week: r.value_week != null ? Number(r.value_week) : undefined,
+      value_month: r.value_month != null ? Number(r.value_month) : undefined,
+      id_star_system: r.id_star_system,
+      star_system_name: r.star_system_name,
+      id_planet: r.id_planet,
+      planet_name: r.planet_name,
+      id_orbit: r.id_orbit,
+      orbit_name: r.orbit_name,
+      id_moon: r.id_moon,
+      moon_name: r.moon_name,
+      id_space_station: r.id_space_station,
+      space_station_name: r.space_station_name,
+      id_city: r.id_city,
+      city_name: r.city_name,
+      id_outpost: r.id_outpost,
+      outpost_name: r.outpost_name,
+      id_poi: r.id_poi,
+      poi_name: r.poi_name,
+      id_terminal: r.id_terminal,
+      terminal_name: r.terminal_name,
+    }));
 
     // Seed cache only if we have at least some core entities
-    const coreCounts = [systems.length, planets.length, stations.length, outposts.length].reduce((a,b)=>a+b,0);
+  const coreCounts = [systems.length, planets.length, moons.length, stations.length, outposts.length].reduce((a,b)=>a+b,0);
     if (coreCounts === 0) return false;
 
     // Preserve any market data already present (items/prices/transactions), replace world topology
-    const { items, prices, locations, moons, transactions } = state.data;
+    const { items, prices, locations, transactions } = state.data;
     state.data = {
       items, prices, locations,
-      systems, planets, moons: moons || [], stations, outposts,
+      systems, planets, moons, stations, outposts,
       cities, terminals, commoditiesByTerminal, itemsByTerminal, commoditiesSummary, itemsSummary, terminalPrices,
+      refineryYields,
       transactions,
     };
     state.loadedAt = Date.now();
@@ -318,6 +370,7 @@ function whereItemAvailable(itemName) {
   const terminalsById = rel.terminalsById || {};
   const systemsById = rel.systemsById || {};
   const planetsById = rel.planetsById || {};
+  const moonsById = rel.moonsById || {};
   const stationsById = rel.stationsById || {};
   const outpostsById = rel.outpostsById || {};
   const citiesById = rel.citiesById || {};
@@ -326,12 +379,13 @@ function whereItemAvailable(itemName) {
     if (!t) return '';
     const sys = t.id_star_system != null ? systemsById[String(t.id_star_system)] : null;
     const pl = t.id_planet != null ? planetsById[String(t.id_planet)] : null;
+    const mo = t.id_moon != null ? moonsById[String(t.id_moon)] : null;
     const st = t.id_space_station != null ? stationsById[String(t.id_space_station)] : null;
     const op = t.id_outpost != null ? outpostsById[String(t.id_outpost)] : null;
     const ci = t.id_city != null ? citiesById[String(t.id_city)] : null;
     // Compose a readable, filter-friendly location string that includes the system
-    const leaf = (st?.name || op?.name || ci?.name || pl?.name || t.name);
-    const mid = pl?.name && (st || op || ci) ? `${pl.name}` : (pl?.name || null);
+    const leaf = (st?.name || op?.name || ci?.name || mo?.name || pl?.name || t.name);
+    const mid = mo?.name || (pl?.name && (st || op || ci) ? `${pl.name}` : (pl?.name || null));
     const parts = [leaf, mid, sys?.name].filter(Boolean);
     return parts.join(' / ');
   };
@@ -358,6 +412,7 @@ function whereItemAvailable(itemName) {
       id_space_station: t?.id_space_station,
       id_outpost: t?.id_outpost,
       id_city: t?.id_city,
+      id_moon: t?.id_moon,
     });
   }
   // Items
@@ -380,6 +435,7 @@ function whereItemAvailable(itemName) {
       id_space_station: t?.id_space_station,
       id_outpost: t?.id_outpost,
       id_city: t?.id_city,
+      id_moon: t?.id_moon,
     });
   }
   return out;
@@ -435,6 +491,7 @@ function buildRelations() {
 
   const systemsById = toMap(d.systems, 'id');
   const planetsById = toMap(d.planets, 'id');
+  const moonsById = toMap(d.moons, 'id');
   const stationsById = toMap(d.stations, 'id');
   const citiesById = toMap(d.cities, 'id');
   const outpostsById = toMap(d.outposts, 'id');
@@ -448,19 +505,24 @@ function buildRelations() {
 
   const ensureSystemChild = (sid, kind) => {
     const k = String(sid);
-    if (!systemChildren[k]) systemChildren[k] = { planets: [], stations: [], cities: [], outposts: [], terminals: [] };
+    if (!systemChildren[k]) systemChildren[k] = { planets: [], moons: [], stations: [], cities: [], outposts: [], terminals: [] };
     if (!systemChildren[k][kind]) systemChildren[k][kind] = [];
     return systemChildren[k][kind];
   };
   const ensurePlanetChild = (pid) => {
     const k = String(pid);
-    if (!planetChildren[k]) planetChildren[k] = { stations: [], cities: [], outposts: [], terminals: [] };
+    if (!planetChildren[k]) planetChildren[k] = { moons: [], stations: [], cities: [], outposts: [], terminals: [] };
     return planetChildren[k];
   };
 
   // Populate children for systems and planets
   for (const p of d.planets) {
     if (p.id_star_system != null) ensureSystemChild(p.id_star_system, 'planets').push(p.id);
+  }
+  // Moons belong to a star system and a planet
+  for (const m of d.moons) {
+    if (m.id_star_system != null) ensureSystemChild(m.id_star_system, 'moons').push(m.id);
+    if (m.id_planet != null) ensurePlanetChild(m.id_planet).moons.push(m.id);
   }
   for (const s of d.stations) {
     if (s.id_star_system != null) ensureSystemChild(s.id_star_system, 'stations').push(s.id);
@@ -477,6 +539,7 @@ function buildRelations() {
   for (const t of d.terminals) {
     if (t.id_star_system != null) ensureSystemChild(t.id_star_system, 'terminals').push(t.id);
     if (t.id_planet != null) ensurePlanetChild(t.id_planet).terminals.push(t.id);
+    // Note: terminals attached to moons are grouped under their parent planet for now.
     if (t.id_space_station != null) {
       const k = String(t.id_space_station);
       if (!stationChildren[k]) stationChildren[k] = { terminals: [] };
@@ -515,6 +578,7 @@ function buildRelations() {
   state.relations = {
     systemsById,
     planetsById,
+    moonsById,
     stationsById,
     citiesById,
     outpostsById,
@@ -527,6 +591,7 @@ function buildRelations() {
     byName: {
       systems: byName(d.systems),
       planets: byName(d.planets),
+      moons: byName(d.moons),
       stations: byName(d.stations),
       cities: byName(d.cities),
       outposts: byName(d.outposts),

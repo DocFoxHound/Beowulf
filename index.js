@@ -188,18 +188,18 @@ channelIds.forEach((channel) => {
   });
 });
 
-// Retrieve the bot assistant (read: personality)
-myAssistant = openai.beta.assistants;
-async function retrieveAssistant() {
-  myAssistant = await openai.beta.assistants.retrieve(
-    process.env.ASSISTANT_KEY
-  );
-}
+// // Retrieve the bot assistant (read: personality)
+// myAssistant = openai.beta.assistants;
+// async function retrieveAssistant() {
+//   myAssistant = await openai.beta.assistants.retrieve(
+//     process.env.ASSISTANT_KEY
+//   );
+// }
 
-//---------------------------------------------------------------------------------//
+// //---------------------------------------------------------------------------------//
 
-//retrieve the chatGPT assistant
-retrieveAssistant();
+// //retrieve the chatGPT assistant
+// retrieveAssistant();
 
 //Event Listener: login
 client.on("ready", async () => {
@@ -282,9 +282,16 @@ client.on("ready", async () => {
     }
   };
   // Run once at startup, then on a fixed interval
-  // At launch: only warm caches from existing DB data (no external refresh)
-  await primeLocationAndMarketCaches();
-  console.log('[Cache] Initial in-memory caches primed from DB.');
+  // If enabled via env, perform a full fresh UEX load at startup (tables are cleared per category before insert)
+  const FRESH_UEX_ON_START = (process.env.UEX_FRESH_LOAD_ON_START || 'false').toLowerCase() === 'true';
+  if (FRESH_UEX_ON_START) {
+    console.log('[UEX] Fresh load on start enabled. Running UEX refresh sequence now…');
+    await runUEXRefreshSequence();
+  } else {
+    // Default: only warm caches from existing DB data (no external refresh)
+    await primeLocationAndMarketCaches();
+    console.log('[Cache] Initial in-memory caches primed from DB.');
+  }
   // Indicate bot is fully ready only after caches are primed
   console.log("Ready")
   // After startup preloads: batch-ingest chat logs into knowledge vectors, then prune

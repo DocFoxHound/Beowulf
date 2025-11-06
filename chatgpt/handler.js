@@ -688,7 +688,7 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
       const botName = (client?.user?.username || '').trim().toLowerCase();
       const tLower = String(target).trim().toLowerCase();
       if (botName && (tLower === botName || tLower === 'robohound')) {
-        const selfDesc = 'I\'m RoboHound — a Discord bot for Star Citizen ops. I can summarize recent activity, answer market questions (UEX-backed), list systems/planets/stations/outposts, and fetch piracy stats and summaries from our knowledge.';
+  const selfDesc = 'I\'m RoboHound — a Discord bot for Star Citizen ops. I can summarize recent activity, answer market questions (UEX-backed), list systems/planets/moons/stations/outposts/cities, and fetch piracy stats and summaries from our knowledge.';
         await sendResponse(message, selfDesc, true);
         return;
       }
@@ -1143,7 +1143,7 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
       console.error('latest hit lookup failed:', e?.response?.data || e?.message || e);
     }
   }
-  const { getTopK, getTopKFromKnowledgePiracy } = require('./retrieval');
+  const { getTopK, getTopKFromKnowledgePiracy, getTopKPiracyMessages } = require('./retrieval');
   const { bestBuyLocations, bestSellLocations, spotFor, mostMovement, bestProfitRoutes, mostActiveTerminals, bestOverallProfitRoute, bestCrossSystemRoutes } = require('./market-answerer');
   const { piracyAdviceForRoute } = require('./piracy-route-advice');
   const {
@@ -1736,17 +1736,11 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
           guildId: message.guild?.id,
           preferVector: (process.env.KNOWLEDGE_PREFER_VECTOR || 'true').toLowerCase() === 'true',
         }) : []),
-        // For piracy.advice, explicitly include chat snippets about piracy as well
-        ...((routed?.intent === 'piracy.advice') ? await getTopK({
-          query: /\bpiracy\b|\bpirate\b/.test(message.content) ? message.content : `${message.content} piracy`,
-          k: 5,
-          sources: ['messages'],
-          openai,
-          guildId: message.guild?.id,
-          channelId: message.channelId,
-          preferVector: (process.env.KNOWLEDGE_PREFER_VECTOR || 'true').toLowerCase() === 'true',
-          temporalHint: false,
-        }) : []),
+        // For piracy.advice, explicitly include chat snippets about piracy as well (topic-focused)
+        ...((routed?.intent === 'piracy.advice') ? await getTopKPiracyMessages(
+          /\bpiracy\b|\bpirate\b/.test(message.content) ? message.content : `${message.content} piracy`,
+          5
+        ) : []),
         // General info buckets
         ...(generalMessages || []),
         ...(generalKnowledge || []),

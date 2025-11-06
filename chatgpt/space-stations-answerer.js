@@ -7,6 +7,7 @@ function filterStations(filters = {}) {
   let rows = stations || [];
   if (filters.system_name) rows = rows.filter(s => String(s.system || '').toLowerCase().includes(String(filters.system_name).toLowerCase()));
   if (filters.planet_name) rows = rows.filter(s => String(s.planet || '').toLowerCase().includes(String(filters.planet_name).toLowerCase()));
+  if (filters.moon_name) rows = rows.filter(s => String(s.moon || '').toLowerCase().includes(String(filters.moon_name).toLowerCase()));
   if (filters.is_default) rows = rows.filter(s => s.default);
   return rows;
 }
@@ -32,6 +33,7 @@ module.exports = {
       `Station: ${s.name}`,
       s.system ? `System: ${s.system}` : null,
       s.planet ? `Planet: ${s.planet}` : null,
+      s.moon ? `Moon: ${s.moon}` : null,
       s.orbit ? `Orbit: ${s.orbit}` : null,
       Array.isArray(s.features) && s.features.length ? `Features: ${s.features.join(', ')}` : null,
     ].filter(Boolean);
@@ -71,17 +73,17 @@ module.exports = {
     await ensure();
     const rows = filterStations(filters).slice(0, top);
     if (!rows.length) return { text: 'No stations in cache yet.' };
-    return { text: ['Stations:', ...rows.map(s => `- ${s.name}${s.system?` — ${s.system}`:''}${s.planet?` (${s.planet})`:''}`)].join('\n') };
+  return { text: ['Stations:', ...rows.map(s => `- ${s.name}${s.system?` — ${s.system}`:''}${s.moon?` (${s.moon})`:(s.planet?` (${s.planet})`:``)}`)].join('\n') };
   },
   async searchSpaceStations({ query = '', top = 12, location_name = null } = {}) {
     await ensure();
     const q = String(query || '').toLowerCase();
     const { stations } = getCache();
     let rows = (stations || []).filter(s => String(s.name || '').toLowerCase().includes(q));
-    if (location_name) rows = rows.filter(s => [s.system, s.planet, s.orbit].some(v => String(v||'').toLowerCase().includes(String(location_name).toLowerCase())));
+  if (location_name) rows = rows.filter(s => [s.system, s.planet, s.moon, s.orbit].some(v => String(v||'').toLowerCase().includes(String(location_name).toLowerCase())));
     rows = rows.slice(0, top);
     if (!rows.length) return { text: 'No matching stations found.' };
-    return { text: ['Matches:', ...rows.map(s => `- ${s.name}${s.system?` — ${s.system}`:''}${s.planet?` (${s.planet})`:''}`)].join('\n') };
+  return { text: ['Matches:', ...rows.map(s => `- ${s.name}${s.system?` — ${s.system}`:''}${s.moon?` (${s.moon})`:(s.planet?` (${s.planet})`:``)}`)].join('\n') };
   },
   async recentSpaceStationChanges() {
     return { text: 'No station change log available yet. Once populated, I can summarize by date.' };

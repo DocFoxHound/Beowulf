@@ -49,11 +49,13 @@ module.exports = {
           return row?.name || null;
         };
         const capList = (arr, type, n=6) => (Array.isArray(arr)?arr:[]).map(id => nameOf(type, id)).filter(Boolean).slice(0,n);
-        const planets = capList(sc.planets, 'planet');
+  const planets = capList(sc.planets, 'planet');
+  const moons = capList(sc.moons, 'moon');
         const stations = capList(sc.stations, 'station');
         const outposts = capList(sc.outposts, 'outpost');
         const cities = capList(sc.cities, 'city');
         if (planets.length) lines.push(`Planets: ${planets.join(', ')}`);
+  if (moons.length) lines.push(`Moons: ${moons.join(', ')}`);
         if (stations.length) lines.push(`Stations: ${stations.join(', ')}`);
         if (outposts.length) lines.push(`Outposts: ${outposts.join(', ')}`);
         if (cities.length) lines.push(`Cities: ${cities.join(', ')}`);

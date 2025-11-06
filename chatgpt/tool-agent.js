@@ -3,12 +3,15 @@
 
 const { sendResponse } = require('../threads/send-response.js');
 const { createHitLog } = require('../api/hitTrackerApi.js');
+const { getHitLogsByPatch, getAllHitLogs } = require('../api/hitTrackerApi.js');
 const { getAllSummarizedItems, getAllSummarizedCommodities } = require('../api/uexApi.js');
 const { getAllGameVersions } = require('../api/gameVersionApi.js');
 const { handleHitPost } = require('../functions/post-new-hit.js');
-const { bestBuyLocations, bestSellLocations, spotFor, bestProfitRoutes, mostActiveTerminals, bestOverallProfitRoute } = require('./market-answerer');
+const { bestBuyLocations, bestSellLocations, spotFor, bestProfitRoutes, mostActiveTerminals, bestOverallProfitRoute, mostMovement, summarizeMarket } = require('./market-answerer');
 const { runWithResponses } = require('./responses-run.js');
 const { piracyAdviceForRoute } = require('./piracy-route-advice');
+const { getTopKFromKnowledgePiracy } = require('./retrieval');
+const { getTopKPiracyMessages } = require('./retrieval');
 
 // Lightweight per-user/channel session for multi-turn slot-filling
 const sessions = new Map(); // key -> { messages, ts }
@@ -113,6 +116,21 @@ function getToolsSpec() {
     {
       type: 'function',
       function: {
+        name: 'market_auto',
+        description: 'Let the bot parse a free-form market/world question and choose the right dataset and metric automatically (buy/sell/spot/routes/activity/list).',
+        parameters: {
+          type: 'object',
+          properties: {
+            query: { type: 'string', description: 'The user\'s raw market/world question.' },
+            top: { type: 'integer', minimum: 1, maximum: 20, default: 6 },
+          },
+          required: ['query'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
         name: 'create_hit',
         description: 'Create a piracy hit-log entry. Ask the user for missing fields first.',
         parameters: {
@@ -142,6 +160,25 @@ function getToolsSpec() {
     {
       type: 'function',
       function: {
+        name: 'market_summary',
+        description: 'Combined market summary (buys, sells, routes) from a single consistent dataset.',
+        parameters: {
+          type: 'object',
+          properties: {
+            item_name: { type: 'string' },
+            location: { type: 'string', nullable: true },
+            area_type: { type: 'string', nullable: true, enum: ['terminal','station','outpost','city','planet'] },
+            top_buys: { type: 'integer', minimum: 1, maximum: 10, default: 5 },
+            top_sells: { type: 'integer', minimum: 1, maximum: 10, default: 5 },
+            top_routes: { type: 'integer', minimum: 1, maximum: 10, default: 5 },
+          },
+          required: ['item_name'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
         name: 'market_best_buy',
         description: 'Top buy locations for a commodity/item.',
         parameters: {
@@ -149,6 +186,7 @@ function getToolsSpec() {
           properties: {
             item_name: { type: 'string' },
             location: { type: 'string', nullable: true },
+            area_type: { type: 'string', nullable: true, enum: ['terminal','station','outpost','city','planet'], description: 'Limit results to specific area types' },
             top: { type: 'integer', minimum: 1, maximum: 10, default: 5 },
           },
           required: ['item_name'],
@@ -165,6 +203,7 @@ function getToolsSpec() {
           properties: {
             item_name: { type: 'string' },
             location: { type: 'string', nullable: true },
+            area_type: { type: 'string', nullable: true, enum: ['terminal','station','outpost','city','planet'], description: 'Limit results to specific area types' },
             top: { type: 'integer', minimum: 1, maximum: 10, default: 5 },
           },
           required: ['item_name'],
@@ -181,6 +220,7 @@ function getToolsSpec() {
           properties: {
             item_name: { type: 'string' },
             location: { type: 'string', nullable: true },
+            area_type: { type: 'string', nullable: true, enum: ['terminal','station','outpost','city','planet'], description: 'Limit results to specific area types' },
             top: { type: 'integer', minimum: 1, maximum: 10, default: 6 },
           },
           required: ['item_name'],
@@ -197,9 +237,26 @@ function getToolsSpec() {
           properties: {
             item_name: { type: 'string', description: 'Commodity/item name or "*" for overall' },
             location: { type: 'string', nullable: true },
+            area_type: { type: 'string', nullable: true, enum: ['terminal','station','outpost','city','planet'], description: 'Require both endpoints to match the area type' },
             top: { type: 'integer', minimum: 1, maximum: 10, default: 5 },
           },
           required: ['item_name'],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'market_activity',
+        description: 'Summarize market activity: busiest commodities or most active terminals (visitation frequency).',
+        parameters: {
+          type: 'object',
+          properties: {
+            scope: { type: 'string', enum: ['commodity','terminal'], default: 'terminal', description: 'terminal -> visitation frequency; commodity -> transaction volume' },
+            location: { type: 'string', nullable: true },
+            top: { type: 'integer', minimum: 1, maximum: 20, default: 7 },
+          },
+          required: [],
         },
       },
     },
@@ -219,19 +276,60 @@ function getToolsSpec() {
         },
       },
     },
+    {
+      type: 'function',
+      function: {
+        name: 'piracy_hotspots',
+        description: 'Summarize recent piracy hotspots (active terminals likely to see freighter traffic). Use when the user asks generally for good pirate spots or where we have been pirating lately.',
+        parameters: {
+          type: 'object',
+          properties: {
+            location: { type: 'string', nullable: true, description: 'Optional system or area to filter by (e.g., Stanton, Pyro, Ruin Station).'},
+            top: { type: 'integer', minimum: 1, maximum: 20, default: 7 },
+          },
+          required: [],
+        },
+      },
+    },
+    {
+      type: 'function',
+      function: {
+        name: 'piracy_recent_hits',
+        description: 'List the most recent piracy hits. Prefer filtering by the latest game patch automatically; do NOT ask the user for the patch.',
+        parameters: {
+          type: 'object',
+          properties: {
+            top: { type: 'integer', minimum: 1, maximum: 20, default: 5 },
+            // Optional override; normally auto-filled to latest patch
+            patch: { type: 'string', nullable: true },
+          },
+          required: [],
+        },
+      },
+    },
   ];
 }
 
-function buildSystemPrompt() {
+function buildSystemPrompt(extraContext = '') {
   return `You are RoboHound, a Discord bot for IronPoint operations. Judge the user's intent and either:
 - Answer directly in one or two short sentences (banter or simple info), or
 - Call exactly one tool with well-formed arguments.
 For hit logging: if missing, ALWAYS ask the user to confirm whether the hit was Air, Ground, or Mixed, and collect cargo details. Prompt for victim names if mentioned or relevant. NEVER ask for patch/version; auto-fill the current patch.
+For market questions, determine the specific intent: best buy, best sell, spot prices, profit routes, refinery yields (refining/mining/ores), or activity (visitation frequency). If the user wants both pricing (buy/sell) and routes, prefer calling market_summary to keep everything consistent. Extract the item/commodity name and any location or area-type constraint (terminals, stations, outposts, moons). If the item is unclear, choose the closest known name; ask a brief clarification only when truly ambiguous. If the phrasing is broad or ambiguous, call market_auto with the raw question and let it choose the dataset/metric. For refining/mining/ore yield questions, call market_auto.
+Data source: market tools read from a local cache of UEX-derived tables (terminals, stations, outposts, prices, refinery yields, user reports). Do not hallucinate values; rely on tool outputs.
+Piracy advice: If the user asks for advice related to piracy (tactics, routes, ambush/snare, boarding), first decide if endpoints are present—if yes, call piracy_advice_for_route. If the user asks broadly for pirate spots/hotspots or where we’ve been pirating lately, call piracy_hotspots (optionally pass a system/location if mentioned). If the user asks for the most recent hits or latest hits, call piracy_recent_hits (do not ask for patch; assume the latest). If neither applies, answer briefly using the provided CONTEXT below.
+${extraContext ? `\nCONTEXT (snippets from org chat and knowledge—use as grounding, do not cite verbatim):\n${extraContext}` : ''}
 Keep replies short and professional. Avoid pirate slang.`;
 }
 
 async function executeTool({ name, args, message, client, openai }) {
   try {
+    if (name === 'market_auto') {
+      const { autoAnswerMarketQuestion } = require('./market-dataset-router');
+      if (!args.query) return { ok: false, error: 'query required' };
+      const ans = await autoAnswerMarketQuestion({ query: args.query, top: Number(args.top || 6) });
+      return { ok: true, text: ans.text, meta: ans.meta };
+    }
     if (name === 'create_hit') {
       const missing = [];
       if (!args.air_or_ground) missing.push('air_or_ground');
@@ -321,17 +419,17 @@ async function executeTool({ name, args, message, client, openai }) {
     }
     if (name === 'market_best_buy') {
       if (!args.item_name) return { ok: false, error: 'item_name required' };
-      const ans = await bestBuyLocations({ name: args.item_name, top: Number(args.top || 5), location: args.location || null });
+      const ans = await bestBuyLocations({ name: args.item_name, top: Number(args.top || 5), location: args.location || null, areaType: args.area_type || null });
       return { ok: true, text: ans.text };
     }
     if (name === 'market_best_sell') {
       if (!args.item_name) return { ok: false, error: 'item_name required' };
-      const ans = await bestSellLocations({ name: args.item_name, top: Number(args.top || 5), location: args.location || null });
+      const ans = await bestSellLocations({ name: args.item_name, top: Number(args.top || 5), location: args.location || null, areaType: args.area_type || null });
       return { ok: true, text: ans.text };
     }
     if (name === 'market_spot') {
       if (!args.item_name) return { ok: false, error: 'item_name required' };
-      const ans = await spotFor({ name: args.item_name, top: Number(args.top || 6), location: args.location || null });
+      const ans = await spotFor({ name: args.item_name, top: Number(args.top || 6), location: args.location || null, areaType: args.area_type || null });
       return { ok: true, text: ans.text };
     }
     if (name === 'market_route') {
@@ -340,8 +438,65 @@ async function executeTool({ name, args, message, client, openai }) {
         const ans = await bestOverallProfitRoute({ top: Number(args.top || 5), location: args.location || null });
         return { ok: true, text: ans.text };
       }
-      const ans = await bestProfitRoutes({ name: args.item_name, top: Number(args.top || 5), location: args.location || null });
+      const ans = await bestProfitRoutes({ name: args.item_name, top: Number(args.top || 5), location: args.location || null, areaType: args.area_type || null });
       return { ok: true, text: ans.text };
+    }
+    if (name === 'market_summary') {
+      if (!args.item_name) return { ok: false, error: 'item_name required' };
+      const ans = await summarizeMarket({
+        name: args.item_name,
+        location: args.location || null,
+        areaType: args.area_type || null,
+        topBuys: Number(args.top_buys || 5),
+        topSells: Number(args.top_sells || 5),
+        topRoutes: Number(args.top_routes || 5),
+      });
+      return { ok: true, text: ans.text };
+    }
+    if (name === 'market_activity') {
+      const scope = args.scope || 'terminal';
+      const location = args.location || null;
+      const top = Number(args.top || (scope === 'terminal' ? 10 : 7));
+      if (scope === 'terminal') {
+        const ans = await mostActiveTerminals({ top, location });
+        return { ok: true, text: ans.text };
+      }
+      const ans = await mostMovement({ scope: 'commodity', top, location });
+      return { ok: true, text: ans.text };
+    }
+    if (name === 'piracy_hotspots') {
+      const location = args.location || null;
+      const top = Number(args.top || 7);
+      const ans = await mostActiveTerminals({ top, location });
+      // Slightly relabel to make it fit piracy framing
+      const lines = (ans.text || '').split('\n');
+      if (lines.length > 0) lines[0] = 'Recent piracy hotspots (high-traffic terminals):';
+      return { ok: true, text: lines.join('\n') };
+    }
+    if (name === 'piracy_recent_hits') {
+      // Prefer latest patch; fall back to global latest hits
+      const top = Math.max(1, Math.min(20, Number(args.top || 5)));
+      let patch = args.patch || null;
+      try { patch = patch || (await getLatestPatch()); } catch {}
+      let rows = [];
+      try {
+        if (patch) rows = await getHitLogsByPatch(patch) || [];
+        if (!rows || !rows.length) rows = await getAllHitLogs() || [];
+      } catch {}
+      if (!Array.isArray(rows) || !rows.length) return { ok: false, error: 'No hits available' };
+      const getTime = (h) => { try { return new Date(h.created_at || h.createdAt || h.timestamp || 0).getTime(); } catch { return 0; } };
+      const sorted = rows.slice().sort((a,b)=> getTime(b)-getTime(a));
+      const take = sorted.slice(0, top);
+      const parts = [];
+      parts.push(`Most recent hits${patch ? ` (patch ${patch})` : ''}:`);
+      for (const h of take) {
+        const dt = (()=>{ try { const d = new Date(h.created_at || h.createdAt || h.timestamp); return isFinite(d) ? d.toISOString().slice(0,10) : ''; } catch { return ''; } })();
+        const title = h.title || `Hit #${h.id}`;
+        const val = Math.round(Number(h.total_value ?? h.total_cut_value ?? 0)).toLocaleString();
+        const scu = Math.round(Number(h.total_scu ?? 0)).toLocaleString();
+        parts.push(`- ${dt ? dt+' — ' : ''}${title}: ${val} aUEC over ${scu} SCU`);
+      }
+      return { ok: true, text: parts.join('\n') };
     }
     if (name === 'piracy_advice_for_route') {
       if (!args.from || !args.to) return { ok: false, error: 'from and to required' };
@@ -357,12 +512,27 @@ async function executeTool({ name, args, message, client, openai }) {
 async function runToolAgent(message, client, openai) {
   try {
     if (!openai?.chat?.completions?.create) return false;
+    // Lightweight piracy-advice detection and grounding context
+    const content = String(message.content || '');
+    const looksAdvice = /(advice|tips|how\s+do\s+i|how\s+should\s+i|best\s+way|where\s+should\s+i|what\s+should\s+i\s+do)/i.test(content);
+    const looksPiracy = /(piracy|pirate|interdict|snare|ambush|camp|board|hit\b|freighter|hauler)/i.test(content);
+    let extraContext = '';
+    if (looksAdvice && looksPiracy) {
+      try {
+        const [msgSnips, knSnips] = await Promise.all([
+          getTopKPiracyMessages(content, 4),
+          getTopKFromKnowledgePiracy({ query: content, k: 3, openai, guildId: message.guild?.id, preferVector: true }),
+        ]);
+        const snippets = ([]).concat(msgSnips || [], knSnips || []);
+        if (snippets.length) extraContext = snippets.join('\n');
+      } catch {}
+    }
 
-    const system = buildSystemPrompt();
+    const system = buildSystemPrompt(extraContext);
     const tools = getToolsSpec();
 
     const s = getSession(message);
-    const messages = [ { role: 'system', content: system } ];
+  const messages = [ { role: 'system', content: system } ];
     if (s?.messages && Array.isArray(s.messages)) messages.push(...s.messages);
     messages.push({ role: 'user', content: message.content || '' });
 

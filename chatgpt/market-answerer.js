@@ -10,10 +10,27 @@ async function ensureData() {
   refreshFromDb().catch(()=>{});
 }
 
-function pickRowsForItem(name, location) {
+function pickRowsForItem(name, location, areaType) {
   const rows = whereItemAvailable(name) || [];
-  if (location) return rows.filter(r => String(r.location || '').toLowerCase().includes(String(location).toLowerCase()));
-  return rows;
+  const locNorm = String(location || '').trim().toLowerCase();
+  const typeNorm = String(areaType || '').trim().toLowerCase();
+  let filtered = rows;
+  if (locNorm) {
+    filtered = filtered.filter(r => String(r.location || '').toLowerCase().includes(locNorm)
+      || String(r.star_system_name || '').toLowerCase().includes(locNorm)
+      || String(r.planet_name || '').toLowerCase().includes(locNorm));
+  }
+  if (typeNorm) {
+    filtered = filtered.filter(r => {
+      if (typeNorm === 'terminal') return true; // rows are per-terminal already; do not exclude
+      if (typeNorm === 'station') return r.id_space_station != null;
+      if (typeNorm === 'outpost') return r.id_outpost != null;
+      if (typeNorm === 'city') return r.id_city != null;
+      if (typeNorm === 'planet') return r.id_planet != null && r.id_space_station == null && r.id_outpost == null && r.id_city == null;
+      return true;
+    });
+  }
+  return filtered;
 }
 
 function renderLocations(rows, { top = 5, mode = 'buy' }) {
@@ -22,6 +39,11 @@ function renderLocations(rows, { top = 5, mode = 'buy' }) {
     ...r,
     score: mode === 'buy' ? Number(r.buy ?? Infinity) : Number(r.sell ?? 0)
   })).filter(r => isFinite(r.score) && r.score > 0);
+  if (!scored.length) {
+    return mode === 'buy'
+      ? 'No buy prices found.'
+      : 'No sell prices found.';
+  }
   const ordered = scored.sort((a, b) => mode === 'buy' ? a.score - b.score : b.score - a.score).slice(0, top);
   const lines = ordered.map(r => `- ${r.location}: ${mode === 'buy' ? 'buy' : 'sell'} at ${fmtNum(mode === 'buy' ? r.buy : r.sell)} ${r.currency || 'aUEC'}`);
   return lines.join('\n');
@@ -90,6 +112,43 @@ module.exports = {
     return { text: [header, ...lines].join('\n') };
   },
 
+  // Diagnostic utility: given a list of location names, report the top-buy commodity at each (by price_buy_avg)
+  // Contract:
+  // - inputs: { locations: string[], system?: string, top?: number }
+  // - outputs: { text, rows: Array<{ location: string, commodities: Array<{ name, buy_avg, sell_avg }> }> }
+  async topBuysByLocations({ locations = [], system = null, top = 1 } = {}) {
+    await ensureData();
+    const { terminalPrices } = getCache();
+    if (!Array.isArray(terminalPrices) || !terminalPrices.length) {
+      return { text: 'No terminal price data available.', rows: [] };
+    }
+    const norm = (s) => String(s || '').trim().toLowerCase();
+    const sys = norm(system);
+    const whereNameMatches = (r, loc) => {
+      const t = [r.space_station_name, r.outpost_name, r.city_name, r.planet_name, r.terminal_name].map(norm);
+      const L = norm(loc);
+      return t.some(x => x && x.includes(L));
+    };
+    const out = [];
+    for (const loc of locations) {
+      const rows = terminalPrices.filter(r => (!sys || norm(r.star_system_name).includes(sys)) && whereNameMatches(r, loc));
+      const nonZero = rows.filter(r => Number(r.price_buy_avg) > 0);
+      nonZero.sort((a,b)=>Number(b.price_buy_avg)-Number(a.price_buy_avg));
+      const take = nonZero.slice(0, Math.max(1, top));
+      out.push({
+        location: loc,
+        commodities: take.map(r => ({ name: r.commodity_name, buy_avg: Number(r.price_buy_avg) || 0, sell_avg: Number(r.price_sell_avg) || 0 }))
+      });
+    }
+    const lines = [];
+    for (const row of out) {
+      if (!row.commodities.length) { lines.push(`- ${row.location}: no buy data`); continue; }
+      const items = row.commodities.map(c => `${c.name}: ${isFinite(c.buy_avg) ? Math.round(c.buy_avg).toLocaleString() : c.buy_avg} aUEC`);
+      lines.push(`- ${row.location}: ${items.join('; ')}`);
+    }
+    return { text: ['Top buys by location', ...(system ? [`in ${system}`] : []), ':'].join(' ')+`\n${lines.join('\n')}`, rows: out };
+  },
+
   // Compute best routes between two star systems across all items
   async bestCrossSystemRoutes({ from, to, top = 5 } = {}) {
     await ensureData();
@@ -145,29 +204,32 @@ module.exports = {
     const lines = topRows.map(p => `- ${p.item} (${p.direction}): Buy at ${p.buyAt} for ${fmtNum(p.buy)}, sell at ${p.sellAt} for ${fmtNum(p.sell)} — margin ${fmtNum(p.margin)} aUEC`);
     return { text: [header, ...lines].join('\n') };
   },
-  async bestBuyLocations({ name, top = 5, location = null }) {
+  async bestBuyLocations({ name, top = 5, location = null, areaType = null }) {
     await ensureData();
     const item = findItem(name) || { name };
-    const rows = pickRowsForItem(item.name, location);
-    const header = `Best buy locations for ${item.name}${location ? ` near ${location}` : ''}:`;
+    const rows = pickRowsForItem(item.name, location, areaType);
+    const scopeBit = areaType ? ` (${areaType})` : '';
+    const header = `Best buy locations for ${item.name}${location ? ` near ${location}` : ''}${scopeBit}:`;
     const body = renderLocations(rows, { top, mode: 'buy' });
     return { text: [header, body].filter(Boolean).join('\n') };
   },
-  async bestSellLocations({ name, top = 5, location = null }) {
+  async bestSellLocations({ name, top = 5, location = null, areaType = null }) {
     await ensureData();
     const item = findItem(name) || { name };
-    const rows = pickRowsForItem(item.name, location);
-    const header = `Best sell locations for ${item.name}${location ? ` near ${location}` : ''}:`;
+    const rows = pickRowsForItem(item.name, location, areaType);
+    const scopeBit = areaType ? ` (${areaType})` : '';
+    const header = `Best sell locations for ${item.name}${location ? ` near ${location}` : ''}${scopeBit}:`;
     const body = renderLocations(rows, { top, mode: 'sell' });
     return { text: [header, body].filter(Boolean).join('\n') };
   },
-  async spotFor({ name, top = 6, location = null }) {
+  async spotFor({ name, top = 6, location = null, areaType = null }) {
     await ensureData();
     const item = findItem(name) || { name };
-    const rows = pickRowsForItem(item.name, location).slice(0, top);
+    const rows = pickRowsForItem(item.name, location, areaType).slice(0, top);
     if (!rows.length) return { text: `No spot prices available yet for ${item.name}. Once prices are loaded, I\'ll list buy/sell by terminal.` };
     const lines = rows.map(r => `- ${r.location}: buy ${fmtNum(r.buy)} / sell ${fmtNum(r.sell)} ${r.currency || 'aUEC'}`);
-    return { text: [`Spot prices for ${item.name}${location ? ` near ${location}` : ''}:`, ...lines].join('\n') };
+    const scopeBit = areaType ? ` (${areaType})` : '';
+    return { text: [`Spot prices for ${item.name}${location ? ` near ${location}` : ''}${scopeBit}:`, ...lines].join('\n') };
   },
   async mostMovement({ scope = 'commodity', top = 7, location = null }) {
     await ensureData();
@@ -246,7 +308,7 @@ module.exports = {
     });
     return { text: [`Most active terminals (last 15d user reports)${location ? ` near ${location}` : ''}:`, ...lines].join('\n') };
   },
-  async bestProfitRoutes({ name, top = 5, location = null }) {
+  async bestProfitRoutes({ name, top = 5, location = null, areaType = null }) {
     await ensureData();
     // Heuristic route: choose min buy and max sell terminals for the item
     const rows = whereItemAvailable(name) || [];
@@ -263,12 +325,25 @@ module.exports = {
     const pairs = [];
     for (const b of buys) {
       for (const s of sells) {
-        if (location) {
+        if (location || areaType) {
           const loc = String(location).toLowerCase();
           const bSys = String(b.star_system_name || '').toLowerCase();
           const sSys = String(s.star_system_name || '').toLowerCase();
-          const bothInSys = (bSys && sSys) ? (bSys.includes(loc) && sSys.includes(loc)) : (String(b.location).toLowerCase().includes(loc) && String(s.location).toLowerCase().includes(loc));
-          if (!bothInSys) continue;
+          if (location) {
+            const bothInSys = (bSys && sSys) ? (bSys.includes(loc) && sSys.includes(loc)) : (String(b.location).toLowerCase().includes(loc) && String(s.location).toLowerCase().includes(loc));
+            if (!bothInSys) continue;
+          }
+          if (areaType) {
+            const t = String(areaType).toLowerCase();
+            if (t === 'station' && !(b.id_space_station != null && s.id_space_station != null)) continue;
+            if (t === 'outpost' && !(b.id_outpost != null && s.id_outpost != null)) continue;
+            if (t === 'city' && !(b.id_city != null && s.id_city != null)) continue;
+            if (t === 'planet') {
+              const bPlanetOnly = b.id_planet != null && b.id_space_station == null && b.id_outpost == null && b.id_city == null;
+              const sPlanetOnly = s.id_planet != null && s.id_space_station == null && s.id_outpost == null && s.id_city == null;
+              if (!(bPlanetOnly && sPlanetOnly)) continue;
+            }
+          }
         }
         const margin = Number(s.sell || 0) - Number(b.buy || 0);
         if (margin > 0) pairs.push({ buyAt: b.location, sellAt: s.location, buy: b.buy, sell: s.sell, margin });
@@ -278,6 +353,89 @@ module.exports = {
     const best = pairs.slice(0, top);
     if (!best.length) return { text: `No profitable routes found for ${name} with the current data.` };
     const lines = best.map(p => `- Buy at ${p.buyAt} for ${fmtNum(p.buy)}, sell at ${p.sellAt} for ${fmtNum(p.sell)} — margin ${fmtNum(p.margin)} aUEC`);
-    return { text: [`Best profit routes for ${name}${location ? ` near ${location}` : ''}:`, ...lines].join('\n') };
+    const scopeBit = areaType ? ` (${areaType})` : '';
+    return { text: [`Best profit routes for ${name}${location ? ` near ${location}` : ''}${scopeBit}:`, ...lines].join('\n') };
+  },
+  // Combined summary to ensure internal consistency across buys, sells, and routes
+  async summarizeMarket({ name, location = null, areaType = null, topBuys = 5, topSells = 5, topRoutes = 5 }) {
+    await ensureData();
+    const item = findItem(name) || { name };
+    const rows = pickRowsForItem(item.name, location, areaType);
+    const scopeBit = areaType ? ` (${areaType})` : '';
+    if (!rows.length) {
+      return { text: `I don't have structured market data yet for ${item.name}. Load market/UEX data and I'll get specific.` };
+    }
+    // Buys
+    const buys = rows.filter(r => isFinite(Number(r.buy)) && Number(r.buy) > 0)
+      .sort((a,b)=>Number(a.buy)-Number(b.buy))
+      .slice(0, topBuys);
+    const buyLines = buys.map(r => `- ${r.location}: buy at ${fmtNum(r.buy)} ${r.currency || 'aUEC'}`);
+    // Sells
+    const sells = rows.filter(r => isFinite(Number(r.sell)) && Number(r.sell) > 0)
+      .sort((a,b)=>Number(b.sell)-Number(a.sell))
+      .slice(0, topSells);
+    const sellLines = sells.map(r => `- ${r.location}: sell at ${fmtNum(r.sell)} ${r.currency || 'aUEC'}`);
+    // Routes (use same filtered rows to keep consistency)
+    const pairs = [];
+    for (const b of buys.slice(0, Math.max(2, Math.min(6, topRoutes+1)))) {
+      for (const s of sells.slice(0, Math.max(2, Math.min(6, topRoutes+1)))) {
+        if (String(b.location) === String(s.location)) continue;
+        const margin = Number(s.sell || 0) - Number(b.buy || 0);
+        if (margin > 0) pairs.push({ buyAt: b.location, sellAt: s.location, buy: b.buy, sell: s.sell, margin });
+      }
+    }
+    pairs.sort((a,b)=>b.margin-a.margin);
+    const routeBest = pairs.slice(0, topRoutes);
+    const routeLines = routeBest.map(p => `- Buy at ${p.buyAt} for ${fmtNum(p.buy)}, sell at ${p.sellAt} for ${fmtNum(p.sell)} — margin ${fmtNum(p.margin)} aUEC`);
+
+    const parts = [];
+    parts.push(`Best Buy Locations for ${item.name}${location ? ` near ${location}` : ''}${scopeBit}:`);
+    parts.push(buyLines.length ? buyLines.join('\n') : 'No buy prices found.');
+    parts.push('');
+    parts.push(`Best Sell Locations for ${item.name}${location ? ` near ${location}` : ''}${scopeBit}:`);
+    parts.push(sellLines.length ? sellLines.join('\n') : 'No sell prices found.');
+    parts.push('');
+    parts.push(`Best Profit Routes for ${item.name}${location ? ` near ${location}` : ''}${scopeBit}:`);
+    parts.push(routeLines.length ? routeLines.join('\n') : 'No profitable routes found with the current data.');
+    return { text: parts.join('\n') };
+  },
+  // Refinery yields: summarize best yields for an ore/commodity optionally scoped by location
+  // Contract:
+  // - inputs: { commodity: string, location?: string, top?: number }
+  // - outputs: { text }
+  async summarizeRefineryYields({ commodity, location = null, top = 8 } = {}) {
+    await ensureData();
+    const d = getCache();
+    const rows = Array.isArray(d.refineryYields) ? d.refineryYields : [];
+    if (!rows.length) return { text: 'No refinery yield data available yet.' };
+    const n = (s) => String(s || '').trim().toLowerCase();
+    const itemName = commodity || '';
+    const itemNorm = n(itemName);
+    let filtered = rows;
+    if (itemNorm) filtered = filtered.filter(r => n(r.commodity_name).includes(itemNorm));
+    if (location) {
+      const loc = n(location);
+      filtered = filtered.filter(r => [r.terminal_name, r.space_station_name, r.outpost_name, r.city_name, r.moon_name, r.planet_name, r.star_system_name]
+        .some(v => n(v).includes(loc)));
+    }
+    if (!filtered.length) return { text: `No refinery yield data found${itemName?` for ${itemName}`:''}${location?` near ${location}`:''}.` };
+    // Score by current value, break ties with weekly/monthly averages
+    const sc = (r) => ({
+      val: Number(r.value || 0),
+      wk: Number(r.value_week || 0),
+      mo: Number(r.value_month || 0),
+    });
+    filtered.sort((a,b) => {
+      const A = sc(a), B = sc(b);
+      if (B.val !== A.val) return B.val - A.val;
+      if (B.wk !== A.wk) return B.wk - A.wk;
+      return B.mo - A.mo;
+    });
+    const take = filtered.slice(0, Math.max(3, Math.min(20, top)));
+    const locStr = (r) => r.terminal_name || r.space_station_name || r.outpost_name || r.city_name || r.moon_name || r.planet_name || r.star_system_name || 'Unknown';
+    const fmtPct = (v) => isFinite(Number(v)) && Number(v) > 0 ? `${Math.round(Number(v))}%` : '—';
+    const lines = take.map(r => `- ${locStr(r)}: yield ${fmtPct(r.value)}${r.value_week!=null?` (7d ${fmtPct(r.value_week)}`:''}${r.value_week!=null&&r.value_month!=null?`, `:''}${r.value_month!=null?`30d ${fmtPct(r.value_month)}`:''}${(r.value_week!=null||r.value_month!=null)?')':''}`);
+    const title = itemName ? `Best refinery yields for ${itemName}${location?` near ${location}`:''}:` : `Best refinery yields${location?` near ${location}`:''}:`;
+    return { text: [title, ...lines].join('\n') };
   },
 };
