@@ -225,6 +225,26 @@ function parseHitId(text) {
   return m ? Number(m[1]) : null;
 }
 
+// Robustly extract a numeric Hit ID from varied API shapes
+function getResolvedHitId(hit) {
+  try {
+    const candidates = [
+      hit?.id,
+      hit?.entry_id,
+      hit?.entryId,
+      hit?.HitTrackId,
+      hit?.HitLogId,
+    ];
+    for (const c of candidates) {
+      const n = Number(c);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 // Basic Levenshtein distance for fuzzy matching
 function levenshtein(a, b) {
   a = a || ''; b = b || '';
@@ -436,7 +456,8 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
               patch.total_cut_scu = Math.round((quick.value / shares) * 100) / 100;
             } catch {}
           }
-          const ok = await editHitLog(hit.id, patch).catch(()=>false);
+          const resolvedId = getResolvedHitId(hit);
+          const ok = resolvedId ? await editHitLog(resolvedId, patch).catch(()=>false) : false;
           if (ok) {
             try { const { handleHitPostUpdate } = require('../functions/post-new-hit.js'); await handleHitPostUpdate(client, hit, { ...hit, ...patch }); } catch {}
             await sendResponse(message, `Updated hit #${hit.id}: set ${quick.field.replace('_',' ')} to ${quick.value}.`, true);
@@ -457,6 +478,15 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
         // Resolve target hit: prefer current thread, then explicit id, then most recent by user
         let hit = null;
         try { hit = await getHitLogByThreadId(message.channelId); } catch {}
+        // Fallback: if direct thread lookup failed, scan all for matching thread_id
+        if (!hit) {
+          try {
+            const all = await getAllHitLogs();
+            if (Array.isArray(all)) {
+              hit = all.find(h => String(h.thread_id || h.threadId || '') === String(message.channelId));
+            }
+          } catch {}
+        }
         if (!hit) {
           const id = parseHitId(contentStr);
           if (id) {
@@ -486,10 +516,21 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
           await sendResponse(message, 'Only the original author or Blooded role can delete this hit.', true);
           return; // handled
         }
-        const ok = await deleteHitLog(hit.id).catch(()=>false);
+        const resolvedId = getResolvedHitId(hit);
+        if (!resolvedId) {
+          if (process.env.DEBUG_HIT_LOGS === '1') {
+            console.error('[deleteHit] Could not resolve hit id from object:', {
+              id: hit?.id, entry_id: hit?.entry_id, entryId: hit?.entryId,
+              thread_id: hit?.thread_id || hit?.threadId,
+            });
+          }
+          await sendResponse(message, "I couldn't determine the hit ID for deletion. Please try 'delete hit #<id>'.", true);
+          return;
+        }
+        const ok = await deleteHitLog(resolvedId).catch(()=>false);
         if (ok) {
           try { await handleHitPostDelete(client, hit); } catch (e) { console.error('post delete embed failed:', e?.message || e); }
-          await sendResponse(message, `Removed hit #${hit.id} from the database. The thread remains for history.`, true);
+          await sendResponse(message, `Removed hit #${resolvedId} from the database. The thread remains for history.`, true);
         } else {
           await sendResponse(message, 'I could not delete that right now. Try again shortly.', true);
         }
@@ -604,7 +645,8 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
         } catch (e) { console.error('edit recompute failed:', e?.message || e); }
         // Build the final merged object for display/update post
         const merged = { ...sess.hit, ...patch };
-        const ok = await editHitLog(sess.hit.id, patch).catch(()=>false);
+        const resolvedId = getResolvedHitId(sess.hit);
+        const ok = resolvedId ? await editHitLog(resolvedId, patch).catch(()=>false) : false;
         if (ok) {
           try { await handleHitPostUpdate(client, sess.hit, merged); } catch (e) { console.error('post update embed failed:', e?.message || e); }
           clearEditSession(message);

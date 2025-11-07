@@ -235,12 +235,16 @@ async function editHitLog(HitLogId, updatedHitLogData) {
 
 async function deleteHitLog(id) {
     console.log("Deleting HitLog")
-    const apiUrl = `${process.env.SERVER_URL}${process.env.API_HIT_TRACKR}/${id}`; 
+    // Ensure we pass the ID via both URL and body for compatibility with API variants
+    const idNum = Number(digitsOnly(id));
+    const apiUrl = `${process.env.SERVER_URL}${process.env.API_HIT_TRACKR}/${idNum || ''}`; 
     try {
         const response = await axios.delete(apiUrl, {
             headers: {
                 'Content-Type': 'application/json'
-            }
+            },
+            // Some backends require the ID in the request body even for DELETE
+            data: { id: idNum }
         });
         return true;
     } catch (error) {
