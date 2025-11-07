@@ -634,11 +634,11 @@ app.post('/hittrackcreate', async (req, res) => {
 // Expose /hittrack endpoint for API to POST new HitTrack objects
 app.post('/hittrackdelete', async (req, res) => {
   try {
-    const hitTrack = req.body;
-    // You can add validation here if needed
-    await handleHitPostDelete(client, openai, hitTrack);
-
-    res.status(200).json({ message: 'HitTrackdelete received by Discord bot.' });
+    const payload = req.body || {};
+    // Normalize to the actual hit object if nested
+    const hit = payload.hit || payload;
+    await handleHitPostDelete(client, openai, hit);
+    res.status(200).json({ message: 'HitTrackdelete processed.' });
   } catch (error) {
     console.error('Error handling /hittrackdelete:', error);
     res.status(500).json({ error: 'Failed to process HitTrackdelete.' });
