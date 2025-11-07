@@ -239,9 +239,18 @@ async function handleHitPostDelete(client, hit) {
         if (!threadId) return; // Nothing to post into
         const channel = await client.channels.fetch(threadId).catch(() => null);
         if (!channel) return;
-
+        // Determine deleter: prefer explicit deleted_by fields injected at call-site
+        const deleterDisplay = (() => {
+            const nick = hit?.deleted_by_nickname || hit?.deleter_nickname;
+            const user = hit?.deleted_by_username || hit?.deleter_username;
+            const raw = hit?.deleted_by || hit?.deleter_id || null;
+            if (nick) return nick;
+            if (user) return user;
+            if (raw) return String(raw);
+            return hit?.nickname || hit?.username || 'Unknown'; // fallback to original author
+        })();
         const embed = new EmbedBuilder()
-            .setTitle(`Hit deleted by ${hit?.nickname || hit?.username || 'Unknown'}`)
+            .setTitle(`Hit deleted by ${deleterDisplay}`)
             .setDescription('This hit has been removed from the database. The thread is preserved for historical context and discussion.')
             .addFields(
                 { name: 'Hit ID', value: toEmbedValue(hit?.id), inline: true },

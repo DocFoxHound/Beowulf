@@ -529,7 +529,9 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
         }
         const ok = await deleteHitLog(resolvedId).catch(()=>false);
         if (ok) {
-          try { await handleHitPostDelete(client, hit); } catch (e) { console.error('post delete embed failed:', e?.message || e); }
+          try {
+            await handleHitPostDelete(client, { ...hit, deleted_by: message.author?.id, deleted_by_username: message.author?.username, deleted_by_nickname: message.member?.nickname || null });
+          } catch (e) { console.error('post delete embed failed:', e?.message || e); }
           await sendResponse(message, `Removed hit #${resolvedId} from the database. The thread remains for history.`, true);
         } else {
           await sendResponse(message, 'I could not delete that right now. Try again shortly.', true);

@@ -369,7 +369,7 @@ async function runHitToolAgent(message, client, openai) {
               // Post deletion embed into thread, if exists
               try {
                 const { handleHitPostDelete } = require('../functions/post-new-hit.js');
-                await handleHitPostDelete(client, hit);
+                await handleHitPostDelete(client, { ...hit, deleted_by: message.author?.id, deleted_by_username: message.author?.username, deleted_by_nickname: message.member?.nickname || null });
               } catch (e) { console.error('delete_hit post embed failed:', e?.message || e); }
               messages.push({ role: 'tool', tool_call_id: call.id, name, content: JSON.stringify({ ok: true, deleted: { id } }) });
             } else {

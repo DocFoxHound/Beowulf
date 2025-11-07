@@ -635,9 +635,14 @@ app.post('/hittrackcreate', async (req, res) => {
 app.post('/hittrackdelete', async (req, res) => {
   try {
     const payload = req.body || {};
-    // Normalize to the actual hit object if nested
     const hit = payload.hit || payload;
-    await handleHitPostDelete(client, openai, hit);
+    // Propagate deleter identity when present (e.g., API caller or service)
+    const meta = {
+      deleted_by: payload.deleted_by || payload.user_id || null,
+      deleted_by_username: payload.deleted_by_username || payload.username || null,
+      deleted_by_nickname: payload.deleted_by_nickname || payload.nickname || null,
+    };
+    await handleHitPostDelete(client, openai, { ...hit, ...meta });
     res.status(200).json({ message: 'HitTrackdelete processed.' });
   } catch (error) {
     console.error('Error handling /hittrackdelete:', error);
