@@ -2,7 +2,7 @@
 
 const { sendResponse } = require('../threads/send-response.js');
 const { runWithResponses } = require('./responses-run.js');
-const { getUserById } = require('../api/userlistApi.js');
+const { getUserById, getUserByUsername } = require('../api/userlistApi.js');
 const { ChatLogsModel } = require('../api/models/chat-logs');
 const { getAllHitLogs, getHitLogByThreadId, getHitLogsByUserId, getHitLogByEntryId, editHitLog, deleteHitLog } = require('../api/hitTrackerApi.js');
 const { listKnowledge } = require('../api/knowledgeApi.js');
@@ -540,6 +540,87 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
       }
     } catch (e) { /* non-fatal */ }
 
+    // Quick assist-add lane: "add PlayerName to the hit" or mentions, allowed if owner or Blooded
+    try {
+      const contentStr = String(message.content || '');
+      const looksAddAssist = /\badd\s+.+\s+(?:to|into|on)\s+(?:the\s+|this\s+)?hit\b/i.test(contentStr);
+      if (looksAddAssist) {
+        // Resolve target hit: prefer current thread, then explicit id, then most recent by user
+        let hit = null;
+        try { hit = await getHitLogByThreadId(message.channelId); } catch {}
+        if (!hit) {
+          const id = parseHitId(contentStr);
+          if (id) {
+            try { hit = await getHitLogByEntryId(id); } catch {}
+          }
+        }
+        if (!hit) {
+          try {
+            const list = await getHitLogsByUserId(message.author?.id);
+            if (Array.isArray(list) && list.length) {
+              hit = list.slice().sort((a,b)=>{
+                const ta = new Date(a.created_at || a.createdAt || 0).getTime();
+                const tb = new Date(b.created_at || b.createdAt || 0).getTime();
+                if (tb !== ta) return tb - ta;
+                return (Number(b.id||0) - Number(a.id||0));
+              })[0];
+            }
+          } catch {}
+        }
+        if (!hit) {
+          // No target
+        } else {
+          const ownerId = String(hit.user_id || '');
+          const authorId = String(message.author?.id || '');
+          if (!ownerId || (ownerId !== authorId && !hasBloodedRole(message.member))) {
+            await sendResponse(message, 'Only the original author or Blooded role can edit this hit.', true);
+            return;
+          }
+          // Collect user IDs from mentions or name tokens
+          const mentionIds = extractMentionsFromContent(contentStr);
+          let addIds = [...mentionIds];
+          if (addIds.length === 0) {
+            const m = contentStr.match(/\badd\s+(.+?)\s+(?:to|into|on)\s+(?:the\s+|this\s+)?hit\b/i);
+            const nameBlob = m ? m[1] : '';
+            const parts = nameBlob.split(/[,&\n]|\s+and\s+/i).map(s=>s.trim()).filter(Boolean).slice(0,5);
+            if (parts.length && message.guild?.members?.cache) {
+              for (const p of parts) {
+                const pl = p.toLowerCase();
+                const found = message.guild.members.cache.find(mem =>
+                  String(mem.displayName||'').toLowerCase() === pl ||
+                  String(mem.user?.username||'').toLowerCase() === pl
+                );
+                if (found) addIds.push(String(found.id));
+              }
+            }
+          }
+          addIds = Array.from(new Set(addIds));
+          if (!addIds.length) {
+            await sendResponse(message, "Please @mention who to add, or use their exact Discord name.", true);
+            return;
+          }
+          const botId = client?.user?.id ? String(client.user.id) : null;
+          const current = Array.isArray(hit.assists) ? hit.assists.slice() : [];
+          const merged = Array.from(new Set([...(current||[]), ...addIds])).filter(id => !botId || String(id) !== botId);
+          const shares = Math.max(1, (merged.length || 0) + 1);
+          const patch = {
+            assists: merged,
+            total_cut_value: Math.round((Number(hit.total_value||0)/shares) * 100) / 100,
+            total_cut_scu: Math.round((Number(hit.total_scu||0)/shares) * 100) / 100,
+          };
+          const resolvedId = getResolvedHitId(hit);
+          const ok = resolvedId ? await editHitLog(resolvedId, patch).catch(()=>false) : false;
+          if (ok) {
+            try { const { handleHitPostUpdate } = require('../functions/post-new-hit.js'); await handleHitPostUpdate(client, hit, { ...hit, ...patch }); } catch {}
+            await sendResponse(message, `Added ${addIds.map(id=>`<@${id}>`).join(', ')} to hit #${hit.id}.`, true);
+          } else {
+            await sendResponse(message, 'I could not update that right now. Try again shortly.', true);
+          }
+          return; // handled
+        }
+      }
+    } catch (e) { /* non-fatal */ }
+
     // Fast-path: if user asks to edit/update and we're in a hit thread, start edit session BEFORE multi-tool agent
     try {
       const looksEditAsk = /(edit|update|fix|change)\s+(this\s+)?hit\b|^\s*(edit|update)\b/i.test(message.content || '');
@@ -717,7 +798,50 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
       // assists via mentions
       if (/^assists?\s*[:=-]/i.test(text) || /<@!?\d+>/.test(text)) {
         const ids = extractMentionsFromContent(text);
-        if (ids.length) { sess.patch.assists = ids; updated = true; }
+        if (ids.length) {
+          sess.patch.assists = ids;
+          // Recompute cuts based on new assists immediately for preview
+          try {
+            const botId = client?.user?.id ? String(client.user.id) : null;
+            const cleanAssists = botId ? ids.filter(id => String(id) !== botId) : ids;
+            const shares = Math.max(1, (cleanAssists.length || 0) + 1);
+            const baseVal = Number(sess.patch.total_value ?? sess.hit.total_value ?? 0);
+            const baseScu = Number(sess.patch.total_scu ?? sess.hit.total_scu ?? 0);
+            sess.patch.total_cut_value = Math.round((baseVal / shares) * 100) / 100;
+            sess.patch.total_cut_scu = Math.round((baseScu / shares) * 100) / 100;
+          } catch {}
+          updated = true;
+        }
+      }
+      // add name to hit (non-mention username/nickname based)
+      const addNameMatch = text.match(/\badd\s+([A-Za-z0-9_]{2,32})\s+(?:to\s+)?(?:this\s+)?hit\b/i);
+      if (addNameMatch) {
+        const uname = addNameMatch[1];
+        try {
+          const u = await getUserByUsername(uname);
+          if (u && u.id) {
+            const arr = Array.isArray(sess.patch.assists) ? sess.patch.assists.slice() : Array.isArray(sess.hit.assists) ? sess.hit.assists.slice() : [];
+            if (!arr.includes(String(u.id))) {
+              arr.push(String(u.id));
+              sess.patch.assists = arr;
+              // Recompute cuts immediately based on new assists
+              try {
+                const botId = client?.user?.id ? String(client.user.id) : null;
+                const cleanAssists = botId ? arr.filter(id => String(id) !== botId) : arr;
+                const shares = Math.max(1, (cleanAssists.length || 0) + 1);
+                const baseVal = Number(sess.patch.total_value ?? sess.hit.total_value ?? 0);
+                const baseScu = Number(sess.patch.total_scu ?? sess.hit.total_scu ?? 0);
+                sess.patch.total_cut_value = Math.round((baseVal / shares) * 100) / 100;
+                sess.patch.total_cut_scu = Math.round((baseScu / shares) * 100) / 100;
+              } catch {}
+              updated = true;
+            }
+          } else {
+            await sendResponse(message, `Couldn't find user '${uname}' in roster. Mention them instead if possible.`, true);
+          }
+        } catch (e) {
+          await sendResponse(message, `Lookup for '${uname}' failed. Try mentioning them.`, true);
+        }
       }
       // victims
       if (/^victims?\s*[:=-]/i.test(text)) {
@@ -929,6 +1053,22 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
         } else if (draft.awaiting === 'air_or_ground') {
           const aog = detectAirOrGround(message.content) || (/\b(air|space)\b/i.test(message.content) ? 'Air' : (/\b(ground|fps|foot)\b/i.test(message.content) ? 'Ground' : (/\bmixed\b/i.test(message.content) ? 'Mixed' : null)));
           if (aog) draft.air_or_ground = aog;
+        } else if (draft.awaiting === 'assists') {
+          // User response for assists: mentions or 'none'
+          const lowerAssist = String(message.content||'').toLowerCase();
+          const mentioned = extractMentionsFromContent(message.content);
+          if (mentioned.length) {
+            const set = new Set([...(draft.assists||[]), ...mentioned]);
+            draft.assists = Array.from(set);
+            draft.assists_none = false;
+          } else if (/\b(none|no|solo|nil|empty)\b/.test(lowerAssist)) {
+            draft.assists = [];
+            draft.assists_none = true;
+          } else {
+            await sendResponse(message, "Please mention assist users (e.g. @Pirate1 @Pirate2) or reply 'none'.", true);
+            rememberHitDraft(message, draft);
+            return;
+          }
         } else if (draft.awaiting === 'confirm') {
           const s = String(message.content || '').trim().toLowerCase();
           if (/^(y|yes|confirm|ok|okay|create|submit)$/i.test(s)) {
@@ -1003,9 +1143,11 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
       }
 
       // Determine missing required pieces
-      const missing = [];
-      if (!Array.isArray(draft.cargo) || draft.cargo.length === 0) missing.push('cargo');
-      if (!draft.air_or_ground) missing.push('air_or_ground');
+  const missing = [];
+  if (!Array.isArray(draft.cargo) || draft.cargo.length === 0) missing.push('cargo');
+  if (!draft.air_or_ground) missing.push('air_or_ground');
+  // Always explicitly ask about assists so users can declare crew or 'none'
+  if (!Array.isArray(draft.assists) || (draft.assists.length === 0 && !draft.assists_none)) missing.push('assists');
 
       if (missing.length) {
         draft.awaiting = missing[0];
@@ -1017,6 +1159,10 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
         } else if (draft.awaiting === 'air_or_ground') {
           await sendResponse(message,
             "Got it. Was this Air, Ground (FPS), or Mixed? Reply with 'Air', 'Ground', or 'Mixed'.",
+            true);
+        } else if (draft.awaiting === 'assists') {
+          await sendResponse(message,
+            "Any assists (crew) on this hit? Mention them now (e.g. @Pirate1 @Pirate2) or reply 'none'.",
             true);
         }
         return;
