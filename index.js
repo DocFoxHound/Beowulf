@@ -531,6 +531,24 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
       raider_level: prestigeRanks.raider_level,
     };
 
+    // If member gained one of the promotion roles, update promote_date to now (UTC ISO)
+    try {
+      const isLive = process.env.LIVE_ENVIRONMENT === "true";
+      const watchedRoleIds = [
+        isLive ? process.env.PROSPECT_ROLE : process.env.TEST_PROSPECT_ROLE,
+        isLive ? process.env.CREW_ROLE : process.env.TEST_CREW_ROLE,
+        isLive ? process.env.MARAUDER_ROLE : process.env.TEST_MARAUDER_ROLE,
+        isLive ? process.env.BLOODED_ROLE : process.env.TEST_BLOODED_ROLE,
+      ].filter(Boolean);
+      const oldRoleIds = new Set(oldMember.roles.cache.map(r => r.id));
+      const gainedPromotion = watchedRoleIds.some(rid => !oldRoleIds.has(rid) && memberRoles.includes(rid));
+      if (gainedPromotion) {
+        updatedUser.promote_date = new Date().toISOString(); // Postgres timestamptz-compatible
+      }
+    } catch (e) {
+      console.error('[PromoteDate] detection failed:', e?.message || e);
+    }
+
     // ...existing code...
     // Update the user's data in the database
     await editUser(user.id, updatedUser);

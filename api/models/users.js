@@ -14,6 +14,7 @@ function toApiPayload(input) {
   for (const f of ID_FIELDS) if (input[f] !== undefined) payload[f] = toIntLike(input[f]);
   for (const f of INT_FIELDS) if (input[f] !== undefined) payload[f] = toIntLike(input[f]);
   if (input.joined_date !== undefined) payload.joined_date = input.joined_date; // ISO string or Date accepted by API
+  if (input.promote_date !== undefined) payload.promote_date = input.promote_date; // ISO string or Date accepted by API
   for (const f of STR_FIELDS) if (input[f] !== undefined) payload[f] = limitStr(input[f], MAX_NAME);
   for (const f of ARR_BIGINT_FIELDS) if (input[f] !== undefined) payload[f] = toIntArray(input[f]);
   return payload;
@@ -35,6 +36,7 @@ function fromApiRow(row) {
   for (const f of ID_FIELDS) out[f] = row[f] !== undefined ? toIntLike(row[f]) : undefined;
   for (const f of INT_FIELDS) out[f] = row[f] !== undefined ? toIntLike(row[f]) : undefined;
   out.joined_date = row.joined_date;
+  out.promote_date = row.promote_date;
   for (const f of STR_FIELDS) out[f] = row[f] !== undefined ? String(row[f]) : undefined;
   for (const f of ARR_BIGINT_FIELDS) out[f] = Array.isArray(row[f]) ? row[f].map(toIntLike).filter(v=>v!==undefined) : [];
   return out;
