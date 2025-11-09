@@ -35,13 +35,15 @@ async function refreshUserlist(client, openai) {
     const logChannel = process.env.LIVE_ENVIRONMENT === "true" ? process.env.ENTRY_LOG_CHANNEL : process.env.TEST_ENTRY_LOG_CHANNEL;
     console.log("refreshUserlist started");
     try {
-        const guild = await client.guilds.cache.get(process.env.LIVE_ENVIRONMENT === "true" ? process.env.GUILD_ID : process.env.TEST_GUILD_ID);
-        const memberList = await guild.members.cache;
+    const guild = await client.guilds.cache.get(process.env.LIVE_ENVIRONMENT === "true" ? process.env.GUILD_ID : process.env.TEST_GUILD_ID);
+    // Fetch full member list to avoid stale cache (ensures roles are current)
+    const memberList = await guild.members.fetch();
+    console.log(`[refreshUserlist] Loaded ${memberList.size} members for reconciliation`);
         // const allClasses = await getClasses();
         // const classData = await generateClassData(allClasses); // Organize classes by category
         const prestigeRoles = await getPrestiges(); // Fetch prestige roles dynamically
 
-        memberList.forEach(async member => {
+    memberList.forEach(async member => {
             try {
                 const oldUserData = await getUserById(member.id) || null;
                 const memberRoles = await member.roles.cache.map(role => role.id);
