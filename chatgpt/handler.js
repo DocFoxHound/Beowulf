@@ -929,14 +929,22 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
     routed.intent = 'user.ask';
     routed.confidence = Math.max(0.6, Number(routed?.confidence || 0));
   }
+  // If the auto-router explicitly surfaced a user_name, prefer user.ask even if category is general
+  if ((!routed?.intent || routed.intent === 'other') && autoPlan && autoPlan.user_name) {
+    routed.intent = 'user.ask';
+    routed.confidence = Math.max(0.7, Number(routed?.confidence || 0));
+  }
 
   // Quick user/org profile ask detection (e.g., "tell me about DocHound", "who is DocHound", "describe DocHound/Beowulf")
   const userQueryMatch = (() => {
     const s0 = String(message.content || '').trim();
     // Remove leading bot mention if present for clean matching
     const s = s0.replace(/^<@!?\d+>\s*/, '');
-    const m1 = s.match(/^(?:tell\s+me\s+about|who\s+is|who\'s|whos|info\s+on|about|describe|how\s+would\s+you\s+describe)\s+([A-Za-z0-9_\-]{2,64})\b/i);
-    if (m1 && m1[1]) return m1[1];
+    // NEW: allow patterns appearing mid-sentence ("hey bot can you tell me about X"), not just at start.
+    // We also capture first plausible username token that follows any of the trigger phrases.
+    const triggerPattern = /(tell\s+me\s+about|who\s+is|who\'?s|whos|info\s+on|about|describe|how\s+would\s+you\s+describe)\s+([A-Za-z0-9_\-]{2,64})\b/i;
+    const m1 = s.match(triggerPattern) || s0.match(triggerPattern); // also test original (in case mention in middle)
+    if (m1 && m1[2]) return m1[2];
     return null;
   })();
   if (userQueryMatch) {
@@ -2454,7 +2462,35 @@ async function autoPlanRetrieval(openai, content) {
   try {
     if (!openai) return null;
     const model = process.env.KNOWLEDGE_AI_MODEL || 'gpt-4o-mini';
-    const system = 'You are a retrieval planner for a Discord bot. Classify the user message into a broad category and decide whether to search recent chats, knowledge docs, or both. Extract concise keywords and entities (e.g., ship names, item names) and produce one focused search query string. Output compact JSON only.';
+    // Optional entity hints: roster usernames/nicknames and known item/commodity names
+    let rosterHint = '';
+    let itemsHint = '';
+    if ((process.env.INCLUDE_ENTITY_HINTS || 'true').toLowerCase() !== 'false') {
+      try {
+        const { getUsers } = require('../api/userlistApi.js');
+        const users = await getUsers().catch(()=>[]);
+        if (Array.isArray(users) && users.length) {
+          const names = [];
+          for (const u of users.slice(0, 120)) {
+            const parts = [u.username, u.nickname, u.name].filter(Boolean);
+            for (const p of parts) { const clean = String(p).trim(); if (clean && !names.includes(clean)) names.push(clean); }
+          }
+          rosterHint = names.slice(0, 150).join(', ');
+        }
+      } catch {}
+      try {
+        const [commodities, items] = await Promise.all([
+          getAllSummarizedCommodities().catch(()=>[]),
+          getAllSummarizedItems().catch(()=>[]),
+        ]);
+        const names = [];
+        const pushName = (n) => { const v = String(n||'').trim(); if (v && !names.includes(v)) names.push(v); };
+        for (const c of commodities.slice(0, 150)) pushName(c.commodity_name || c.name);
+        for (const i of items.slice(0, 150)) pushName(i.name || i.commodity_name);
+        itemsHint = names.slice(0, 200).join(', ');
+      } catch {}
+    }
+    const system = 'You are a retrieval planner for a Discord bot. Classify the user message into a broad category and decide whether to search recent chats, knowledge docs, or both. Distinguish USER PROFILE requests (asks about a known player) from ITEM/MARKET queries. Use provided ROSTER and ITEMS lists as disambiguation hints. Extract concise keywords and entities (ship names, item names, user name) and produce one focused search query string. Output compact JSON only.' + (rosterHint ? `\nROSTER: ${rosterHint}` : '') + (itemsHint ? `\nITEMS: ${itemsHint}` : '');
     const schema = {
       category: 'one of: dogfighting, piracy, market, chat, users, general',
       sources: 'array including any of: messages, knowledge',
@@ -2463,7 +2499,8 @@ async function autoPlanRetrieval(openai, content) {
       query: 'string to use for retrieval',
       keywords: 'array of short keywords',
       ship_name: 'optional string',
-      item_name: 'optional string',
+      item_name: 'optional string if item/commodity focus',
+      user_name: 'optional string if user profile focus (exact roster match)',
       k_messages: 'optional integer 1..10',
       k_knowledge: 'optional integer 1..10',
     };
@@ -2505,6 +2542,7 @@ async function autoPlanRetrieval(openai, content) {
         keywords: Array.isArray(plan.keywords) ? plan.keywords.slice(0, 8) : [],
         ship_name: plan.ship_name || null,
         item_name: plan.item_name || null,
+        user_name: plan.user_name || null,
         k_messages: Math.max(1, Math.min(10, Number(plan.k_messages || 6))) || 6,
         k_knowledge: Math.max(1, Math.min(10, Number(plan.k_knowledge || 4))) || 4,
       };
