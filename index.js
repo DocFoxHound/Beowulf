@@ -15,6 +15,7 @@ const { getUserById } = require('./api/userlistApi.js');
 const { editUser } = require('./api/userlistApi.js');
 const { getUserRank } = require('./userlist-functions/userlist-controller.js')
 const { refreshUserlist } = require("./common/refresh-userlist.js");
+const { refreshUserListCache } = require('./common/userlist-cache.js');
 const { saveMessage } = require("./common/message-saver.js");
 const { loadChatlogs } = require("./vector-handling/vector-handler.js");
 const { trimChatLogs } = require("./vector-handling/vector-handler.js");
@@ -43,6 +44,7 @@ const { processLeaderboardLogs } = require('./functions/process-leaderboard-logs
 const { processOrgLeaderboards } = require('./functions/process-leaderboards.js');
 const { verifyUser } = require('./functions/verify-user.js');
 const { handleNewGuildMember } = require('./common/new-user.js');
+const { userlistEvents, USERLIST_CHANGED } = require('./common/userlist-events.js');
 const { handleSimpleWelcomeProspect, handleSimpleWelcomeGuest, handleSimpleJoin } = require("./common/inprocessing-verify-handle.js");
 const { refreshPlayerStatsView } = require('./api/playerStatsApi.js');
 const { removeProspectFromFriendlies } = require('./common/remove-prospect-from-friendly.js');
@@ -65,6 +67,16 @@ if (args.length === 1) {
 dotenv.config({
   path: envFile,
 });
+
+// Coalesce DB-driven userlist changes into a debounced cache refresh
+let _userlistCacheTimer = null;
+function scheduleUserlistCacheRefresh(delayMs = 1500) {
+  try { if (_userlistCacheTimer) clearTimeout(_userlistCacheTimer); } catch {}
+  _userlistCacheTimer = setTimeout(async () => {
+    try { await refreshUserListCache(); } catch (e) { console.error('[UserlistEvents] cache refresh failed:', e?.message || e); }
+  }, delayMs);
+}
+try { userlistEvents.on(USERLIST_CHANGED, () => scheduleUserlistCacheRefresh(1500)); } catch {}
 
 // Single-instance guard: prevent running multiple bot processes on the same machine
 (() => {
@@ -236,6 +248,7 @@ client.on("ready", async () => {
   preloadedDbTables = await preloadFromDb(); //leave on
   // await removeProspectFromFriendlies(client);
   await refreshUserlist(client, openai) //actually leave this here
+  try { await refreshUserListCache(); } catch (e) { console.error('[Startup] userlist cache refresh failed:', e?.message || e); }
   // Ensure SKILL_LEVEL_* roles are aligned at startup based on live Discord roles (RAPTOR/RAIDER)
   // try { await syncSkillLevelsFromGuild(client); } catch (e) { console.error('[Startup] Skill role sync failed:', e?.message || e); }
   // Ensure MEMBER role is aligned at startup based on CREW/MARAUDER/BLOODED
@@ -311,7 +324,10 @@ client.on("ready", async () => {
   setInterval(async () => preloadedDbTables = preloadFromDb(),
     21600000 //every 6 hours
   );
-  setInterval(() => refreshUserlist(client, openai),
+  setInterval(async () => {
+    try { await refreshUserlist(client, openai); } catch (e) { console.error('[Interval] refreshUserlist failed:', e?.message || e); }
+    try { await refreshUserListCache(); } catch (e) { console.error('[Interval] refreshUserListCache failed:', e?.message || e); }
+  },
     43201000 //every 12 hours and 1 second
   );
   // setInterval(() => loadChatlogs(client, openai),
@@ -479,8 +495,9 @@ client.on(Events.InteractionCreate, async interaction => {
 });
 
 // Event Listener: new member joins the server
-client.on('guildMemberAdd', (member) => {
+client.on('guildMemberAdd', async (member) => {
   handleNewGuildMember(member, client, openai)
+  try { await refreshUserListCache(); } catch (e) { console.error('[GuildMemberAdd] userlist cache refresh failed:', e?.message || e); }
 });
 
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
@@ -552,9 +569,16 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
     // ...existing code...
     // Update the user's data in the database
     await editUser(user.id, updatedUser);
+    // Refresh cached userlist after individual update
+    try { await refreshUserListCache(); } catch (e) { console.error('[GuildMemberUpdate] userlist cache refresh failed:', e?.message || e); }
   } catch (error) {
     console.error("Error updating user:", error);
   }
+});
+
+// Keep cache in sync when members leave the guild
+client.on('guildMemberRemove', async (member) => {
+  try { await refreshUserListCache(); } catch (e) { console.error('[GuildMemberRemove] userlist cache refresh failed:', e?.message || e); }
 });
 
 client.on('interactionCreate', async (interaction) => {

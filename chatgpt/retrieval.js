@@ -80,18 +80,20 @@ async function computeQueryEmbedding(openai, text) {
   }
 }
 
-async function getTopKFromKnowledge({ query, k = 3, openai, guildId, channelId, preferVector = true, temporalHint = false }) {
+async function getTopKFromKnowledge({ query, k = 3, openai, guildId, channelId, preferVector = true, temporalHint = false, filterCategory = null }) {
   try {
     let rows = [];
     if (preferVector) {
       const embedding = await computeQueryEmbedding(openai, query);
       if (embedding) {
-        const vec = await vectorSearchKnowledge({ queryEmbedding: embedding, limit: Math.max(1, k), filter_guild_id: guildId, filter_channel_id: channelId });
+        const vec = await vectorSearchKnowledge({ queryEmbedding: embedding, limit: Math.max(1, k), filter_guild_id: guildId, filter_channel_id: channelId, filter_category: filterCategory || undefined });
         if (Array.isArray(vec) && vec.length) rows = vec;
       }
     }
     if (!rows.length) {
-      const fts = await listKnowledge({ q: query, guild_id: guildId, channel_id: channelId, limit: Math.max(1, k) });
+      const params = { q: query, guild_id: guildId, channel_id: channelId, limit: Math.max(1, k) };
+      if (filterCategory) params.category = filterCategory;
+      const fts = await listKnowledge(params);
       if (Array.isArray(fts) && fts.length) rows = fts;
     }
     const snippets = [];
@@ -213,3 +215,80 @@ module.exports = {
   getTopKFromKnowledgePiracy,
   getTopKPiracyMessages,
 };
+
+// Banter/general chat retrieval focused on chatlogs vector store
+async function getTopKBanter({ query, k = 6, openai, guildId, channelId }) {
+  try {
+    const preferVector = (process.env.KNOWLEDGE_PREFER_VECTOR || 'true').toLowerCase() === 'true';
+    // 1) Prefer knowledge vectors from category 'chat' scoped to guild/channel
+    const kn = await getTopKFromKnowledge({
+      query,
+      k: Math.max(1, Math.floor(k / 2) + 2),
+      openai,
+      guildId,
+      channelId,
+      preferVector,
+      temporalHint: true,
+      filterCategory: 'chat',
+    });
+    // 2) Mix in recent message-based snippets as lightweight backup
+    const msgs = await getTopKFromMessages(query, Math.max(1, k - kn.length));
+    // Merge, dedupe, cap
+    const seen = new Set();
+    const out = [];
+    for (const s of [...kn, ...msgs]) { if (!seen.has(s)) { seen.add(s); out.push(s); } }
+    return out.slice(0, k);
+  } catch (e) {
+    console.error('getTopKBanter error:', e?.message || e);
+    return [];
+  }
+}
+
+module.exports.getTopKBanter = getTopKBanter;
+
+// Targeted user mentions retrieval in chat logs (knowledge: category 'chat' + messages fallback)
+async function getTopKUserMentions({ user = null, query = '', k = 6, openai, guildId, channelId }) {
+  try {
+    const preferVector = (process.env.KNOWLEDGE_PREFER_VECTOR || 'true').toLowerCase() === 'true';
+    // Build a focused query based on the user if given, else use provided query
+    const buildUserQuery = (u) => {
+      try {
+        const id = u?.id ? String(u.id) : '';
+        const uname = (u?.username || '').trim();
+        const nick = (u?.nickname || '').trim();
+        const pieces = [];
+        if (uname) pieces.push(uname, `@${uname}`);
+        if (nick && nick !== uname) pieces.push(nick, `@${nick}`);
+        if (id) pieces.push(`<@${id}>`, `<@!${id}>`);
+        pieces.push('mentioned said talking about user player');
+        return pieces.filter(Boolean).join(' ');
+      } catch { return ''; }
+    };
+    const q = user ? buildUserQuery(user) : String(query || 'user mentioned said who is profile').slice(0, 400);
+
+    // 1) Knowledge vector search in 'chat' category
+    const kn = await getTopKFromKnowledge({
+      query: q,
+      k: Math.max(1, Math.floor(k / 2) + 2),
+      openai,
+      guildId,
+      channelId,
+      preferVector,
+      temporalHint: true,
+      filterCategory: 'chat',
+    });
+
+    // 2) Messages fallback: simple keyword match scoring
+    const msgs = await getTopKFromMessages(q, Math.max(1, k - kn.length));
+
+    const seen = new Set();
+    const out = [];
+    for (const s of [...kn, ...msgs]) { if (!seen.has(s)) { seen.add(s); out.push(s); } }
+    return out.slice(0, k);
+  } catch (e) {
+    console.error('getTopKUserMentions error:', e?.message || e);
+    return [];
+  }
+}
+
+module.exports.getTopKUserMentions = getTopKUserMentions;

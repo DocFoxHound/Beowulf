@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { userlistEvents, USERLIST_CHANGED } = require('../common/userlist-events');
 
 async function createUser(newUser) {
     console.log("Inserting new user into UserList")
@@ -9,6 +10,7 @@ async function createUser(newUser) {
                 'Content-Type': 'application/json'
             }
         });
+        try { userlistEvents.emit(USERLIST_CHANGED, { type: 'create', id: newUser?.id || null }); } catch {}
         return true;
     } catch (error) {
         console.error('Error placing user in UserList: ', error.response ? error.response.data : error.message);
@@ -56,6 +58,7 @@ async function editUser(userId, updatedUserData) {
                 'Content-Type': 'application/json'
             }
         });
+        try { userlistEvents.emit(USERLIST_CHANGED, { type: 'update', id: userId }); } catch {}
         return true;
     } catch (error) {
         console.error('Error updating user in UserList: ', error.response ? error.response.data : error.message);
@@ -72,6 +75,7 @@ async function deleteUser(userId) {
                 'Content-Type': 'application/json'
             }
         });
+        try { userlistEvents.emit(USERLIST_CHANGED, { type: 'delete', id: userId }); } catch {}
         return true;
     } catch (error) {
         console.error('Error deleting user: ', error.response ? error.response.data : error.message);

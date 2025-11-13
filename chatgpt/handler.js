@@ -919,6 +919,16 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
   const isPiracySpots = routed?.intent === 'piracy.spots';
   const useAutoRouter = ((process.env.AUTO_ROUTER_ENABLED || 'true').toLowerCase() === 'true') && (!routed?.intent || routed.intent === 'other' || (Number(routed?.confidence || 0) < 0.7));
   const autoPlan = useAutoRouter ? await autoPlanRetrieval(openai, formattedMessage) : null;
+  // If the auto-router classifies this as chat/general and we don't have a strong intent, treat it as banter
+  if ((!routed?.intent || routed.intent === 'other') && autoPlan && (autoPlan.category === 'chat' || (autoPlan.category === 'general' && !looksInfoSeeking))) {
+    routed.intent = 'chat.banter';
+    routed.confidence = Math.max(0.5, Number(routed?.confidence || 0));
+  }
+  // If the auto-router classifies as users, route to user.ask intent
+  if ((!routed?.intent || routed.intent === 'other') && autoPlan && autoPlan.category === 'users') {
+    routed.intent = 'user.ask';
+    routed.confidence = Math.max(0.6, Number(routed?.confidence || 0));
+  }
 
   // Quick user/org profile ask detection (e.g., "tell me about DocHound", "who is DocHound", "describe DocHound/Beowulf")
   const userQueryMatch = (() => {
@@ -956,6 +966,97 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
     }
   }
 
+  // Helper: pick a user from the cached userlist using LLM with deterministic fallback
+  async function pickUserFromUserlist(candidateText) {
+    try {
+      const { getUserListCache } = require('../common/userlist-cache');
+      const list = getUserListCache();
+      if (!Array.isArray(list) || !list.length) return null;
+      // Fast path: if there is a direct mention, resolve that id
+      const m = String(candidateText || '').match(/<@!?([0-9]{8,})>/);
+      if (m && m[1]) {
+        const found = list.find(u => String(u.id) === String(m[1]));
+        if (found) return found;
+      }
+      // Build compact roster for the model (id|username|nickname)
+      const rows = list.slice(0, 500).map(u => `${u.id}|${u.username||''}|${u.nickname||''}`); // cap for prompt size
+      const prompt = `You are matching a person mentioned in this message to a known user. Return STRICT JSON { id: string|null, reason: string }.
+Message: ${candidateText}
+Known users (id|username|nickname):\n${rows.join('\n')}
+Rules:\n- Prefer exact or near-exact username/nickname match; ignore case and punctuation.\n- If multiple close matches, pick the most exact username first.\n- Return id=null if no plausible match.`;
+      let out = null;
+      try {
+        const txt = await runWithResponses({
+          openai,
+          formattedUserMessage: prompt,
+          guildId: null,
+          channelId: null,
+          rank: null,
+          contextSnippets: [],
+        });
+        out = (txt || '').trim();
+      } catch {}
+      try {
+        const json = JSON.parse(out);
+        const id = json && json.id ? String(json.id) : null;
+        if (id) {
+          const found = list.find(u => String(u.id) === id);
+          if (found) return found;
+        }
+      } catch {}
+      // Fallback: deterministic fuzzy match on username/nickname
+      const name = String(candidateText || '').replace(/<@!?.+?>/g, '').trim();
+      const tokens = name.toLowerCase().match(/[a-z0-9_\-]{2,}/g) || [];
+      const score = (u) => {
+        const cand = [String(u.username||'').toLowerCase(), String(u.nickname||'').toLowerCase()];
+        let s = 0; for (const t of tokens) { if (!t) continue; if (cand.some(v => v.includes(t))) s += 1; }
+        return s;
+      };
+      const ranked = list.map(u => ({ u, s: score(u) })).sort((a,b)=>b.s-a.s);
+      return ranked.length && ranked[0].s > 0 ? ranked[0].u : null;
+    } catch (e) { return null; }
+  }
+
+  // New intent: user.ask — find a target user and retrieve mentions from chat vectors
+  if (routed?.intent === 'user.ask') {
+    try {
+      const { getTopKUserMentions } = require('./retrieval');
+      const target = await pickUserFromUserlist(formattedMessage);
+      const snips = await getTopKUserMentions({
+        user: target,
+        query: formattedMessage,
+        k: 8,
+        openai,
+        guildId: message.guild?.id,
+        channelId: message.channelId,
+      });
+      const header = target
+        ? `Focus on this user: id=${target.id}, username=${target.username||''}, nickname=${target.nickname||''}.`
+        : 'No exact roster match found; infer the user from context.';
+      const guard = 'Answer briefly and neutrally. Use only the provided snippets. Avoid speculation. If mentions are sparse, say so.';
+      const out = await runWithResponses({
+        openai,
+        formattedUserMessage: formattedMessage,
+        guildId: message.guild?.id,
+        channelId: message.channelId,
+        rank: deriveRankLabel(message.member) || null,
+        contextSnippets: [header, guard].concat(snips || []),
+      });
+      if (out && out.trim()) { await sendResponse(message, out.trim(), true); return; }
+      // Fallback to deterministic profile summaries if LLM returned nothing
+      if (target) {
+        const opinion = await buildUserOpinionSummary(target.nickname || target.username || target.id, openai);
+        if (opinion) { await sendResponse(message, opinion, true); return; }
+        const prof = await buildUserProfileSummary(target.nickname || target.username || target.id);
+        if (prof) { await sendResponse(message, prof, true); return; }
+      }
+      await sendResponse(message, 'I could not find enough relevant mentions to answer confidently.', true);
+      return;
+    } catch (e) {
+      console.error('user.ask handling failed:', e?.message || e);
+      // do not return; allow the generic retrieval path to try
+    }
+  }
   // Small talk / banter: prefer LLM-generated responses unless disabled
   if (routed?.intent === 'chat.banter') {
     const useLLMBanter = ((process.env.BANTER_USE_LLM || 'true').toLowerCase() !== 'false');
@@ -965,13 +1066,23 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
     if (useLLMBanter) {
       try {
         const banterStyle = 'Banter mode: respond briefly (1–2 sentences), friendly, avoid profanity, deflect insults politely, and don\'t over-explain. Use a casual tone but no role-play. Do not start with interjections like "Ah,", "Well,", "So,", "Okay,". No pirate jargon (ahoy, aye, matey, ye, booty, plunder, shanty, arr).';
+        const { getTopKBanter } = require('./retrieval');
+        const banterSnips = await getTopKBanter({
+          query: formattedMessage,
+          k: 6,
+          openai,
+          guildId: message.guild?.id,
+          channelId: message.channelId,
+        }).catch(()=>[]);
         const txt = await runWithResponses({
           openai,
-          formattedUserMessage: await formatDiscordMessage(message),
+          formattedUserMessage: formattedMessage,
           guildId: message.guild?.id,
           channelId: message.channelId,
           rank: deriveRankLabel(message.member) || null,
-          contextSnippets: [banterStyle].concat(await buildRecentConversationSnippet(message) ? [await buildRecentConversationSnippet(message)] : []),
+          contextSnippets: [banterStyle]
+            .concat(Array.isArray(banterSnips) ? banterSnips : [])
+            .concat(recentSnippet ? [recentSnippet] : []),
         });
         const reply = (txt && txt.trim()) ? txt.trim() : `Here if you need me, ${displayName}.`;
         const key = `${message.channelId}:${message.author?.id}`;
