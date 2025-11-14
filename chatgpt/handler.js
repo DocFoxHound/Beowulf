@@ -914,64 +914,51 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
     const { routeIntent } = require('./intent-router');
     routed = await routeIntent(openai, formattedMessage);
   }
+  const useAutoRouter = ((process.env.AUTO_ROUTER_ENABLED || 'true').toLowerCase() === 'true');
+  const autoPlan = useAutoRouter ? await autoPlanRetrieval(openai, formattedMessage) : null;
+  // Prefer LLM-driven intent from autoPlan when available
+  if (autoPlan?.intent) {
+    routed.intent = autoPlan.intent;
+    // Treat router as medium confidence by default; legacy router can still override if explicitly enabled
+    routed.confidence = Math.max(Number(routed?.confidence || 0), 0.6);
+  } else {
+    routed.intent = routed.intent || 'other';
+  }
   const isPiracyIntent = Boolean((routed?.intent || '').startsWith('piracy.'));
   const isDogfightingIntent = Boolean((routed?.intent || '').startsWith('dogfighting.'));
   const isPiracySpots = routed?.intent === 'piracy.spots';
-  const useAutoRouter = ((process.env.AUTO_ROUTER_ENABLED || 'true').toLowerCase() === 'true') && (!routed?.intent || routed.intent === 'other' || (Number(routed?.confidence || 0) < 0.7));
-  const autoPlan = useAutoRouter ? await autoPlanRetrieval(openai, formattedMessage) : null;
-  // If the auto-router classifies this as chat/general and we don't have a strong intent, treat it as banter
-  if ((!routed?.intent || routed.intent === 'other') && autoPlan && (autoPlan.category === 'chat' || (autoPlan.category === 'general' && !looksInfoSeeking))) {
-    routed.intent = 'chat.banter';
-    routed.confidence = Math.max(0.5, Number(routed?.confidence || 0));
-  }
-  // If the auto-router classifies as users, route to user.ask intent
-  if ((!routed?.intent || routed.intent === 'other') && autoPlan && autoPlan.category === 'users') {
-    routed.intent = 'user.ask';
-    routed.confidence = Math.max(0.6, Number(routed?.confidence || 0));
-  }
-  // If the auto-router explicitly surfaced a user_name, prefer user.ask even if category is general
-  if ((!routed?.intent || routed.intent === 'other') && autoPlan && autoPlan.user_name) {
-    routed.intent = 'user.ask';
-    routed.confidence = Math.max(0.7, Number(routed?.confidence || 0));
-  }
-
-  // Quick user/org profile ask detection (e.g., "tell me about DocHound", "who is DocHound", "describe DocHound/Beowulf")
-  const userQueryMatch = (() => {
-    const s0 = String(message.content || '').trim();
-    // Remove leading bot mention if present for clean matching
-    const s = s0.replace(/^<@!?\d+>\s*/, '');
-    // NEW: allow patterns appearing mid-sentence ("hey bot can you tell me about X"), not just at start.
-    // We also capture first plausible username token that follows any of the trigger phrases.
-    const triggerPattern = /(tell\s+me\s+about|who\s+is|who\'?s|whos|info\s+on|about|describe|how\s+would\s+you\s+describe)\s+([A-Za-z0-9_\-]{2,64})\b/i;
-    const m1 = s.match(triggerPattern) || s0.match(triggerPattern); // also test original (in case mention in middle)
-    if (m1 && m1[2]) return m1[2];
-    return null;
-  })();
-  if (userQueryMatch) {
-    try {
-      const target = userQueryMatch;
-      // If asking about the bot or org name, handle specially
-      const botName = (client?.user?.username || '').trim().toLowerCase();
-      const tLower = String(target).trim().toLowerCase();
-      if (botName && (tLower === botName || tLower === 'robohound')) {
-  const selfDesc = 'I\'m RoboHound — a Discord bot for Star Citizen ops. I can summarize recent activity, answer market questions (UEX-backed), list systems/planets/moons/stations/outposts/cities, and fetch piracy stats and summaries from our knowledge.';
-        await sendResponse(message, selfDesc, true);
-        return;
+  // Heuristic override: if message clearly asks *about* an existing roster user, force user.ask even if item intent heuristics triggered.
+  try {
+    if (routed.intent && /^item\./.test(routed.intent)) {
+      const raw = String(message.content||'');
+      const cleaned = raw.replace(/^<@!?\d+>\s*/, '');
+      const aboutPattern = /(tell\s+me\s+about|who\s+is|who'?s|describe|info\s+on|profile\s+of)\s+([A-Za-z0-9_\-]{2,64})\b/i;
+      const m = cleaned.match(aboutPattern);
+      if (m && m[2]) {
+        const candidate = m[2];
+        // Load roster (cached by process lifetime) and see if candidate matches username/nickname exactly (case-insensitive)
+        const { getUsers } = require('../api/userlistApi.js');
+        let roster = [];
+        try { roster = await getUsers().catch(()=>[]) || []; } catch {}
+        const norm = (s) => String(s||'').trim().toLowerCase();
+        const cn = norm(candidate);
+        const found = roster.find(u => cn && (norm(u.username) === cn || norm(u.nickname) === cn || norm(u.name) === cn));
+        if (found) {
+          routed.intent = 'user.ask';
+          routed.confidence = Math.max(0.85, Number(routed.confidence||0));
+          // Supply user_name hint so downstream can bias retrieval
+          autoPlan.user_name = found.username || found.nickname || candidate;
+        }
       }
-      if (tLower === 'beowulf') {
-        const org = await buildOrgSummary('Beowulf');
-        if (org) { await sendResponse(message, org, true); return; }
-      }
-      // Prefer an opinionated take over a raw profile summary
-  const opinion = await buildUserOpinionSummary(target, openai);
-      if (opinion) { await sendResponse(message, opinion, true); return; }
-      // Fallback to a factual profile if we couldn't form an opinion
-      const prof = await buildUserProfileSummary(target);
-      if (prof) { await sendResponse(message, prof, true); return; }
-    } catch (e) {
-      console.error('user profile lookup failed:', e?.response?.data || e?.message || e);
-      // fall through
     }
+  } catch (e) { /* non-fatal heuristic error */ }
+
+  // If the auto-router is unsure, ask the model-driven clarification question instead of guessing
+  if (autoPlan?.needs_clarification) {
+    const q = autoPlan.clarification_question
+      || 'Are you asking about another player, about market/items, or something else?';
+    await sendResponse(message, q, true);
+    return;
   }
 
   // Helper: pick a user from the cached userlist using LLM with deterministic fallback
@@ -1029,7 +1016,11 @@ Rules:\n- Prefer exact or near-exact username/nickname match; ignore case and pu
   if (routed?.intent === 'user.ask') {
     try {
       const { getTopKUserMentions } = require('./retrieval');
-      const target = await pickUserFromUserlist(formattedMessage);
+      // Prefer router-supplied user_name when present, otherwise fall back to free-form matching
+      const hintedName = autoPlan?.user_name || null;
+      const target = hintedName
+        ? await pickUserFromUserlist(hintedName)
+        : await pickUserFromUserlist(formattedMessage);
       const snips = await getTopKUserMentions({
         user: target,
         query: formattedMessage,
@@ -1073,7 +1064,21 @@ Rules:\n- Prefer exact or near-exact username/nickname match; ignore case and pu
 
     if (useLLMBanter) {
       try {
-        const banterStyle = 'Banter mode: respond briefly (1–2 sentences), friendly, avoid profanity, deflect insults politely, and don\'t over-explain. Use a casual tone but no role-play. Do not start with interjections like "Ah,", "Well,", "So,", "Okay,". No pirate jargon (ahoy, aye, matey, ye, booty, plunder, shanty, arr).';
+        // Expanded creative / banter style with few-shot guidance
+        const banterStyle = [
+          'Mode: conversational, playful, helpful. Adapt output length to task: pure chit-chat (1–2 sentences), creative requests (2–6 lines).',
+          'Never refuse harmless creative writing (songs, playful letters, humorous descriptions) unless it demands disallowed content. Avoid real-world HR/legal disclaimers unless user explicitly asks for policy accuracy.',
+          'Guardrails: no hate, no explicit sexual content; mild innuendo OK but keep it tasteful. Deflect crude phrasing with light humor.',
+          'Avoid pirate jargon (ahoy, aye, matey, ye, booty, plunder, shanty, arr). Avoid leading filler like "Ah," "Well," "So," "Okay,".',
+          'If user asks about a person with joking/creative tone ("write a formal punishment"), produce a playful, clearly fictional document with gentle humor; no real disciplinary threats.',
+          'If user asks to "write" (song, poem, letter, roast) treat as creative task. Provide a concise, stylized response; 1 short verse or a brief letter body + closing.',
+          'If ambiguous double-entendres ("meat missiles"), prefer humorous clarification + playful mini-description rather than technical item lookup.',
+          'Few-shot examples:\nUser: write a formal punishment write-up for rocketjok\nBot: Subject: Informal Notice Regarding Excessive AI Button Mashing\nBody: rocketjok, it is with mock gravity that we note your prolific deployment of artificial cognition. Side effects observed: dazzled channels, mild meme turbulence. Remedy: Stretch fingers, hydrate, allow lesser mortals one question each. Continue the good work—just season with restraint.\n\nUser: explain meat missiles in space\nBot: That phrase is more cheeky slang than aerospace engineering—let\'s say it refers to brave (and occasionally headstrong) pilots rocketing into the void. Nothing to catalog; just a wink and onward.\n\nUser: write a short song about our weak loot\nBot: Verse: Crates all rattled, promises thin, scanning the hold for profit within. Chorus: We sail the void with pockets light, still plotting routes for a fatter night.',
+        ].join(' ');
+        // Heuristic: creative triggers & double-entendre detection
+        const contentLower = String(message.content||'').toLowerCase();
+        const creativeTriggers = /(write|compose|song|poem|lyrics|verse|chorus|letter|roast|punishment|report|story|explain|describe)/i.test(contentLower);
+        const innuendoTriggers = /(meat\s+missiles?|pp|penis|dong|dick|balls?|nut\b)/i.test(contentLower);
         const { getTopKBanter } = require('./retrieval');
         const banterSnips = await getTopKBanter({
           query: formattedMessage,
@@ -1082,6 +1087,10 @@ Rules:\n- Prefer exact or near-exact username/nickname match; ignore case and pu
           guildId: message.guild?.id,
           channelId: message.channelId,
         }).catch(()=>[]);
+        // Dynamically adjust instructions snippet order
+        const dynamicDirectives = [];
+        if (creativeTriggers) dynamicDirectives.push('This is a creative banter request; produce creative output.');
+        if (innuendoTriggers) dynamicDirectives.push('Treat slang as playful; respond humorously—not clinically. No explicit sexual detail.');
         const txt = await runWithResponses({
           openai,
           formattedUserMessage: formattedMessage,
@@ -1089,6 +1098,7 @@ Rules:\n- Prefer exact or near-exact username/nickname match; ignore case and pu
           channelId: message.channelId,
           rank: deriveRankLabel(message.member) || null,
           contextSnippets: [banterStyle]
+            .concat(dynamicDirectives)
             .concat(Array.isArray(banterSnips) ? banterSnips : [])
             .concat(recentSnippet ? [recentSnippet] : []),
         });
@@ -1120,6 +1130,9 @@ Rules:\n- Prefer exact or near-exact username/nickname match; ignore case and pu
       if (/(^|\b)(sorry|my\s*bad|oops|whoops)(\b|!|\.)/i.test(s)) return "No worries.";
       if (/(^|\b)(bye|good\s*night|goodnight|gn|good\s*morning|gm|good\s*evening|ge|cya|see\s*ya|later|l8r|brb|gtg|g2g)(\b|!|\.)/i.test(s)) return "Catch you later!";
       if (/(\bfuck\b\s*(you|u)|\bstfu\b|asshole|dickhead|\bbitch\b|\bcunt\b|\bwtf\b)/i.test(s)) return `Let's keep it friendly, ${displayName}. What can I help with?`;
+      // Creative quick fallback (no LLM) if clear creative trigger
+      if (/(write|compose|song|poem|lyrics|verse|chorus|letter|roast|punishment|report)/i.test(s)) {
+        return `I can draft that. Try: 'write a 4-line verse about weak loot' or 'make a playful mock notice for rocketjok'.`; }
       return `Listening, ${displayName}. How can I help?`;
     })();
     const key = `${message.channelId}:${message.author?.id}`;
@@ -2457,7 +2470,7 @@ function buildPiracySpotsQuery(content, filters) {
   }
 }
 
-// LLM self-query auto-router: judges category and retrieval plan, produces enriched query
+// LLM self-query auto-router: judges category, intent, and retrieval plan, and can request clarification
 async function autoPlanRetrieval(openai, content) {
   try {
     if (!openai) return null;
@@ -2490,9 +2503,20 @@ async function autoPlanRetrieval(openai, content) {
         itemsHint = names.slice(0, 200).join(', ');
       } catch {}
     }
-    const system = 'You are a retrieval planner for a Discord bot. Classify the user message into a broad category and decide whether to search recent chats, knowledge docs, or both. Distinguish USER PROFILE requests (asks about a known player) from ITEM/MARKET queries. Use provided ROSTER and ITEMS lists as disambiguation hints. Extract concise keywords and entities (ship names, item names, user name) and produce one focused search query string. Output compact JSON only.' + (rosterHint ? `\nROSTER: ${rosterHint}` : '') + (itemsHint ? `\nITEMS: ${itemsHint}` : '');
+    const system = 'You are an intent router and retrieval planner for a Discord bot. Your job is to:\n'+
+      '- Decide the PRIMARY intent of the message.\n'+
+      '- Decide whether to search recent chats, knowledge docs, or both.\n'+
+      '- Distinguish USER PROFILE requests (asks about a known player) from ITEM/MARKET queries.\n'+
+      '- If the message is ambiguous between "user.ask" and any market/item intent, you MUST request clarification instead of guessing.\n'+
+      'You have two special disambiguation hints:\n'+
+      '- ROSTER: list of known player names.\n'+
+      '- ITEMS: list of known item/commodity names.\n'+
+      'If a token matches both ROSTER and ITEMS, treat the message as AMBIGUOUS unless the surrounding words clearly indicate one meaning.\n'+
+      'When AMBIGUOUS, set needs_clarification=true and write a short clarification_question the bot can send.\n'+
+      'Output STRICT JSON only.' + (rosterHint ? `\nROSTER: ${rosterHint}` : '') + (itemsHint ? `\nITEMS: ${itemsHint}` : '');
     const schema = {
       category: 'one of: dogfighting, piracy, market, chat, users, general',
+      intent: 'string intent id, e.g., user.ask, item.buy, item.sell, market.route, market.spot, piracy.hit.create, chat.banter, general.info, other',
       sources: 'array including any of: messages, knowledge',
       prefer_channel: 'boolean if channel-local chat should be prioritized',
       temporalHint: 'boolean if recency matters based on phrasing (today, this week, etc.)',
@@ -2501,6 +2525,8 @@ async function autoPlanRetrieval(openai, content) {
       ship_name: 'optional string',
       item_name: 'optional string if item/commodity focus',
       user_name: 'optional string if user profile focus (exact roster match)',
+      needs_clarification: 'boolean, true if the router is not confident enough to choose a single intent or target',
+      clarification_question: 'optional short natural-language question to disambiguate the user intent',
       k_messages: 'optional integer 1..10',
       k_knowledge: 'optional integer 1..10',
     };
@@ -2535,6 +2561,7 @@ async function autoPlanRetrieval(openai, content) {
       const sources = Array.isArray(plan.sources) ? plan.sources.filter(v => v === 'messages' || v === 'knowledge') : ['messages'];
       return {
         category: plan.category || 'general',
+        intent: plan.intent || 'other',
         sources: sources.length ? sources : ['messages'],
         prefer_channel: Boolean(plan.prefer_channel),
         temporalHint: Boolean(plan.temporalHint),
@@ -2543,6 +2570,8 @@ async function autoPlanRetrieval(openai, content) {
         ship_name: plan.ship_name || null,
         item_name: plan.item_name || null,
         user_name: plan.user_name || null,
+        needs_clarification: Boolean(plan.needs_clarification),
+        clarification_question: plan.clarification_question ? String(plan.clarification_question).slice(0, 200) : null,
         k_messages: Math.max(1, Math.min(10, Number(plan.k_messages || 6))) || 6,
         k_knowledge: Math.max(1, Math.min(10, Number(plan.k_knowledge || 4))) || 4,
       };
