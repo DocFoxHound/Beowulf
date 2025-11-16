@@ -431,7 +431,10 @@ client.on("messageCreate", async (message) => {
   );
 
   if (isMentioningBot || isReplyToBot) {
-    // Route to the new chatgpt handler (delegates to legacy for now)
+    console.log('[bot] mention or reply detected:', {
+      author: message.author?.username,
+      content: message.content,
+    });
     try {
       await handleBotConversation(message, client, openai, preloadedDbTables);
     } catch (e) {

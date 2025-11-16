@@ -2,6 +2,7 @@ const { getUserRank, getPrestigeRanks } = require("../userlist-functions/userlis
 const { getUserById } = require("../api/userlistApi")
 const { editUser } = require("../api/userlistApi")
 const { createUser } = require("../api/userlistApi")
+const { getUsers, deleteUser } = require("../api/userlistApi")
 const { getPrestiges } = require("../api/prestige-roles-api");
 const { checkForPrestigePromotionUpdateUserlist, checkForRankPromotionUpdateUserlist, markOffCompletedClassesDeterminedByPrestigeRank } = require("../deprecated-but-keep/check-for-promotion")
 const { getAllFleets } = require("../api/userFleetApi");
@@ -35,10 +36,11 @@ async function refreshUserlist(client, openai) {
     const logChannel = process.env.LIVE_ENVIRONMENT === "true" ? process.env.ENTRY_LOG_CHANNEL : process.env.TEST_ENTRY_LOG_CHANNEL;
     console.log("refreshUserlist started");
     try {
-    const guild = await client.guilds.cache.get(process.env.LIVE_ENVIRONMENT === "true" ? process.env.GUILD_ID : process.env.TEST_GUILD_ID);
-    // Fetch full member list to avoid stale cache (ensures roles are current)
-    const memberList = await guild.members.fetch();
-    console.log(`[refreshUserlist] Loaded ${memberList.size} members for reconciliation`);
+    const targetGuildId = process.env.LIVE_ENVIRONMENT === "true" ? process.env.GUILD_ID : process.env.TEST_GUILD_ID;
+    const guild = await client.guilds.fetch(targetGuildId);
+    // Force-fetch full member list from API to avoid stale cache
+    const memberList = await guild.members.fetch({ force: true });
+    console.log(`[refreshUserlist] Fresh-fetched ${memberList.size} members for reconciliation`);
         // const allClasses = await getClasses();
         // const classData = await generateClassData(allClasses); // Organize classes by category
         const prestigeRoles = await getPrestiges(); // Fetch prestige roles dynamically
@@ -120,6 +122,24 @@ async function refreshUserlist(client, openai) {
                 console.error(`Error processing member ${member.id}:`, memberErr);
             }
         });
+
+        // After reconciling current members, prune DB users not in Discord
+        try {
+            const dbUsers = (await getUsers()) || [];
+            let removedCount = 0;
+            for (const user of dbUsers) {
+                const userId = user?.id;
+                if (!userId) continue;
+                // `memberList` is a Collection keyed by userId
+                if (!memberList.has(userId)) {
+                    const ok = await deleteUser(userId);
+                    if (ok) removedCount++;
+                }
+            }
+            console.log(`[refreshUserlist] Pruned ${removedCount} users not found in Discord.`);
+        } catch (pruneErr) {
+            console.error('[refreshUserlist] Error pruning non-Discord users from DB:', pruneErr);
+        }
         console.log("refreshUserlist finished");
         return "Userlist updated.";
     } catch (error) {

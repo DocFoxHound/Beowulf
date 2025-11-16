@@ -660,7 +660,7 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
           const hitHandled = await runHitToolAgent(message, client, openai);
           if (hitHandled) return;
         } catch (e2) {
-          console.error('tool-hit-agent fallback failed:', e2?.message || e2);
+          console.error('tool-hit-agent fallback failed:', e2?.message || e);
         }
       }
     }
@@ -829,8 +829,6 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
                 const botId = client?.user?.id ? String(client.user.id) : null;
                 const cleanAssists = botId ? arr.filter(id => String(id) !== botId) : arr;
                 const shares = Math.max(1, (cleanAssists.length || 0) + 1);
-                const baseVal = Number(sess.patch.total_value ?? sess.hit.total_value ?? 0);
-                const baseScu = Number(sess.patch.total_scu ?? sess.hit.total_scu ?? 0);
                 sess.patch.total_cut_value = Math.round((baseVal / shares) * 100) / 100;
                 sess.patch.total_cut_scu = Math.round((baseScu / shares) * 100) / 100;
               } catch {}
@@ -916,6 +914,13 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
   }
   const useAutoRouter = ((process.env.AUTO_ROUTER_ENABLED || 'true').toLowerCase() === 'true');
   const autoPlan = useAutoRouter ? await autoPlanRetrieval(openai, formattedMessage) : null;
+  if ((process.env.DEBUG_ROUTER || 'true').toLowerCase() === 'true') {
+    try {
+      console.log('[router] message=', formattedMessage);
+      console.log('[router] legacy routed=', routed);
+      console.log('[router] autoPlan=', autoPlan);
+    } catch {}
+  }
   // Prefer LLM-driven intent from autoPlan when available
   if (autoPlan?.intent) {
     routed.intent = autoPlan.intent;
@@ -927,32 +932,6 @@ async function handleBotConversation(message, client, openai, preloadedDbTables)
   const isPiracyIntent = Boolean((routed?.intent || '').startsWith('piracy.'));
   const isDogfightingIntent = Boolean((routed?.intent || '').startsWith('dogfighting.'));
   const isPiracySpots = routed?.intent === 'piracy.spots';
-  // Heuristic override: if message clearly asks *about* an existing roster user, force user.ask even if item intent heuristics triggered.
-  try {
-    if (routed.intent && /^item\./.test(routed.intent)) {
-      const raw = String(message.content||'');
-      const cleaned = raw.replace(/^<@!?\d+>\s*/, '');
-      const aboutPattern = /(tell\s+me\s+about|who\s+is|who'?s|describe|info\s+on|profile\s+of)\s+([A-Za-z0-9_\-]{2,64})\b/i;
-      const m = cleaned.match(aboutPattern);
-      if (m && m[2]) {
-        const candidate = m[2];
-        // Load roster (cached by process lifetime) and see if candidate matches username/nickname exactly (case-insensitive)
-        const { getUsers } = require('../api/userlistApi.js');
-        let roster = [];
-        try { roster = await getUsers().catch(()=>[]) || []; } catch {}
-        const norm = (s) => String(s||'').trim().toLowerCase();
-        const cn = norm(candidate);
-        const found = roster.find(u => cn && (norm(u.username) === cn || norm(u.nickname) === cn || norm(u.name) === cn));
-        if (found) {
-          routed.intent = 'user.ask';
-          routed.confidence = Math.max(0.85, Number(routed.confidence||0));
-          // Supply user_name hint so downstream can bias retrieval
-          autoPlan.user_name = found.username || found.nickname || candidate;
-        }
-      }
-    }
-  } catch (e) { /* non-fatal heuristic error */ }
-
   // If the auto-router is unsure, ask the model-driven clarification question instead of guessing
   if (autoPlan?.needs_clarification) {
     const q = autoPlan.clarification_question
@@ -1587,7 +1566,7 @@ Rules:\n- Prefer exact or near-exact username/nickname match; ignore case and pu
     if (!/^item\.|^market\./.test(routed?.intent || '') && (likelyFollowUp || mentionsOnlyLocation)) {
       const key = `${message.channelId}:${message.author?.id}`;
       const ctx = lastMarketContext.get(key);
-      if (ctx && ctx.item_name && /^market\.|^item\./.test(ctx.intent || '')) {
+      if (ctx && ctx.item_name && (/^market\.|^item\./).test(ctx.intent || '')) {
         const loc = mentionsOnlyLocation ? (mentionsOnlyLocation[3] || '').replace(/[?!.]+$/,'').trim() : s.replace(/^and\s+/i, '').replace(/[?!.]+$/,'').trim();
         if (loc) {
           try {
@@ -2164,7 +2143,8 @@ Rules:\n- Prefer exact or near-exact username/nickname match; ignore case and pu
   ];
   if ((process.env.DEBUG_RETRIEVAL || 'false').toLowerCase() === 'true') {
     try {
-      console.log('[retrieval] intent=', routed?.intent, 'conf=', routed?.confidence, 'piracyIntent=', isPiracyIntent, 'piracySpots=', isPiracySpots, 'dogfightingIntent=', isDogfightingIntent, 'autoUsed=', Boolean(autoPlan));
+      console.log('[handler] starting router for message:', formattedMessage);
+      console.log('[router] intent=', routed?.intent, 'conf=', routed?.confidence, 'piracyIntent=', isPiracyIntent, 'piracySpots=', isPiracySpots, 'dogfightingIntent=', isDogfightingIntent, 'autoUsed=', Boolean(autoPlan));
       console.log('[retrieval] counts:', {
         piracySpotsMessages: piracySpotsMessages.length,
         piracySpotsKnowledge: piracySpotsKnowledge.length,
@@ -2360,7 +2340,7 @@ async function buildKnowledgeRecentActivitySnippet({ guildId, channelId, limit =
       const dateTag = Array.isArray(r.tags) ? (r.tags.find(t => String(t).startsWith('date:')) || '').slice(5) : '';
       const date = dateTag || (r.created_at ? String(r.created_at).slice(0, 10) : 'recent');
       const title = r.title || `#${r.channel_id} — ${date}`;
-      const body = truncateText(String(r.content || ''), 600);
+      const body = truncateText(String(r.content || ''), 700);
       parts.push(`- ${date}: ${title}`);
       if (body) parts.push(body);
     }
@@ -2373,7 +2353,10 @@ async function buildKnowledgeRecentActivitySnippet({ guildId, channelId, limit =
 }
 
 function truncateText(s, n) {
-
+  if (!s) return '';
+  if (s.length <= n) return s;
+  return s.slice(0, Math.max(0, n - 1)) + '…';
+}
 // Fallback snapshot when knowledge summaries aren't available; focuses on channel-local last 5m
 async function buildRecentActivitySnapshot(message, opts = {}) {
   try {
@@ -2389,7 +2372,7 @@ async function buildRecentActivitySnapshot(message, opts = {}) {
     const recent = rows
       .filter(r => {
         try {
-          const ch = String(r?.channel_name || r?.message?.metadata?.channel || '');
+          const ch = String(r?.channel_name || r?.message?.metadata?.channel || ''); 
           if (ch !== channelName) return false;
           const ts = new Date(r?.message?.metadata?.date || 0).getTime();
           return ts && ts >= cutoff && ts <= now;
@@ -2419,610 +2402,13 @@ async function buildRecentActivitySnapshot(message, opts = {}) {
       if (!content) continue;
       const snippet = content.length > 140 ? content.slice(0, 137) + '…' : content;
       lines.push(`- ${user || 'user'}: ${snippet}`);
-      const total = (header + '\n' + lines.join('\n')).length;
-      if (total > maxChars) break;
+      // Safety cap on total chars
+      const total = lines.join('\n');
+      if (total.length > maxChars) break;
     }
     return [header].concat(lines).join('\n');
   } catch (e) {
     console.error('buildRecentActivitySnapshot error:', e?.message || e);
-    return '';
-  }
-}
-  if (!s) return '';
-  if (s.length <= n) return s;
-  return s.slice(0, Math.max(0, n - 1)) + '…';
-}
-
-// Helper: craft a focused retrieval query for dogfighting asks
-function buildDogfightingQuery(content, intent, filters) {
-  try {
-    const s = String(content || '');
-    const ship = String(filters?.ship_name || '').trim();
-    let focus = '';
-    if (/dogfighting\.equipment/.test(intent || '')) {
-      focus = 'loadout equipment components guns cannons repeaters ballistic laser distortion gimballed fixed shield power cooler';
-    } else if (/dogfighting\.ships/.test(intent || '')) {
-      focus = 'best ship fighter choice vs matchup';
-    } else if (/dogfighting\.meta/.test(intent || '')) {
-      focus = 'pvp meta patch balance';
-    } else if (/dogfighting\.training/.test(intent || '')) {
-      focus = 'training piloting aim pip tracking strafing decouple practice';
-    } else if (/dogfighting\./.test(intent || '')) {
-      focus = 'strategy tactics approach engage disengage ambush joust turnfight boom and zoom';
-    }
-    return [ship, s, 'dogfighting', focus].filter(Boolean).join(' ');
-  } catch {
-    return String(content || '');
-  }
-}
-
-// Helper: focused query for piracy spot discovery
-function buildPiracySpotsQuery(content, filters) {
-  try {
-    const s = String(content || '');
-    const time = (filters?.date_start && filters?.date_end) ? `time:${filters.date_start}..${filters.date_end}` : 'recent';
-    const focus = 'piracy spot spots hotspot hot spots location route lane where to pirate targets shipping lanes';
-    const loc = String(filters?.location_name || '').trim();
-    const locTag = loc ? `loc:${loc}` : '';
-    return [s, focus, time, locTag].filter(Boolean).join(' ');
-  } catch {
-    return String(content || '');
-  }
-}
-
-// LLM self-query auto-router: judges category, intent, and retrieval plan, and can request clarification
-async function autoPlanRetrieval(openai, content) {
-  try {
-    if (!openai) return null;
-    const model = process.env.KNOWLEDGE_AI_MODEL || 'gpt-4o-mini';
-    // Optional entity hints: roster usernames/nicknames and known item/commodity names
-    let rosterHint = '';
-    let itemsHint = '';
-    if ((process.env.INCLUDE_ENTITY_HINTS || 'true').toLowerCase() !== 'false') {
-      try {
-        const { getUsers } = require('../api/userlistApi.js');
-        const users = await getUsers().catch(()=>[]);
-        if (Array.isArray(users) && users.length) {
-          const names = [];
-          for (const u of users.slice(0, 120)) {
-            const parts = [u.username, u.nickname, u.name].filter(Boolean);
-            for (const p of parts) { const clean = String(p).trim(); if (clean && !names.includes(clean)) names.push(clean); }
-          }
-          rosterHint = names.slice(0, 150).join(', ');
-        }
-      } catch {}
-      try {
-        const [commodities, items] = await Promise.all([
-          getAllSummarizedCommodities().catch(()=>[]),
-          getAllSummarizedItems().catch(()=>[]),
-        ]);
-        const names = [];
-        const pushName = (n) => { const v = String(n||'').trim(); if (v && !names.includes(v)) names.push(v); };
-        for (const c of commodities.slice(0, 150)) pushName(c.commodity_name || c.name);
-        for (const i of items.slice(0, 150)) pushName(i.name || i.commodity_name);
-        itemsHint = names.slice(0, 200).join(', ');
-      } catch {}
-    }
-    const system = 'You are an intent router and retrieval planner for a Discord bot. Your job is to:\n'+
-      '- Decide the PRIMARY intent of the message.\n'+
-      '- Decide whether to search recent chats, knowledge docs, or both.\n'+
-      '- Distinguish USER PROFILE requests (asks about a known player) from ITEM/MARKET queries.\n'+
-      '- If the message is ambiguous between "user.ask" and any market/item intent, you MUST request clarification instead of guessing.\n'+
-      'You have two special disambiguation hints:\n'+
-      '- ROSTER: list of known player names.\n'+
-      '- ITEMS: list of known item/commodity names.\n'+
-      'If a token matches both ROSTER and ITEMS, treat the message as AMBIGUOUS unless the surrounding words clearly indicate one meaning.\n'+
-      'When AMBIGUOUS, set needs_clarification=true and write a short clarification_question the bot can send.\n'+
-      'Output STRICT JSON only.' + (rosterHint ? `\nROSTER: ${rosterHint}` : '') + (itemsHint ? `\nITEMS: ${itemsHint}` : '');
-    const schema = {
-      category: 'one of: dogfighting, piracy, market, chat, users, general',
-      intent: 'string intent id, e.g., user.ask, item.buy, item.sell, market.route, market.spot, piracy.hit.create, chat.banter, general.info, other',
-      sources: 'array including any of: messages, knowledge',
-      prefer_channel: 'boolean if channel-local chat should be prioritized',
-      temporalHint: 'boolean if recency matters based on phrasing (today, this week, etc.)',
-      query: 'string to use for retrieval',
-      keywords: 'array of short keywords',
-      ship_name: 'optional string',
-      item_name: 'optional string if item/commodity focus',
-      user_name: 'optional string if user profile focus (exact roster match)',
-      needs_clarification: 'boolean, true if the router is not confident enough to choose a single intent or target',
-      clarification_question: 'optional short natural-language question to disambiguate the user intent',
-      k_messages: 'optional integer 1..10',
-      k_knowledge: 'optional integer 1..10',
-    };
-    const user = `Message: ${content}\nReturn JSON with fields: ${JSON.stringify(Object.keys(schema))}.`;
-    let out = null;
-    if (openai?.responses?.create) {
-      const res = await openai.responses.create({
-        model,
-        input: [
-          { role: 'system', content: [{ type: 'text', text: system }] },
-          { role: 'user', content: [{ type: 'text', text: `Schema: ${JSON.stringify(schema)}` }] },
-          { role: 'user', content: [{ type: 'text', text: user }] },
-        ],
-      });
-      out = res.output_text?.trim?.();
-    } else if (openai?.chat?.completions?.create) {
-      const resp = await openai.chat.completions.create({
-        model,
-        temperature: 0,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: `Schema: ${JSON.stringify(schema)}` },
-          { role: 'user', content: user },
-        ],
-      });
-      out = resp.choices?.[0]?.message?.content?.trim();
-    }
-    if (!out) return null;
-    try {
-      const plan = JSON.parse(out);
-      // Normalize sources
-      const sources = Array.isArray(plan.sources) ? plan.sources.filter(v => v === 'messages' || v === 'knowledge') : ['messages'];
-      return {
-        category: plan.category || 'general',
-        intent: plan.intent || 'other',
-        sources: sources.length ? sources : ['messages'],
-        prefer_channel: Boolean(plan.prefer_channel),
-        temporalHint: Boolean(plan.temporalHint),
-        query: String(plan.query || '').slice(0, 400) || String(content || ''),
-        keywords: Array.isArray(plan.keywords) ? plan.keywords.slice(0, 8) : [],
-        ship_name: plan.ship_name || null,
-        item_name: plan.item_name || null,
-        user_name: plan.user_name || null,
-        needs_clarification: Boolean(plan.needs_clarification),
-        clarification_question: plan.clarification_question ? String(plan.clarification_question).slice(0, 200) : null,
-        k_messages: Math.max(1, Math.min(10, Number(plan.k_messages || 6))) || 6,
-        k_knowledge: Math.max(1, Math.min(10, Number(plan.k_knowledge || 4))) || 4,
-      };
-    } catch {
-      return null;
-    }
-  } catch (e) {
-    console.error('autoPlanRetrieval error:', e?.response?.data || e?.message || e);
-    return null;
-  }
-}
-
-// Build a compact, natural profile summary for a given username/nickname from chat logs
-async function buildUserProfileSummary(name) {
-  try {
-    const target = String(name || '').trim();
-    if (!target) return '';
-    const { getUsers } = require('../api/userlistApi.js');
-    const users = await getUsers().catch(()=>null);
-    let userRow = null;
-    if (Array.isArray(users) && users.length) {
-      const norm = (s) => String(s || '').trim().toLowerCase();
-      const tn = norm(target);
-      userRow = users.find(u => norm(u.username || u.nickname || u.name) === tn) ||
-                users.find(u => norm(u.username || '') === tn) ||
-                users.find(u => norm(u.nickname || '') === tn) || null;
-    }
-    const rows = await ChatLogsModel.list();
-    const now = Date.now();
-    const daysToMs = (d) => d * 24 * 60 * 60 * 1000;
-    let windowDays = 30;
-    let since = now - daysToMs(windowDays);
-    // Canonicalize names to compare consistently
-    const canon = (s) => {
-      const x = String(s || '').trim();
-      if (!x) return '';
-      // Strip leading @ and optional brackets like [TAG]
-      const noAt = x.replace(/^@+/, '');
-      const noTag = noAt.replace(/^\[[^\]]+\]\s*/, '');
-      return noTag.toLowerCase().replace(/\s+/g, ' ');
-    };
-    // Build a robust set of name tokens for matching and mentions
-    const nameTokens = (() => {
-      const raw = new Set();
-      const add = (s) => { const v = String(s || '').trim(); if (v) raw.add(v); };
-      add(target);
-      if (userRow) {
-        add(userRow.username);
-        add(userRow.nickname);
-        add(userRow.name);
-        if (userRow.id) {
-          raw.add(`<@${userRow.id}>`);
-          raw.add(`<@!${userRow.id}>`);
-        }
-      }
-      const out = new Set();
-      for (const t of raw) {
-        const s = String(t).trim();
-        if (!s) continue;
-        out.add(s);
-        out.add(s.toLowerCase());
-        out.add(s.replace(/\s+/g, ''));
-        out.add(s.toLowerCase().replace(/\s+/g, ''));
-        out.add('@' + s);
-        out.add('@' + s.toLowerCase());
-        // Strip bracket tags like [IRONPOINT] dochound -> dochound
-        const stripTag = s.replace(/^\[[^\]]+\]\s*/, '');
-        if (stripTag !== s) {
-          out.add(stripTag);
-          out.add(stripTag.toLowerCase());
-        }
-      }
-      return Array.from(out).filter(Boolean);
-    })();
-    const matchUser = (u) => {
-      const v = canon(u);
-      if (!v) return false;
-      return nameTokens.some(tok => canon(tok) === v);
-    };
-    const contentMentionsTarget = (content) => {
-      const s = String(content || '');
-      const lc = s.toLowerCase();
-      // Also consider explicit Discord mention forms if we have an id
-      const idForms = (userRow?.id) ? [
-        `<@${userRow.id}>`,
-        `<@!${userRow.id}>`,
-      ] : [];
-      if (idForms.some(m => lc.includes(m.toLowerCase()))) return true;
-      return nameTokens.some(tok => lc.includes(String(tok).toLowerCase()));
-    };
-    const getUserMsgs = (sinceTs) => (Array.isArray(rows) ? rows : []).filter(r => {
-      try {
-        const meta = r?.message?.metadata || {};
-        const ts = new Date(meta.date || r?.created_at || 0).getTime();
-        // Also attempt to parse speaker from content prefix "@name: " if metadata is missing
-        let saidBy = String(meta.user || '').trim();
-        if (!saidBy) {
-          const m = String(r?.message?.content || '').match(/^@([^:]{2,64}):/);
-          saidBy = m ? m[1].trim() : '';
-        }
-        return matchUser(saidBy) && ts && ts >= sinceTs && ts <= now;
-      } catch { return false; }
-    });
-    // Collect messages ABOUT the user (mentions), excluding the user's own lines
-    const getAboutMsgs = (sinceTs) => (Array.isArray(rows) ? rows : []).filter(r => {
-      try {
-        const meta = r?.message?.metadata || {};
-        const ts = new Date(meta.date || r?.created_at || 0).getTime();
-        if (!(ts && ts >= sinceTs && ts <= now)) return false;
-        const raw = String(r?.message?.content || '');
-        // Strip the leading speaker label for content checks
-        const body = raw.replace(/^@[^:]+:\s*/i, '');
-        if (!contentMentionsTarget(raw) && !contentMentionsTarget(body)) return false;
-        // Exclude if spoken by the target user
-        const saidBy = String(meta.user || '').trim();
-        const prefixMatch = raw.match(/^@([^:]{2,64}):/);
-        const speaker = saidBy || (prefixMatch ? prefixMatch[1].trim() : '');
-        if (speaker && matchUser(speaker)) return false;
-        return true;
-      } catch { return false; }
-    });
-    // First pass: 30-day window
-    let userMsgs = getUserMsgs(since);
-    let aboutMsgs = getAboutMsgs(since);
-    // If nothing found, widen the window to 90 days to avoid "0"-only summaries
-    if ((!userMsgs.length && !aboutMsgs.length)) {
-      windowDays = 90;
-      since = now - daysToMs(windowDays);
-      userMsgs = getUserMsgs(since);
-      aboutMsgs = getAboutMsgs(since);
-    }
-    // Stats: counts and top channels
-    const totalAuthored = userMsgs.length;
-    const totalMentions = aboutMsgs.length;
-    const byChannel = new Map();
-    for (const r of userMsgs) {
-      const ch = String(r?.channel_name || r?.message?.metadata?.channel || 'unknown');
-      byChannel.set(ch, (byChannel.get(ch) || 0) + 1);
-    }
-    const topChannels = Array.from(byChannel.entries()).sort((a,b)=>b[1]-a[1]).slice(0, 3);
-    // Recent samples
-    const samples = userMsgs
-      .sort((a,b)=> new Date(b?.message?.metadata?.date || 0) - new Date(a?.message?.metadata?.date || 0))
-      .slice(0, 5)
-      .map(r => {
-        const meta = r?.message?.metadata || {};
-        const when = (()=>{ try { return String(meta.date || '').slice(0, 16).replace('T',' ');} catch { return ''; } })();
-        const text = String(r?.message?.content || '')
-          .replace(/^@[^:]+:\s*/i, '')
-          .replace(/^[‘’'“”"]|[‘’'“”"]$/g, '')
-          .replace(/<@!?.+?>/g, '@user')
-          .replace(/\s+/g, ' ')
-          .trim();
-        return `- [${when}] #${r?.channel_name || meta.channel || '?'}: ${text.length > 160 ? text.slice(0,157)+'…' : text}`;
-      });
-    const aboutSamples = aboutMsgs
-      .sort((a,b)=> new Date(b?.message?.metadata?.date || 0) - new Date(a?.message?.metadata?.date || 0))
-      .slice(0, 5)
-      .map(r => {
-        const meta = r?.message?.metadata || {};
-        const when = (()=>{ try { return String(meta.date || '').slice(0, 16).replace('T',' ');} catch { return ''; } })();
-        const raw = String(r?.message?.content || '');
-        const speaker = String(meta.user || (raw.match(/^@([^:]{2,64}):/)?.[1] || 'user')).trim();
-        const text = raw
-          .replace(/^@[^:]+:\s*/i, '')
-          .replace(/^[‘’'“”"]|[‘’'“”"]$/g, '')
-          .replace(/<@!?.+?>/g, '@user')
-          .replace(/\s+/g, ' ')
-          .trim();
-        return `- [${when}] ${speaker}: ${text.length > 160 ? text.slice(0,157)+'…' : text}`;
-      });
-
-    const parts = [];
-    const display = userRow?.nickname || userRow?.username || target;
-    const windowLabel = windowDays === 30 ? 'last month' : `last ${windowDays} days`;
-
-    // Headline
-    parts.push(`Here’s a quick look at ${display} over the ${windowLabel}:`);
-    // Lightweight context
-    if (userRow && (userRow.joined_at || userRow.joinedAt)) {
-      parts.push(`- joined: ${(userRow.joined_at||userRow.joinedAt).slice(0,10)}`);
-    }
-    // Core stats
-    const channelStr = topChannels.length ? ` — top channels: ${topChannels.map(([c,n])=>`#${c} (${n})`).join(', ')}` : '';
-    parts.push(`- messages: ${totalAuthored}${channelStr}`);
-    if (totalMentions) parts.push(`- mentioned by others: ${totalMentions}`);
-
-    // Recent samples, trimmed to keep it readable
-    if (samples.length) {
-      parts.push('Recent lines:');
-      parts.push(...samples.slice(0, 3));
-    }
-    if (aboutSamples.length) {
-      parts.push('People talking about them:');
-      parts.push(...aboutSamples.slice(0, 3));
-    }
-    // Keep the tone organic, avoid debug-ish footers
-    return parts.join('\n');
-  } catch (e) {
-    console.error('buildUserProfileSummary error:', e?.response?.data || e?.message || e);
-    return '';
-  }
-}
-
-// Build an opinionated, concise take on a user derived from authored lines and how others mention them
-async function buildUserOpinionSummary(name, openai) {
-  try {
-    const target = String(name || '').trim();
-    if (!target) return '';
-    const { getUsers } = require('../api/userlistApi.js');
-    const users = await getUsers().catch(()=>null);
-    let userRow = null;
-    if (Array.isArray(users) && users.length) {
-      const norm = (s) => String(s || '').trim().toLowerCase();
-      const tn = norm(target);
-      userRow = users.find(u => norm(u.username || u.nickname || u.name) === tn) ||
-                users.find(u => norm(u.username || '') === tn) ||
-                users.find(u => norm(u.nickname || '') === tn) || null;
-    }
-    const rows = await ChatLogsModel.list();
-    const now = Date.now();
-    const daysToMs = (d) => d * 24 * 60 * 60 * 1000;
-    let windowDays = 30;
-    let since = now - daysToMs(windowDays);
-
-    // helpers
-    const canon = (s) => {
-      const x = String(s || '').trim();
-      if (!x) return '';
-      const noAt = x.replace(/^@+/, '');
-      const noTag = noAt.replace(/^\[[^\]]+\]\s*/, '');
-      return noTag.toLowerCase().replace(/\s+/g, ' ');
-    };
-    const nameTokens = (() => {
-      const raw = new Set();
-      const add = (s) => { const v = String(s || '').trim(); if (v) raw.add(v); };
-      add(target);
-      if (userRow) {
-        add(userRow.username); add(userRow.nickname); add(userRow.name);
-        if (userRow.id) { raw.add(`<@${userRow.id}>`); raw.add(`<@!${userRow.id}>`); }
-      }
-      const out = new Set();
-      for (const t of raw) {
-        const s = String(t).trim(); if (!s) continue;
-        out.add(s); out.add(s.toLowerCase()); out.add(s.replace(/\s+/g, ''));
-        out.add(s.toLowerCase().replace(/\s+/g, ''));
-        out.add('@' + s); out.add('@' + s.toLowerCase());
-        const stripTag = s.replace(/^\[[^\]]+\]\s*/, '');
-        if (stripTag !== s) { out.add(stripTag); out.add(stripTag.toLowerCase()); }
-      }
-      return Array.from(out).filter(Boolean);
-    })();
-    const matchUser = (u) => {
-      const v = canon(u); if (!v) return false;
-      return nameTokens.some(tok => canon(tok) === v);
-    };
-    const contentMentionsTarget = (content) => {
-      const s = String(content || '');
-      const lc = s.toLowerCase();
-      const idForms = (userRow?.id) ? [`<@${userRow.id}>`, `<@!${userRow.id}>`] : [];
-      if (idForms.some(m => lc.includes(m.toLowerCase()))) return true;
-      return nameTokens.some(tok => lc.includes(String(tok).toLowerCase()));
-    };
-    const getUserMsgs = (sinceTs) => (Array.isArray(rows) ? rows : []).filter(r => {
-      try {
-        const meta = r?.message?.metadata || {};
-        const ts = new Date(meta.date || r?.created_at || 0).getTime();
-        let saidBy = String(meta.user || '').trim();
-        if (!saidBy) {
-          const m = String(r?.message?.content || '').match(/^@([^:]{2,64}):/);
-          saidBy = m ? m[1].trim() : '';
-        }
-        return matchUser(saidBy) && ts && ts >= sinceTs && ts <= now;
-      } catch { return false; }
-    });
-    const getAboutMsgs = (sinceTs) => (Array.isArray(rows) ? rows : []).filter(r => {
-      try {
-        const meta = r?.message?.metadata || {};
-        const ts = new Date(meta.date || r?.created_at || 0).getTime();
-        if (!(ts && ts >= sinceTs && ts <= now)) return false;
-        const raw = String(r?.message?.content || '');
-        const body = raw.replace(/^@[^:]+:\s*/i, '');
-        if (!contentMentionsTarget(raw) && !contentMentionsTarget(body)) return false;
-        const saidBy = String(meta.user || '').trim();
-        const prefixMatch = raw.match(/^@([^:]{2,64}):/);
-        const speaker = saidBy || (prefixMatch ? prefixMatch[1].trim() : '');
-        if (speaker && matchUser(speaker)) return false;
-        return true;
-      } catch { return false; }
-    });
-
-    let userMsgs = getUserMsgs(since);
-    let aboutMsgs = getAboutMsgs(since);
-    if (!userMsgs.length && !aboutMsgs.length) {
-      windowDays = 90; since = now - daysToMs(windowDays);
-      userMsgs = getUserMsgs(since);
-      aboutMsgs = getAboutMsgs(since);
-    }
-
-    // If still nothing, bail out
-    if (!userMsgs.length && !aboutMsgs.length) return '';
-
-    // Extract clean text bodies
-    const cleanBody = (raw) => String(raw || '')
-      .replace(/^@[^:]+:\s*/i, '')
-      .replace(/<@!?.+?>/g, '@user')
-      .replace(/https?:\/\/\S+/g, '')
-      .replace(/[`*_>~]/g, '')
-      .trim();
-    const userTexts = userMsgs.map(r => cleanBody(r?.message?.content));
-    const aboutTexts = aboutMsgs.map(r => cleanBody(r?.message?.content));
-
-    // Simple style and theme analysis
-    const tokens = (s) => (String(s || '').toLowerCase().match(/[a-z][a-z0-9'\-]{1,}/g) || []);
-    const STOP = new Set(['the','a','an','and','or','but','if','then','so','to','of','in','on','for','with','at','by','from','as','is','are','was','were','be','been','it','this','that','these','those','i','you','we','they','he','she','them','his','her','our','your','their','my','me','us','do','did','does','just','like','get','got','going','gonna','yeah','nah','ok','okay','right','left','up','down','here','there','today','tonight','now','nowadays','lol','lmao','xd','o7','gg']);
-    const countFreq = (arr) => {
-      const m = new Map();
-      for (const t of arr) { if (!STOP.has(t)) m.set(t, (m.get(t)||0)+1); }
-      return m;
-    };
-    const userTok = countFreq(userTexts.flatMap(tokens));
-    const aboutTok = countFreq(aboutTexts.flatMap(tokens));
-    const topK = (m, k=5) => Array.from(m.entries()).sort((a,b)=>b[1]-a[1]).slice(0,k).map(([w])=>w);
-    const topUserThemes = topK(userTok, 5);
-    const topAboutThemes = topK(aboutTok, 5);
-
-    // Style metrics
-    const avgLen = userTexts.length ? Math.round(userTexts.reduce((a,s)=>a+(s||'').length,0)/userTexts.length) : 0;
-    const qRate = userTexts.length ? userTexts.filter(s=>s.includes('?')).length / userTexts.length : 0;
-    const eRate = userTexts.length ? userTexts.filter(s=>s.includes('!')).length / userTexts.length : 0;
-    const curseList = [/\b(fuck|shit|damn|ass|bitch|wtf)\b/i];
-    const curseRate = userTexts.length ? userTexts.filter(s=>curseList.some(rx=>rx.test(s))).length / userTexts.length : 0;
-    const helpfulRate = userTexts.length ? userTexts.filter(s=>/(thanks|thank you|ty|appreciate|help|welcome)/i.test(s)).length / userTexts.length : 0;
-
-    // Mentions sentiment heuristic
-    const mentionsPraise = aboutTexts.filter(s=>/(thanks|props|good|nice|leader|helpful|welcome|great|gg|well done)/i.test(s)).length;
-    const mentionsCritic = aboutTexts.filter(s=>/(bad|wrong|blame|issue|problem|annoying|toxic)/i.test(s)).length;
-    const mentionTone = mentionsPraise > mentionsCritic + 1 ? 'positive' : (mentionsCritic > mentionsPraise + 1 ? 'mixed' : (mentionsPraise+mentionsCritic>0 ? 'neutral' : 'sparse'));
-
-    // Build adjectives
-    const adjectives = [];
-    if (qRate >= 0.25) adjectives.push('inquisitive');
-    if (eRate >= 0.25) adjectives.push('energetic');
-    if (curseRate >= 0.08) adjectives.push('blunt');
-    if (helpfulRate >= 0.08) adjectives.push('helpful');
-    if (!adjectives.length) adjectives.push('straightforward');
-
-    // Top channels
-    const byChannel = new Map();
-    for (const r of userMsgs) {
-      const ch = String(r?.channel_name || r?.message?.metadata?.channel || 'general');
-      byChannel.set(ch, (byChannel.get(ch)||0)+1);
-    }
-    const topChannels = Array.from(byChannel.entries()).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([c])=>`#${c}`);
-
-    // Pick a short example line (avoid pings/links)
-    const example = userTexts.find(s => s && s.length >= 10) || userTexts[0] || '';
-    const exShort = example && example.length > 140 ? example.slice(0,137)+'…' : example;
-
-    const display = userRow?.nickname || userRow?.username || target;
-    const windowLabel = windowDays === 30 ? 'last month' : `last ${windowDays} days`;
-
-    // Optional: Use LLM to craft persona-aligned opinion using only provided facts
-    const useLLM = ((process.env.USER_OPINION_USE_LLM || 'true').toLowerCase() !== 'false');
-    if (useLLM && openai) {
-      try {
-        const facts = [
-          `name: ${display}`,
-          `window: ${windowLabel}`,
-          `adjectives: ${adjectives.slice(0,3).join(', ')}`,
-          `avg_len_chars: ${avgLen}`,
-          `question_rate: ${(qRate*100).toFixed(0)}%`,
-          `exclaim_rate: ${(eRate*100).toFixed(0)}%`,
-          `curse_rate: ${(curseRate*100).toFixed(0)}%`,
-          `helpful_rate: ${(helpfulRate*100).toFixed(0)}%`,
-          `top_channels: ${topChannels.join(', ') || '#general'}`,
-          `themes_self: ${topUserThemes.join(', ')}`,
-          `themes_mentions: ${topAboutThemes.join(', ')}`,
-          `mentions_tone: ${mentionTone}`,
-          exShort ? `example: ${exShort.replace(/^[‘’'“”"]|[‘’'“”"]$/g, '')}` : null,
-        ].filter(Boolean).join('\n');
-
-        const persona = 'RoboHound: witty, succinct, operations-focused vibe; never toxic; no profanity; 2–4 sentences; confident but grounded. No role-play or pirate jargon. Avoid interjection openers.';
-        const guardrails = 'Use ONLY the provided facts. Do not invent achievements or relationships. No usernames beyond the target. No links. Keep it conversational, not a report. Answer directly; do not restate the request.';
-        const txt = await runWithResponses({
-          openai,
-          formattedUserMessage: `Summarize ${display}.`,
-          guildId: null,
-          channelId: null,
-          rank: null,
-          contextSnippets: [persona, guardrails, `Facts:\n${facts}`],
-        });
-        const out = (txt || '').trim();
-        if (out) return out;
-      } catch (e) {
-        // fall back to deterministic persona text
-      }
-    }
-
-    // Deterministic, persona-laced fallback (no LLM)
-    const openers = [
-      `${display}? Here’s my read:`,
-      `Quick take on ${display}:`,
-      `Gut check on ${display}:`,
-    ];
-    const lenLabel = avgLen < 60 ? 'short and to-the-point' : (avgLen < 140 ? 'medium-length' : 'long-form');
-    const tones = [];
-    if (qRate>=0.25) tones.push('curious');
-    if (eRate>=0.25) tones.push('animated');
-    if (curseRate>=0.08) tones.push('blunt');
-    if (helpfulRate>=0.08) tones.push('helpful');
-    const toneStr = tones.length ? `Feels ${tones.join(' and ')}.` : '';
-    const chStr = topChannels.length ? `They live mostly in ${topChannels.join(' and ')}.` : '';
-    const themeStr = topUserThemes.length ? `Talk track leans ${topUserThemes.slice(0,3).join(', ')}.` : '';
-    const mentionStr = aboutMsgs.length
-      ? (mentionTone === 'positive' ? 'Crew callouts skew positive.' : (mentionTone === 'mixed' ? 'Crew chatter is a mix of props and pushback.' : 'Mentions are sparse.'))
-      : '';
-    const exampleStr = exShort ? `Example: “${exShort.replace(/^[‘’'“”"]|[‘’'“”"]$/g, '')}”` : '';
-    const closer = pickDifferent([
-      'Net take: solid presence, keeps the channel moving.',
-      'Bottom line: reliable voice when ops heat up.',
-      'TL;DR: consistent signal in the noise.',
-    ]);
-    return [
-      pickDifferent(openers),
-      `${adjectives.slice(0,2).join(' and ')} overall; ${lenLabel}.`,
-      [chStr, themeStr, toneStr, mentionStr].filter(Boolean).join(' '),
-      exampleStr,
-      closer,
-    ].filter(Boolean).join(' ');
-  } catch (e) {
-    console.error('buildUserOpinionSummary error:', e?.response?.data || e?.message || e);
-    return '';
-  }
-}
-
-// Build a brief org summary; prefer knowledge entries if available
-async function buildOrgSummary(name) {
-  try {
-    const label = String(name || '').trim();
-    // Try knowledge docs first
-    const rows = await listKnowledge({ category: 'about', section: 'org', limit: 1, order: 'created_at.desc' }).catch(()=>[]);
-    if (Array.isArray(rows) && rows.length) {
-      const r = rows[0];
-      const title = r.title || label;
-      const body = truncateText(String(r.content || ''), 700);
-      return `${title}:\n${body}`;
-    }
-    // Fallback minimal description
-    return `${label}: our Star Citizen org focused on coordinated operations, market intel, and piracy ops. Ask me for systems, stations, routes, or recent activity.`;
-  } catch {
     return '';
   }
 }
