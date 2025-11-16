@@ -268,7 +268,7 @@ async function handleSimpleWelcomeProspect(interaction, client, openai){
         console.error('Error removing newUserRole:', error);
     }
     // Create welcome message
-    const messageToBot = `Congratulate ${dbUser.username} on joining as a PROSPECT. Let them know they need to now prove themselves to become part of the Crew. Explain that they'll have to learn pirate skills and dogfighting to excel, but most importantly to jump into a voice channel and play with the crew..`;
+    const messageToBot = `Congratulate ${dbUser.username} on joining as a PROSPECT. Let them know they need to now prove themselves to become part of the Crew. Tell them they can see the requirements on the website. Explain that IronPoint has two schools of skills called 'Prestiges', and they are RAPTOR (dogfighting skills) and RAIDER (piracy skills). Explain that despite the two prestiges, crew are expected to be both good dogfighters and good pirates.`;
     let returnedMessage = "";
     try{
         returnedMessage = await notifyWelcomeForEmbed(dbUser, openai, client, messageToBot);

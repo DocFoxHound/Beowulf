@@ -509,35 +509,35 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
     try { await updateSkillOnMemberChange(oldMember, newMember); } catch (e) { console.error('[SkillRoles] live update failed:', e?.message || e); }
     // Ensure MEMBER role is aligned with CREW/MARAUDER/BLOODED changes
     try { await updateMemberOnMemberChange(oldMember, newMember); } catch (e) { console.error('[MemberRole] live update failed:', e?.message || e); }
-    // ...existing code...
-    // Fetch the user's existing data
-    const user = await getUserById(newMember.user.id) || null;
-    if (!user) {
-      console.log("Member update had no user identified, returning");
-      return;
-    }
-
-    // Get the member's rank and prestige levels
+    // Compute role changes first (independent of DB state)
     const memberRoles = newMember.roles.cache.map(role => role.id);
     const prospectRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.PROSPECT_ROLE : process.env.TEST_PROSPECT_ROLE;
     const friendlyRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.FRIENDLY_ROLE : process.env.TEST_FRIENDLY_ROLE;
     const verifiedRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.VERIFIED_ROLE : process.env.TEST_VERIFIED_ROLE;
     const newUserRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.NEW_USER_ROLE : process.env.TEST_NEW_USER_ROLE;
+    const oldRoles = oldMember.roles.cache.map(role => role.id);
+
+    // Trigger welcomes when the role is newly gained (do not require NEW_USER_ROLE)
+    if (!oldRoles.includes(prospectRole) && memberRoles.includes(prospectRole)) {
+      try { await handleSimpleWelcomeProspect(newMember, client, openai); } catch (e) { console.error('[WelcomeProspect] failed:', e?.message || e); }
+    }
+    if (!oldRoles.includes(friendlyRole) && memberRoles.includes(friendlyRole)) {
+      try { await handleSimpleWelcomeGuest(newMember, client, openai); } catch (e) { console.error('[WelcomeGuest] failed:', e?.message || e); }
+    }
+
+    // ...existing code...
+    // Fetch the user's existing data for DB updates (welcomes already handled above)
+    const user = await getUserById(newMember.user.id) || null;
+    if (!user) {
+      console.log("Member update had no user identified; skipping DB update.");
+      return;
+    }
+
+    // Get the member's rank and prestige levels
     const userRank = await getUserRank(memberRoles);
 
     // Fetch prestige roles for level calculation
     const prestigeRanks = await getPrestigeRanks(memberRoles);
-
-    // Check if user gained the verifiedRole
-    const oldRoles = oldMember.roles.cache.map(role => role.id);
-    if (!oldRoles.includes(prospectRole) && memberRoles.includes(prospectRole) && memberRoles.includes(newUserRole)) {
-      // User just gained the prospectRole
-      await handleSimpleWelcomeProspect(newMember, client, openai);
-    }
-    if (!oldRoles.includes(friendlyRole) && memberRoles.includes(friendlyRole) && memberRoles.includes(newUserRole)) {
-      // User just gained the prospectRole
-      await handleSimpleWelcomeGuest(newMember, client, openai);
-    }
 
     // Initialize the updatedUser object
     const updatedUser = {
