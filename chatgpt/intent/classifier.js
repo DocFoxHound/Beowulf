@@ -6,15 +6,16 @@ const DEFAULT_INTENT = {
 };
 
 const KEYWORD_RULES = [
-  { intent: 'price_query', needsTool: true, keywords: ['price', 'worth', 'sell', 'buy', 'market', 'commodity', 'trade'], minConfidence: 0.55 },
+  { intent: 'price_query', needsTool: true, keywords: ['price', 'worth', 'sell', 'buy', 'market', 'commodity', 'trade', 'refine', 'refinery', 'refining', 'yield'], minConfidence: 0.55 },
+  { intent: 'location_info', needsTool: true, keywords: ['moon', 'planet', 'system', 'outpost', 'city', 'station', 'where is', 'located', 'location', 'orbit'], minConfidence: 0.5 },
   { intent: 'user_stats', needsTool: true, keywords: ['stat', 'score', 'leaderboard', 'rank', 'prestige', 'progress'], minConfidence: 0.55 },
   { intent: 'help', needsTool: false, keywords: ['help', 'how do', 'explain', 'what is', 'can you remind'], minConfidence: 0.5 },
   { intent: 'admin', needsTool: false, keywords: ['promote', 'verify', 'approve', 'ban', 'flag'], minConfidence: 0.45 },
   { intent: 'serious_info', needsTool: false, keywords: ['policy', 'rule', 'schedule', 'operation', 'ops', 'mission'], minConfidence: 0.5 },
 ];
 
-const ALLOWED_INTENTS = ['banter', 'price_query', 'user_stats', 'serious_info', 'help', 'admin', 'other'];
-const TOOL_DEFAULTS = new Set(['price_query', 'user_stats', 'admin']);
+const ALLOWED_INTENTS = ['banter', 'price_query', 'location_info', 'user_stats', 'serious_info', 'help', 'admin', 'other'];
+const TOOL_DEFAULTS = new Set(['price_query', 'location_info', 'user_stats', 'admin']);
 const INTENT_MODEL = process.env.CHATGPT_INTENT_MODEL || 'gpt-3.5-turbo';
 const USE_MODEL = (process.env.CHATGPT_INTENT_USE_MODEL || 'true').toLowerCase() === 'true';
 

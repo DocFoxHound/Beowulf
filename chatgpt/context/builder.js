@@ -4,10 +4,13 @@ const {
   getLeaderboardSnapshot,
   getPlayerStatsSnapshot,
   getMarketSnapshotFromCache,
+  getLocationSnapshotFromCache,
   getHitActivitySummary,
+  extractMarketTargets,
 } = require('../tools');
 const { ensureCachesReady } = require('./cache-readiness');
 const { fetchKnowledgeSnippets } = require('./knowledge-search');
+const { fetchMemorySnippets } = require('./memory-search');
 
 const RECENT_CHAT_LIMIT = Number(process.env.CHATGPT_RECENT_CHAT_LIMIT || 8);
 const MARKET_FILLER_WORDS = new Set(['what', 'is', 'the', 'current', 'price', 'for', 'of', 'a', 'an', 'anyone', 'know']);
@@ -38,7 +41,7 @@ function extractMarketQuery(text) {
   };
 }
 
-async function buildContext({ message, meta, intent }) {
+async function buildContext({ message, meta, intent, openai }) {
   await ensureCachesReady();
   const channelId = meta.channelId;
   const userId = meta.authorId;
@@ -52,20 +55,60 @@ async function buildContext({ message, meta, intent }) {
   const includeLeaderboard = intent.intent === 'user_stats' || /leaderboard|rank|score|promotion|prestige/.test(lowerContent);
   const leaderboard = includeLeaderboard ? getLeaderboardSnapshot(userId) : null;
 
-  const includeMarket = intent.intent === 'price_query' || /price|market|sell|buy|commodity|terminal|trade|haul|cargo/.test(lowerContent);
+  const includeMarket = intent.intent === 'price_query' || /price|market|sell|buy|commodity|terminal|trade|haul|cargo|refine|refinery|refining|yield|processing/.test(lowerContent);
+  const includeLocationInfo = intent.intent === 'location_info';
   const marketQueryMeta = extractMarketQuery(content);
+  const shouldExtractTargets = includeMarket || includeLocationInfo;
+  const emptyTargets = {
+    marketType: 'overview',
+    commodityName: null,
+    commodityDataset: null,
+    locationName: null,
+    locationDataset: null,
+    locationType: null,
+    locationRecord: null,
+    hasRefineryKeyword: false,
+    datasetPreference: null,
+    catalogSummary: null,
+  };
+  const extractedTargets = shouldExtractTargets ? extractMarketTargets(content) : null;
+  const marketTargets = includeMarket ? (extractedTargets || emptyTargets) : emptyTargets;
+  const locationTargets = includeLocationInfo ? extractedTargets : null;
   const marketSnapshot = includeMarket
     ? getMarketSnapshotFromCache(marketQueryMeta.query, {
         limit: 5,
         requestedQuery: marketQueryMeta.requested,
         isGeneric: marketQueryMeta.isGeneric,
+        marketType: marketTargets.marketType,
+        commodityName: marketTargets.commodityName,
+        locationName: marketTargets.locationName,
+        commodityDataset: marketTargets.commodityDataset,
+        datasetPreference: marketTargets.datasetPreference,
       })
     : null;
+  const marketCatalogSummary = includeMarket ? marketTargets.catalogSummary : null;
+  const marketQuery = includeMarket ? { ...marketQueryMeta, ...marketTargets } : null;
+
+  const locationSnapshot = includeLocationInfo && locationTargets?.locationName
+    ? getLocationSnapshotFromCache({
+        locationName: locationTargets.locationName,
+        locationDataset: locationTargets.locationDataset,
+        locationRecord: locationTargets.locationRecord,
+      })
+    : null;
+  const locationQuery = includeLocationInfo ? locationTargets : null;
 
   const includeHitSummary = /piracy|pirate|hit track|hittrack|hittracker|bounty|raid|ambush|cargo|haul/.test(lowerContent);
   const hitSummary = includeHitSummary ? getHitActivitySummary() : [];
 
   const knowledgeSnippets = await fetchKnowledgeSnippets({ content, guildId: meta.guildId, channelId });
+  const longTermMemories = await fetchMemorySnippets({
+    content,
+    guildId: meta.guildId,
+    channelId,
+    userId,
+    openai,
+  }) || [];
   const includeKnowledge = true;
 
   return {
@@ -80,14 +123,22 @@ async function buildContext({ message, meta, intent }) {
     playerStats,
     hitSummary,
     marketSnapshot,
+    marketQuery,
+    marketCatalogSummary,
+    locationSnapshot,
+    locationQuery,
     knowledgeSnippets,
+    longTermMemories,
     sections: {
       includeRecent: true,
       includeProfile: true,
       includeStats: true,
       includeKnowledge,
+      includeMemories: Boolean(longTermMemories.length),
       includeLeaderboard: Boolean(leaderboard),
       includeMarket: Boolean(marketSnapshot),
+      includeMarketCatalog: Boolean(marketCatalogSummary),
+      includeLocation: Boolean(locationSnapshot),
       includeHitSummary: includeHitSummary && hitSummary.length > 0,
     },
     externalData: {
@@ -95,7 +146,10 @@ async function buildContext({ message, meta, intent }) {
       leaderboardLoaded: Boolean(leaderboard),
       statsLoaded: Boolean(playerStats),
       marketLoaded: Boolean(marketSnapshot),
+      marketCatalogLoaded: Boolean(marketCatalogSummary),
+      locationLoaded: Boolean(locationSnapshot),
       hitSummaryLoaded: hitSummary.length > 0,
+      memoriesLoaded: longTermMemories.length > 0,
     },
   };
 }

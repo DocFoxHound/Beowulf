@@ -45,7 +45,7 @@ async function handleChatGptInteraction({ message, client, openai }) {
     try { await message.channel.sendTyping(); } catch {}
 
     const intent = await runStage('intent', () => classifyIntent({ message, meta, openai }));
-    const context = await runStage('context', () => buildContext({ message, meta, intent }));
+    const context = await runStage('context', () => buildContext({ message, meta, intent, openai }));
     const personaResponse = await runStage('persona', () => generatePersonaResponse({ message, meta, intent, context, openai }));
 
     let sentReply = null;

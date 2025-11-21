@@ -66,7 +66,29 @@ function formatLeaderboard(row) {
   return fields.length ? fields.join('\n') : 'Leaderboard entry cached without key fields.';
 }
 
-function formatMarketSnapshot(snapshot) {
+function formatPriceLine(entry) {
+  const buy = entry.buyPrice != null ? Number(entry.buyPrice).toLocaleString() : 'n/a';
+  const sell = entry.sellPrice != null ? Number(entry.sellPrice).toLocaleString() : 'n/a';
+  const freshness = entry.updatedAt ? ` – updated ${entry.updatedAt}` : '';
+  return `• ${entry.item} @ ${entry.location} (buy ${buy}, sell ${sell})${freshness}`;
+}
+
+function formatYield(value) {
+  if (value == null) return 'n/a';
+  const num = Number(value);
+  if (Number.isNaN(num)) return String(value);
+  return num.toLocaleString();
+}
+
+function formatRefineryLine(entry) {
+  const now = formatYield(entry.yieldValue);
+  const week = formatYield(entry.yieldWeek);
+  const month = formatYield(entry.yieldMonth);
+  const freshness = entry.updatedAt ? ` – updated ${entry.updatedAt}` : '';
+  return `• ${entry.item} @ ${entry.location} (value ${now}, 7d ${week}, 30d ${month})${freshness}`;
+}
+
+function formatSingleMarketSnapshot(snapshot, datasetLabel) {
   if (!snapshot) return 'No market data pulled.';
   const {
     query,
@@ -76,9 +98,15 @@ function formatMarketSnapshot(snapshot) {
     requestedQuery,
     totalRecords,
     isGenericRequest,
+    type,
   } = snapshot;
+  const category = type || 'overview';
   let header;
-  if (query) {
+  if (category === 'refinery') {
+    header = query
+      ? `Refinery yields for ${query} (matches ${matches})`
+      : `Top refinery yields (showing ${sample.length} of ${matches || totalRecords || sample.length})`;
+  } else if (query) {
     header = `Query: ${query} (matches ${matches})`;
   } else if (fallbackUsed && requestedQuery) {
     header = `No direct UEX match for "${requestedQuery}". Showing ${sample.length} cached trades (${totalRecords || sample.length} total).`;
@@ -87,11 +115,63 @@ function formatMarketSnapshot(snapshot) {
   } else {
     header = `Top cached commodities (showing ${sample.length} of ${totalRecords || sample.length})`;
   }
+  const prefix = datasetLabel ? `[${datasetLabel}] ` : '';
+  const formatter = category === 'refinery' ? formatRefineryLine : formatPriceLine;
+  const lines = sample.length ? sample.map(formatter) : ['No cached rows to display.'];
+  return [`${prefix}${header}`].concat(lines).join('\n');
+}
+
+function formatMarketSnapshot(snapshot) {
+  if (!snapshot) return 'No market data pulled.';
+  const entries = Array.isArray(snapshot.datasetSnapshots) && snapshot.datasetSnapshots.length
+    ? snapshot.datasetSnapshots
+    : [{ dataset: snapshot.dataset || 'commodities', label: snapshot.datasetLabel, snapshot }];
+  const sections = entries
+    .filter((entry) => entry?.snapshot)
+    .map((entry) => formatSingleMarketSnapshot(entry.snapshot, entry.label));
+  return sections.length ? sections.join('\n\n') : 'No market data pulled.';
+}
+
+function formatMarketQueryMeta(meta) {
+  if (!meta) return 'No market intent metadata.';
+  const parts = [];
+  if (meta.marketType) parts.push(`Type: ${meta.marketType}`);
+  if (meta.commodityName) parts.push(`Commodity: ${meta.commodityName}`);
+  if (meta.locationName) parts.push(`Location: ${meta.locationName}`);
+  return parts.length ? parts.join(' | ') : 'Market intent metadata unavailable.';
+}
+
+function formatMarketCatalogSummary(summary) {
+  if (!summary) return 'No market catalog summary available.';
+  const lines = [];
+  if (summary.commodities) {
+    lines.push(`Commodities (${summary.commodities.count || 0}): ${summary.commodities.samples?.join(', ') || 'n/a'}`);
+  }
+  if (summary.items) {
+    lines.push(`Items (${summary.items.count || 0}): ${summary.items.samples?.join(', ') || 'n/a'}`);
+  }
+  if (summary.locations) {
+    const locationLines = Object.entries(summary.locations)
+      .map(([type, data]) => `${type} (${data.count || 0}): ${data.samples?.join(', ') || 'n/a'}`);
+    if (locationLines.length) {
+      lines.push('Locations:');
+      lines.push(...locationLines);
+    }
+  }
+  return lines.length ? lines.join('\n') : 'Market catalog summary unavailable.';
+}
+
+function formatLocationSnapshot(snapshot) {
+  if (!snapshot) return 'No location data pulled.';
+  const { query, dataset, sample = [], matches = 0 } = snapshot;
+  const header = query
+    ? `Location lookup for ${query} (${dataset}, matches ${matches})`
+    : `Location data (${dataset})`;
+  if (!sample.length) return `${header}\nNo cached location rows available.`;
   const lines = sample.map((entry) => {
-    const buy = entry.buyPrice != null ? Number(entry.buyPrice).toLocaleString() : 'n/a';
-    const sell = entry.sellPrice != null ? Number(entry.sellPrice).toLocaleString() : 'n/a';
-    const freshness = entry.updatedAt ? ` – updated ${entry.updatedAt}` : '';
-    return `• ${entry.item} @ ${entry.location} (buy ${buy}, sell ${sell})${freshness}`;
+    const services = entry.services?.length ? ` | Services: ${entry.services.join(', ')}` : '';
+    const notes = entry.notes?.length ? ` | ${entry.notes.join(' | ')}` : '';
+    return `• ${entry.name} (${entry.type})${services}${notes}`;
   });
   return [header].concat(lines).join('\n');
 }
@@ -130,7 +210,19 @@ function formatKnowledgeSnippets(snippets) {
   }).join('\n');
 }
 
-function buildContextBlock({ intent = {}, recentChat, userProfile, leaderboard, playerStats, marketSnapshot, hitSummary, knowledgeSnippets, sections = {} }) {
+function formatLongTermMemories(memories) {
+  if (!Array.isArray(memories) || !memories.length) return 'No historical memories matched.';
+  return memories.map((memory) => {
+    const typeLabel = memory.type ? memory.type.replace(/_/g, ' ') : 'memory';
+    const importance = memory.importance != null ? ` (importance ${memory.importance})` : '';
+    const score = typeof memory.score === 'number' ? `, score ${memory.score.toFixed(2)}` : '';
+    const tags = Array.isArray(memory.tags) && memory.tags.length ? `\n  Tags: ${memory.tags.join(', ')}` : '';
+    const summary = memory.content || 'No content stored.';
+    return `• ${typeLabel}${importance}${score}\n  ${summary}${tags}`;
+  }).join('\n');
+}
+
+function buildContextBlock({ intent = {}, recentChat, userProfile, leaderboard, playerStats, marketSnapshot, marketQuery, marketCatalogSummary, locationSnapshot, locationQuery, hitSummary, knowledgeSnippets, longTermMemories, sections = {} }) {
   const confidence = Number(intent.confidence || 0);
   const parts = [
     `Intent: ${intent.intent || 'banter'} (confidence ${confidence.toFixed(2)})`,
@@ -143,13 +235,32 @@ function buildContextBlock({ intent = {}, recentChat, userProfile, leaderboard, 
     '\nKnowledge Matches:',
     formatKnowledgeSnippets(knowledgeSnippets),
   ];
+  if (sections.includeMemories) {
+    parts.push('\nHistorical Memories:');
+    parts.push(formatLongTermMemories(longTermMemories));
+  }
   if (sections.includeLeaderboard) {
     parts.push('\nLeaderboard (leaderboard cache):');
     parts.push(formatLeaderboard(leaderboard));
   }
-  if (sections.includeMarket) {
+  if (sections.includeMarket && marketSnapshot) {
     parts.push('\nMarket Snapshot (UEX cache):');
     parts.push(formatMarketSnapshot(marketSnapshot));
+    if (marketQuery) {
+      parts.push('Market Query Meta:');
+      parts.push(formatMarketQueryMeta(marketQuery));
+    }
+  }
+  if (sections.includeMarketCatalog && marketCatalogSummary) {
+    parts.push('\nMarket Catalog Reference:');
+    parts.push(formatMarketCatalogSummary(marketCatalogSummary));
+  }
+  if (sections.includeLocation && locationSnapshot) {
+    parts.push('\nLocation Data (UEX cache):');
+    parts.push(formatLocationSnapshot(locationSnapshot));
+    if (locationQuery?.locationName && locationQuery?.locationDataset) {
+      parts.push(`Location Query Meta: ${locationQuery.locationName} (${locationQuery.locationDataset})`);
+    }
   }
   if (sections.includeHitSummary) {
     parts.push('\nHit Tracker (hit cache):');
@@ -170,14 +281,19 @@ async function generatePersonaResponse({ message, intent, context, openai }) {
     marketMatches: context.marketSnapshot?.matches || 0,
     hitCount: (context.hitSummary || []).length,
     knowledgeMatches: (context.knowledgeSnippets || []).length,
+    memoryMatches: (context.longTermMemories || []).length,
     contextChars: contextBlock.length,
     sections: [
       measureSection('recentChat', formatRecentChat(context.recentChat)),
       measureSection('userProfile', formatUserProfile(context.userProfile)),
       measureSection('playerStats', context.playerStats ? JSON.stringify(context.playerStats).slice(0, 600) : ''),
       measureSection('knowledge', formatKnowledgeSnippets(context.knowledgeSnippets)),
+      context.sections?.includeMemories ? measureSection('memories', formatLongTermMemories(context.longTermMemories)) : null,
       context.sections?.includeLeaderboard ? measureSection('leaderboard', formatLeaderboard(context.leaderboard)) : null,
       context.sections?.includeMarket ? measureSection('market', formatMarketSnapshot(context.marketSnapshot)) : null,
+      context.sections?.includeMarket && context.marketQuery ? measureSection('marketQueryMeta', formatMarketQueryMeta(context.marketQuery)) : null,
+      context.sections?.includeMarketCatalog ? measureSection('marketCatalog', formatMarketCatalogSummary(context.marketCatalogSummary)) : null,
+      context.sections?.includeLocation ? measureSection('location', formatLocationSnapshot(context.locationSnapshot)) : null,
       context.sections?.includeHitSummary ? measureSection('hitSummary', formatHitSummary(context.hitSummary)) : null,
     ].filter(Boolean),
   });
