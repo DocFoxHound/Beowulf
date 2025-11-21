@@ -1,5 +1,16 @@
 const axios = require('axios');
-const REQ_TIMEOUT = Number(process.env.UEX_API_TIMEOUT_MS || 15000);
+const REQ_TIMEOUT = Number(process.env.UEX_API_TIMEOUT_MS || 10000);
+axios.defaults.timeout = REQ_TIMEOUT;
+
+function unwrapListPayload(data) {
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data.rows)) return data.rows;
+    if (Array.isArray(data.data)) return data.data;
+    if (Array.isArray(data.records)) return data.records;
+    if (Array.isArray(data.result)) return data.result;
+    return data;
+}
 
 //--------------------------------------------
 //              CITY CONTROLLER               
@@ -9,7 +20,7 @@ async function getAllCities() {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/cities/`;
     try {
         const response = await axios.get(apiUrl);
-        return response.data;  // This will be the return value of the function
+        return unwrapListPayload(response.data);
     } catch (error) {
         console.error('Error fetching entity:', error.response ? error.response.data : error.message);
         return null;  // Return null if there's an error
@@ -90,7 +101,7 @@ async function getAllCommodities() {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/commodities/`;
     try {
         const response = await axios.get(apiUrl);
-        return response.data;  // This will be the return value of the function
+        return unwrapListPayload(response.data);
     } catch (error) {
         console.error('Error fetching entity:', error.response ? error.response.data : error.message);
         return null;  // Return null if there's an error
@@ -167,7 +178,7 @@ async function getAllTerminalCommodities() {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/terminalcommodities/`;
     try {
         const response = await axios.get(apiUrl);
-        return response.data;  // This will be the return value of the function
+        return unwrapListPayload(response.data);
     } catch (error) {
         console.error('Error fetching entity:', error.response ? error.response.data : error.message);
         return null;  // Return null if there's an error
@@ -244,7 +255,7 @@ async function getAllSummarizedCommodities() {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/summarizedcommodities/`;
     try {
         const response = await axios.get(apiUrl);
-        return response.data;  // This will be the return value of the function
+        return unwrapListPayload(response.data);
     } catch (error) {
         console.error('Error fetching entity:', error.response ? error.response.data : error.message);
         return null;  // Return null if there's an error
@@ -321,7 +332,7 @@ async function getAllTerminalItems() {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/terminalitems/`;
     try {
         const response = await axios.get(apiUrl);
-        return response.data;  // This will be the return value of the function
+        return unwrapListPayload(response.data);
     } catch (error) {
         console.error('Error fetching entity:', error.response ? error.response.data : error.message);
         return null;  // Return null if there's an error
@@ -398,7 +409,7 @@ async function getAllSummarizedItems() {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/sumarizeditems/`;
     try {
         const response = await axios.get(apiUrl);
-        return response.data;  // This will be the return value of the function
+        return unwrapListPayload(response.data);
     } catch (error) {
         console.error('Error fetching entity:', error.response ? error.response.data : error.message);
         return null;  // Return null if there's an error
@@ -477,7 +488,7 @@ async function getAllOutposts() {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/outposts/`;
     try {
         const response = await axios.get(apiUrl);
-        return response.data;  // This will be the return value of the function
+        return unwrapListPayload(response.data);
     } catch (error) {
         console.error('Error fetching entity:', error.response ? error.response.data : error.message);
         return null;  // Return null if there's an error
@@ -554,7 +565,7 @@ async function getAllPlanets() {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/planets/`;
     try {
         const response = await axios.get(apiUrl);
-        return response.data;  // This will be the return value of the function
+        return unwrapListPayload(response.data);
     } catch (error) {
         console.error('Error fetching entity:', error.response ? error.response.data : error.message);
         return null;  // Return null if there's an error
@@ -631,7 +642,7 @@ async function getAllMoons() {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/moons/`;
     try {
         const response = await axios.get(apiUrl);
-        return response.data;
+        return unwrapListPayload(response.data);
     } catch (error) {
         console.error('Error fetching entity:', error.response ? error.response.data : error.message);
         return null;
@@ -708,7 +719,7 @@ async function getAllSpaceStations() {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/spacestations/`;
     try {
         const response = await axios.get(apiUrl);
-        return response.data;  // This will be the return value of the function
+        return unwrapListPayload(response.data);
     } catch (error) {
         console.error('Error fetching entity:', error.response ? error.response.data : error.message);
         return null;  // Return null if there's an error
@@ -785,7 +796,7 @@ async function getAllStarSystems() {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/starsystems/`;
     try {
         const response = await axios.get(apiUrl);
-        return response.data;  // This will be the return value of the function
+        return unwrapListPayload(response.data);
     } catch (error) {
         console.error('Error fetching entity:', error.response ? error.response.data : error.message);
         return null;  // Return null if there's an error
@@ -862,7 +873,7 @@ async function getAllShips() {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/ships/`;
     try {
         const response = await axios.get(apiUrl);
-        return response.data;  // This will be the return value of the function
+        return unwrapListPayload(response.data);
     } catch (error) {
         console.error('Error fetching entity:', error.response ? error.response.data : error.message);
         return null;  // Return null if there's an error
@@ -940,7 +951,7 @@ async function getAllTerminals() {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/terminals/`;
     try {
         const response = await axios.get(apiUrl);
-        return response.data;  // This will be the return value of the function
+        return unwrapListPayload(response.data);
     } catch (error) {
         console.error('Error fetching entity:', error.response ? error.response.data : error.message);
         return null;  // Return null if there's an error
@@ -1031,7 +1042,7 @@ async function getAllTerminalPrices() {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/terminalprices/`;
     try {
         const response = await axios.get(apiUrl);
-        return response.data;  // This will be the return value of the function
+        return unwrapListPayload(response.data);
     } catch (error) {
         console.error('Error fetching entity:', error.response ? error.response.data : error.message);
         return null;  // Return null if there's an error
@@ -1108,7 +1119,7 @@ async function getAllRefineryYields() {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/refineryyields/`;
     try {
         const response = await axios.get(apiUrl);
-        return response.data;
+        return unwrapListPayload(response.data);
     } catch (error) {
         console.error('Error fetching entity:', error.response ? error.response.data : error.message);
         return null;
@@ -1185,7 +1196,7 @@ async function getAllItemCategories() {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/itemcategories/`;
     try {
         const response = await axios.get(apiUrl);
-        return response.data;
+            return unwrapListPayload(response.data);
     } catch (error) {
         console.error('[UEX][itemcategories] list error:', error?.response?.data || error?.message);
         return null;
@@ -1251,7 +1262,7 @@ async function getAllItems() {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_EXP_GER}/items/`;
     try {
         const response = await axios.get(apiUrl);
-        return response.data;
+        return unwrapListPayload(response.data);
     } catch (error) {
         console.error('[UEX][items] list error:', error?.response?.data || error?.message);
         return null;

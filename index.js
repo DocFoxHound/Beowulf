@@ -7,13 +7,52 @@ const path = require('node:path');
 const { preloadFromDb } = require("./common/preload-from-db.js");
 // const queueReminderCheck = require("./queue-functions/queue-controller.js").queueReminderCheck
 const { processUEXData } = require("./common/process-uex-data.js")
+const {
+  hydrateUexCachesFromDb,
+  getUexCache,
+  getUexCacheRecords,
+  getUexCacheState,
+  getUexCacheLabels,
+  primeUexCacheFromSnapshot,
+} = require('./common/uex-cache.js');
+const {
+  hydratePlayerStatsCacheFromDb,
+  refreshPlayerStatsCache,
+  getPlayerStatsCache,
+  getPlayerStatsCacheState,
+} = require('./common/player-stats-cache.js');
+const {
+  hydrateLeaderboardsFromDb,
+  getPlayerLeaderboardCache,
+  getOrgLeaderboardCache,
+  getLeaderboardCacheState,
+} = require('./common/leaderboard-cache.js');
+const {
+  hydrateHitCacheFromDb,
+  getHitCache,
+  getHitCacheState,
+} = require('./common/hit-cache.js');
 const { createUser } = require('./api/userlistApi.js');
 const { getUserById } = require('./api/userlistApi.js');
 const { editUser } = require('./api/userlistApi.js');
 const { getUserRank } = require('./userlist-functions/userlist-controller.js')
 const { refreshUserlist } = require("./common/refresh-userlist.js");
-const { refreshUserListCache } = require('./common/userlist-cache.js');
+const {
+  refreshUserListCache,
+  getUserListCache,
+  getUserListMeta,
+  getUserFromCacheById,
+  getUserFromCacheByName,
+  getUserListCacheState,
+} = require('./common/userlist-cache.js');
 const { saveMessage } = require("./common/message-saver.js");
+const { freshLoadChatMessages } = require("./scripts/fresh-load-chat-messages.js");
+const {
+  addChatMessageToCache,
+  preloadCachedChatMessages,
+  getCachedMessagesForChannel,
+  getChatCacheState,
+} = require("./common/chat-cache.js");
 const { loadChatlogs } = require("./vector-handling/vector-handler.js");
 const { trimChatLogs } = require("./vector-handling/vector-handler.js");
 const { main: ingestChatBatch, ingestChatMessage } = require('./vector-handling/chat-ingest.js');
@@ -33,8 +72,8 @@ const { handleFleetMemberChange } = require('./functions/fleet-member-change.js'
 const { processPlayerLeaderboards } = require('./functions/process-leaderboards.js');
 const { voiceChannelSessions } = require("./common/voice-channel-sessions.js");
 const { automatedAwards } = require("./common/automated-awards.js");
-const { promotePlayerNotify } = require("./common/promote-player-notify.js");
-const { notifyForAward } = require("./common/bot-notify.js");
+const { promotePlayerNotify } = require('./common/promote-player-notify.js');
+const { notifyForAward } = require('./common/bot-notify.js');
 const { grantPrestigeNotify } = require("./common/grant-prestige-notify.js");
 const { getPrestigeRanks } = require("./userlist-functions/userlist-controller.js");
 const { processLeaderboardLogs } = require('./functions/process-leaderboard-logs.js');
@@ -43,10 +82,10 @@ const { verifyUser } = require('./functions/verify-user.js');
 const { handleNewGuildMember } = require('./common/new-user.js');
 const { userlistEvents, USERLIST_CHANGED } = require('./common/userlist-events.js');
 const { handleSimpleWelcomeProspect, handleSimpleWelcomeGuest, handleSimpleJoin } = require("./common/inprocessing-verify-handle.js");
-const { refreshPlayerStatsView } = require('./api/playerStatsApi.js');
 const { removeProspectFromFriendlies } = require('./common/remove-prospect-from-friendly.js');
 const { syncSkillLevelsFromGuild, updateSkillOnMemberChange } = require('./common/skill-level-assigner.js');
 const { makeMember, updateMemberOnMemberChange } = require('./common/make-member.js');
+const { handleChatGptInteraction } = require('./chatgpt/orchestrator');
 
 
 // Initialize dotenv config file
@@ -59,6 +98,10 @@ dotenv.config({
   path: envFile,
 });
 
+const AUTO_FIX_COMMODITIES = (process.env.UEX_AUTO_FIX_COMMODITIES || 'true').toLowerCase() === 'true';
+const MIN_COMMODITY_ROWS = Number(process.env.UEX_MIN_COMMODITY_ROWS || 25);
+let commoditiesAutoRefreshPromise = null;
+
 // Coalesce DB-driven userlist changes into a debounced cache refresh
 let _userlistCacheTimer = null;
 function scheduleUserlistCacheRefresh(delayMs = 1500) {
@@ -68,6 +111,46 @@ function scheduleUserlistCacheRefresh(delayMs = 1500) {
   }, delayMs);
 }
 try { userlistEvents.on(USERLIST_CHANGED, () => scheduleUserlistCacheRefresh(1500)); } catch {}
+
+async function shouldEngageChatGpt(message, client) {
+  if (!message || !client) return false;
+  if (!message.guild) return false;
+  const botId = client.user?.id;
+  if (!botId) return false;
+  if (message.author?.id === botId) return false;
+  const mentioned = message.mentions?.users?.has(botId);
+  if (mentioned) return true;
+  const repliedUserId = message.mentions?.repliedUser?.id;
+  if (repliedUserId && repliedUserId === botId) return true;
+  if (message.reference?.messageId && message.channel?.messages?.fetch) {
+    try {
+      const referenced = await message.channel.messages.fetch(message.reference.messageId);
+      if (referenced?.author?.id === botId) return true;
+    } catch (_) {}
+  }
+  return false;
+}
+
+async function ensureCommoditiesDatasetHealthy(reason = 'startup') {
+  if (!AUTO_FIX_COMMODITIES) return;
+  if (commoditiesAutoRefreshPromise) return commoditiesAutoRefreshPromise;
+  const commoditiesEntry = getUexCache('commodities');
+  const currentCount = Array.isArray(commoditiesEntry?.records) ? commoditiesEntry.records.length : 0;
+  if (currentCount >= MIN_COMMODITY_ROWS) return;
+  console.warn(`[UEX] Commodities dataset thin (${currentCount} records). Triggering refresh (reason=${reason}).`);
+  commoditiesAutoRefreshPromise = (async () => {
+    await processUEXData('commodities');
+    await hydrateUexCachesFromDb({ labels: ['commodities', 'summarizedcommodities'] });
+    console.log('[UEX] Commodities dataset refreshed via processUEXData("commodities").');
+  })()
+    .catch((e) => {
+      console.error('[UEX] Commodities auto-refresh failed:', e?.message || e);
+    })
+    .finally(() => {
+      commoditiesAutoRefreshPromise = null;
+    });
+  return commoditiesAutoRefreshPromise;
+}
 
 // Single-instance guard: prevent running multiple bot processes on the same machine
 (() => {
@@ -169,11 +252,87 @@ channelIds.forEach((channel) => {
   });
 });
 
+function getActiveGuildId() {
+  return process.env.LIVE_ENVIRONMENT === "true" ? process.env.GUILD_ID : process.env.TEST_GUILD_ID;
+}
+
+const shouldFreshLoadChatMessages = (process.env.CHAT_MESSAGES_FRESH_LOAD_ON_START || 'false').toLowerCase() === 'true';
+
+const userListCacheAccessor = {
+  getAll: () => getUserListCache(),
+  getMeta: () => getUserListMeta(),
+  getById: (id) => getUserFromCacheById(id),
+  getByName: (name) => getUserFromCacheByName(name),
+  getState: () => getUserListCacheState(),
+};
+
+const chatMessagesCacheAccessor = {
+  getChannelIds: () => Array.from(getChatCacheState().keys()),
+  getState: () => getChatCacheState(),
+  getForChannel: (channelId) => getCachedMessagesForChannel(channelId),
+};
+
+const uexCacheAccessor = {
+  labels: () => getUexCacheLabels(),
+  get: (label) => getUexCache(label),
+  getRecords: (label) => getUexCacheRecords(label),
+  getState: () => getUexCacheState(),
+};
+
+const playerStatsCacheAccessor = {
+  getAll: () => getPlayerStatsCache(),
+  getState: () => getPlayerStatsCacheState(),
+  refresh: () => refreshPlayerStatsCache(),
+};
+
+const leaderboardCacheAccessor = {
+  getPlayers: () => getPlayerLeaderboardCache(),
+  getOrgs: () => getOrgLeaderboardCache(),
+  getState: () => getLeaderboardCacheState(),
+};
+
+const hitCacheAccessor = {
+  getAll: () => getHitCache(),
+  getState: () => getHitCacheState(),
+};
+
+globalThis.userListCache = userListCacheAccessor;
+globalThis.chatMessagesCache = chatMessagesCacheAccessor;
+globalThis.uexCache = uexCacheAccessor;
+globalThis.playerStatsCache = playerStatsCacheAccessor;
+globalThis.leaderboardCache = leaderboardCacheAccessor;
+globalThis.hitCache = hitCacheAccessor;
+
+async function hydrateChatCache() {
+  const guildId = getActiveGuildId();
+  if (!guildId) {
+    console.warn('[ChatCache] Missing guild id; skipping preload.');
+    return;
+  }
+  await preloadCachedChatMessages({ channelIds, guildId });
+}
+
 //Event Listener: login
 client.on("ready", async () => {
   //fetch channels on a promise, reducing startup time
   const channelFetchPromises = channelIds.map(id => client.channels.fetch(id).catch(e => console.error(`Failed to fetch channel: ${id}`, e)));
   const channels = await Promise.all(channelFetchPromises);
+  if (shouldFreshLoadChatMessages) {
+    try {
+      await freshLoadChatMessages({
+        skipEnvLoad: true,
+        configs: [{
+          label: process.env.LIVE_ENVIRONMENT === "true" ? 'live' : 'test',
+          guildId: getActiveGuildId(),
+          channels: channelIds,
+          client,
+        }],
+      });
+    } catch (e) {
+      console.error('[ChatCache] Fresh load run failed:', e?.message || e);
+    }
+  }
+  try { await hydrateChatCache(); } catch (e) { console.error('[ChatCache] Preload failed:', e?.message || e); }
   //preload some channelIDs and Names
   channelIdAndName = channels.map(channel => ({
     channelName: channel?.name,
@@ -202,17 +361,29 @@ client.on("ready", async () => {
 
 
   preloadedDbTables = await preloadFromDb(); //leave on
-  // await removeProspectFromFriendlies(client);
+  try {
+    const primed = primeUexCacheFromSnapshot(preloadedDbTables, { source: 'database-preload', info: 'preloadFromDb' });
+    if (primed) {
+      console.log(`[UEXCache] Primed ${primed} datasets from preloaded DB tables.`);
+    } else {
+      console.warn('[UEXCache] Preloaded DB tables were empty; skipping cache prime.');
+    }
+  } catch (e) {
+    console.error('[UEXCache] Failed to prime cache from preloaded tables:', e?.message || e);
+  }
   await refreshUserlist(client, openai) //actually leave this here
   try { await refreshUserListCache(); } catch (e) { console.error('[Startup] userlist cache refresh failed:', e?.message || e); }
-  // Ensure SKILL_LEVEL_* roles are aligned at startup based on live Discord roles (RAPTOR/RAIDER)
-  // try { await syncSkillLevelsFromGuild(client); } catch (e) { console.error('[Startup] Skill role sync failed:', e?.message || e); }
-  // Ensure MEMBER role is aligned at startup based on CREW/MARAUDER/BLOODED
-  // try { await makeMember(client); } catch (e) { console.error('[Startup] Member role sync failed:', e?.message || e); }
-  try { await ingestDailyChatSummaries(client, openai); } catch (e) { console.error('Initial chat ingest failed:', e); }
-  try { await ingestHitLogs(client, openai); } catch (e) { console.error('Initial hit ingest failed:', e); }
-  try { await ingestPlayerStats(client); } catch (e) { console.error('Initial player-stats ingest failed:', e); }
-  // await processPlayerLeaderboards(client, openai)
+  try {
+    await hydrateUexCachesFromDb();
+    console.log('[UEXCache] Hydrated from database tables.');
+  } catch (e) {
+    console.error('[Startup] uex cache hydrate failed:', e?.message || e);
+  }
+  await ensureCommoditiesDatasetHealthy('startup-hydrate');
+  try { await hydratePlayerStatsCacheFromDb(); } catch (e) { console.error('[Startup] player stats cache hydrate failed:', e?.message || e); }
+  try { await hydrateLeaderboardsFromDb(); } catch (e) { console.error('[Startup] leaderboard cache hydrate failed:', e?.message || e); }
+  try { await hydrateHitCacheFromDb(); } catch (e) { console.error('[Startup] hit cache hydrate failed:', e?.message || e); }
+
   // Sequential UEX refresh + cache warmup
   const DAY_MS = 86400000;
   let uexRefreshInProgress = false;
@@ -259,7 +430,18 @@ client.on("ready", async () => {
     })();
   }
   setInterval(runUEXRefreshSequence, DAY_MS); // every 24 hours
-  setInterval(async () => preloadedDbTables = preloadFromDb(),
+  setInterval(async () => {
+    try {
+      preloadedDbTables = await preloadFromDb();
+      const primed = primeUexCacheFromSnapshot(preloadedDbTables, { source: 'database-preload', info: 'preloadFromDb:interval' });
+      if (primed) {
+        console.log(`[UEXCache] Interval prime refreshed ${primed} datasets.`);
+      }
+    } catch (e) {
+      console.error('[UEXCache] Interval preload failed:', e?.message || e);
+    }
+    await ensureCommoditiesDatasetHealthy('interval-prime');
+  },
     21600000 //every 6 hours
   );
   setInterval(async () => {
@@ -281,13 +463,14 @@ client.on("ready", async () => {
   // setInterval(() => trimChatLogs(),
   //   43200000 //every 12 hours
   // );
-  setInterval(() => manageEvents(client, openai),
+  setInterval(async () => {
+    try { await refreshPlayerStatsCache(); } catch (e) { console.error('[Interval] player stats cache refresh failed:', e?.message || e); }
+  },
     300000 // every 5 minutes
   );
-  setInterval(() => refreshPlayerStatsView(client, openai),
-    300000 // every 5 minutes
-  );
-  setInterval(() => processPlayerLeaderboards(client, openai),
+  setInterval(async () => {
+    try { await processPlayerLeaderboards(client, openai); } catch (e) { console.error('[Interval] processPlayerLeaderboards failed:', e?.message || e); }
+  },
     14400000 //every 4 hours
   );
   setInterval(() => automatedAwards(client, openai),
@@ -297,19 +480,19 @@ client.on("ready", async () => {
   // Ingest daily chat summaries into knowledge base (every 6 hours)
   // Combined sequential ingest cycle (every 6 hours): chat summaries then hit logs
   const SIX_HOURS = 21600000;
-  setInterval(async () => {
-    try {
-      await ingestDailyChatSummaries(client, openai);
-      await ingestHitLogs(client, openai);
-    } catch (e) {
-      console.error('Chat/Hit ingest cycle failed:', e);
-    }
-  }, SIX_HOURS);
-  // Ingest player stats into knowledge base (every 6 hours)
-  setInterval(() => ingestPlayerStats(client),
-    3600000 //every 1 hour  
-    // 21600000 // every 6 hours
-  );
+  // setInterval(async () => {
+  //   try {
+  //     await ingestDailyChatSummaries(client, openai);
+  //     await ingestHitLogs(client, openai);
+  //   } catch (e) {
+  //     console.error('Chat/Hit ingest cycle failed:', e);
+  //   }
+  // }, SIX_HOURS);
+  // // Ingest player stats into knowledge base (every 6 hours)
+  // setInterval(() => ingestPlayerStats(client),
+  //   3600000 //every 1 hour  
+  //   // 21600000 // every 6 hours
+  // );
 }),
 
 client.on("messageCreate", async (message) => {
@@ -340,7 +523,14 @@ client.on("messageCreate", async (message) => {
   if (!inAllowedChannel) return;
   // Optionally persist messages to the backend for retrieval scoring
   if ((process.env.SAVE_MESSAGES || 'false').toLowerCase() === 'true') {
-    try { await saveMessage(message, client); } catch {}
+    try {
+      const savedRecord = await saveMessage(message);
+      if (savedRecord) {
+        addChatMessageToCache(savedRecord, { fallbackChannelId: message.channelId, fallbackGuildId: message.guildId });
+      }
+    } catch (e) {
+      console.error('[ChatCache] Failed to save/cache message:', e?.message || e);
+    }
   }
 
   // Ingest each new message into knowledge vectors (advice/opinion grounding)
@@ -358,6 +548,10 @@ client.on("messageCreate", async (message) => {
     } catch (e) {
       console.error('[ChatIngest] failed to schedule live ingest:', e?.message || e);
     }
+  }
+
+  if (await shouldEngageChatGpt(message, client)) {
+    await handleChatGptInteraction({ message, client, openai });
   }
 
 });

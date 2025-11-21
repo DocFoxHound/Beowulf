@@ -1,6 +1,7 @@
 // Central export for API models
 
 const { KnowledgeModel } = require('./knowledge');
+const { KnowledgeDocsModel } = require('./knowledge-docs');
 const { UexTerminalModel } = require('./uex-terminal');
 const { UexTerminalPricesModel } = require('./uex-terminal-prices');
 const { UexStarSystemsModel } = require('./uex-star-systems');
@@ -23,9 +24,13 @@ const { UsersModel } = require('./users');
 const { HitTrackerModel } = require('./hit-tracker');
 const { ChatLogsModel } = require('./chat-logs');
 const { PlayerStatsModel } = require('./player-stats');
+const { MemoriesModel } = require('./memories');
+const { UserProfilesModel } = require('./user-profiles');
+const { ChatMessagesModel } = require('./chat-messages');
 
 module.exports = {
   KnowledgeModel,
+  KnowledgeDocsModel,
   UexTerminalModel,
   UexTerminalPricesModel,
   UexStarSystemsModel,
@@ -48,4 +53,7 @@ module.exports = {
   HitTrackerModel,
   ChatLogsModel,
   PlayerStatsModel,
+  MemoriesModel,
+  UserProfilesModel,
+  ChatMessagesModel,
 };

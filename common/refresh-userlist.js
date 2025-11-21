@@ -4,7 +4,6 @@ const { editUser } = require("../api/userlistApi")
 const { createUser } = require("../api/userlistApi")
 const { getUsers, deleteUser } = require("../api/userlistApi")
 const { getPrestiges } = require("../api/prestige-roles-api");
-const { checkForPrestigePromotionUpdateUserlist, checkForRankPromotionUpdateUserlist, markOffCompletedClassesDeterminedByPrestigeRank } = require("../deprecated-but-keep/check-for-promotion")
 const { getAllFleets } = require("../api/userFleetApi");
 
 // Import rank role IDs from .env

@@ -1,6 +1,7 @@
 const { ChannelType, EmbedBuilder } = require("discord.js");
 const { getFleetById } = require("../api/userFleetApi"); // <-- Add this import
 const { editHitLog } = require("../api/hitTrackerApi"); // <-- Add this import
+const { upsertHitInCache, removeHitFromCache } = require("../common/hit-cache.js");
 
 // Simple in-memory de-duplication to prevent double posting the same hit
 const _postedHitCache = new Map(); // key -> timestamp
@@ -163,6 +164,9 @@ async function handleHitPost(client, openai, hitTrack) {
         hitTrack.thread_id = thread.id;
         try {
             await editHitLog(hitTrack.id, hitTrack);
+            try { upsertHitInCache(hitTrack, { source: 'handleHitPost' }); } catch (cacheErr) {
+                console.error('[HitCache] Failed to upsert after post:', cacheErr?.message || cacheErr);
+            }
         } catch (err) {
             console.error(err);
         }
@@ -225,6 +229,9 @@ async function handleHitPostUpdate(client, hitBefore, hitAfter) {
             .addFields(changed.length ? changed : [{ name: 'No visible changes', value: 'No fields changed.', inline: false }]);
 
         await channel.send({ embeds: [header] });
+        try { upsertHitInCache(hitAfter, { source: 'handleHitPostUpdate' }); } catch (cacheErr) {
+            console.error('[HitCache] Failed to upsert after update:', cacheErr?.message || cacheErr);
+        }
     } catch (e) {
         console.error('handleHitPostUpdate error:', e?.message || e);
     }
@@ -263,6 +270,9 @@ async function handleHitPostDelete(client, hit) {
             .setColor(0xcc0000);
 
         await channel.send({ embeds: [embed] });
+        try { removeHitFromCache(hit?.id, { source: 'handleHitPostDelete' }); } catch (cacheErr) {
+            console.error('[HitCache] Failed to remove after delete:', cacheErr?.message || cacheErr);
+        }
     } catch (e) {
         console.error('handleHitPostDelete error:', e?.message || e);
     }

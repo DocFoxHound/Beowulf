@@ -1,5 +1,6 @@
 const axios = require('axios');
 const UEX = require('../api/uexApi');
+const { refreshUexCache } = require('./uex-cache.js');
 
 let marketplaceArray = []; // Declare marketplaceArray outside the function to persist data
 let categoriesArray = [];   // Cache item categories for items iteration
@@ -105,6 +106,7 @@ async function processUEXData(whichTable){
                 // Clear only the specific tables for this category right before loading
                 await clearTablesForTitle(api.title);
                 await sendToDb(api.title, data);
+                refreshRuntimeCache(api.title, data, whichTable);
             } catch (error) {
                 const status = error?.response?.status;
                 const body = safeStringify(error?.response?.data);
@@ -123,6 +125,7 @@ async function processUEXData(whichTable){
                 }
                 await clearTablesForTitle(api.title);
                 await sendToDb(api.title, data);
+                refreshRuntimeCache(api.title, data, whichTable);
             }catch(error){
                 const status = error?.response?.status;
                 const body = safeStringify(error?.response?.data);
@@ -171,6 +174,7 @@ async function processUEXData(whichTable){
             console.log(`[UEX][terminal_prices] completed: ok=${successCount}, fail=${failCount}`);
             await clearTablesForTitle(api.title);
             await sendToDb(api.title, individualTerminalData);  
+            refreshRuntimeCache(api.title, individualTerminalData, whichTable);
         } else if (api.title === 'items') {
             // Iterate over categories and fetch items per category with throttling
             // Ensure we have categories loaded; if not, try to fetch on the fly
@@ -211,6 +215,7 @@ async function processUEXData(whichTable){
             console.log(`[UEX][items] completed: ok=${ok}, fail=${fail}`);
             await clearTablesForTitle(api.title);
             await sendToDb(api.title, allItemsData);
+            refreshRuntimeCache(api.title, allItemsData, whichTable);
         }
     }
     console.log(`Finished processUEXData`)
@@ -518,6 +523,14 @@ async function sendToDb(title, data) {
 module.exports = {
     processUEXData
 };
+
+function refreshRuntimeCache(label, payload, whichTable) {
+    try {
+        refreshUexCache(label, payload, { source: 'remote-api', info: `processUEXData:${whichTable}` });
+    } catch (e) {
+        console.error(`[UEXCache] Failed to refresh cache for ${label}:`, e?.message || e);
+    }
+}
 
 // Clear tables for a single category label right before loading that category
 async function clearTablesForTitle(label){
