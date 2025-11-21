@@ -219,10 +219,10 @@ async function handleSimpleJoin(interaction, client, openai){
     }
 
     // Create welcome message
-    const messageToBot = `Welcome ${dbUser.username} to IronPoint, the best Pirate crew in Star Citizen. Explain that we expect skill and creativity, as they're both needed to dominate.`;
+    const welcomeMessage = `Welcome ${dbUser.username} to IronPoint, the best Pirate crew in Star Citizen. Skill and creativity keep us on top, so show both and let's dominate together.`;
     let returnedMessage = "";
     try{
-        returnedMessage = await notifyWelcomeForEmbed(dbUser, openai, client, messageToBot);
+        returnedMessage = await notifyWelcomeForEmbed(dbUser, openai, client, welcomeMessage);
     }catch(error){
         returnedMessage = "Welcome to IronPoint! Please take a moment to read the rules and let us know if you're here as a Guest or here as a potential Join!";
         console.error("Error notifying welcome for embed:", error);
@@ -268,10 +268,10 @@ async function handleSimpleWelcomeProspect(interaction, client, openai){
         console.error('Error removing newUserRole:', error);
     }
     // Create welcome message
-    const messageToBot = `Congratulate ${dbUser.username} on joining as a PROSPECT. Let them know they need to now prove themselves to become part of the Crew. Tell them they can see the requirements on the website. Explain that IronPoint has two schools of skills called 'Prestiges', and they are RAPTOR (dogfighting skills) and RAIDER (piracy skills). Explain that despite the two prestiges, crew are expected to be both good dogfighters and good pirates.`;
+    const prospectMessage = `Congratulations on locking in as a PROSPECT, ${dbUser.username}! Check the website for requirements, master both Raptor (dogfighting) and Raider (piracy) prestiges, and prove you can steal something valuable while surviving the fight.`;
     let returnedMessage = "";
     try{
-        returnedMessage = await notifyWelcomeForEmbed(dbUser, openai, client, messageToBot);
+        returnedMessage = await notifyWelcomeForEmbed(dbUser, openai, client, prospectMessage);
     }catch(error){
         returnedMessage = "Congratulations on joining IronPoint as a PROSPECT! We value teamwork, creative problem solving, and of course dogfighting skills. You'll be expected to learn how to function on the Pirate Team, and how to hold your own against some of the best. You're contributions to our successes will be crucial to keeping us on top!";
         console.error("Error notifying welcome for embed:", error);
@@ -320,10 +320,10 @@ async function handleSimpleWelcomeGuest(interaction, client, openai){
         console.error('Error removing newUserRole:', error);
     }
     // Create welcome message
-    const messageToBot = `Reword the following in your own way:  ${dbUser.username}, welcome to IronPoint, the best Pirate Crew in Star Citizen! IronPoint values capable Dogfighters, creative Pirates, and mature players. We encourage skill development, teamwork, and a mature outlook towards the community. Give 'GGs' after fights, and Leave Only Bare Metal on your victims.`;
+    const guestMessage = `${dbUser.username}, welcome to IronPoint—the best pirate crew in Star Citizen. We value lethal dogfighting, clever piracy, and maturity. Drop GGs after scraps and leave only bare metal behind.`;
     let returnedMessage = "";
     try{
-        returnedMessage = await notifyWelcomeForEmbed(dbUser, openai, client, messageToBot);
+        returnedMessage = await notifyWelcomeForEmbed(dbUser, openai, client, guestMessage);
     }catch(error){
         returnedMessage = "Welcome to IronPoint, the best Pirate Crew in Star Citizen! IronPoint values capable Dogfighters, creative Pirates, and mature players. We encourage skill development, teamwork, and a mature outlook towards the community. Give 'GG`s' after fights, and Leave Only Bare Metal on your victims.";
         console.error("Error notifying welcome for embed:", error);

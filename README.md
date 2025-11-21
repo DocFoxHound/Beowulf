@@ -1,8 +1,8 @@
 # Beowulf Discord Bot
-Intelligent, data-driven Discord automation for Star Citizen org operations: conversational assistance, hit tracking, fleets/schedules, leaderboards, awards, and market insights.
+Data-driven Discord automation for Star Citizen org operations: hit tracking, fleets/schedules, leaderboards, awards, and market insights.
 
 ## Overview
-Beowulf combines deterministic data pipelines (UEX market data, stats, schedules) with retrieval-augmented AI responses. It offers HTTP endpoints for backend-triggered events and a modular command/event system for Discord.
+Beowulf combines deterministic data pipelines (UEX market data, stats, schedules) with Discord automation. It offers HTTP endpoints for backend-triggered events plus scheduled background jobs — no slash-commands or conversational handlers remain in this build.
 
 ### Quick Start
 1) Create a `.env` from `ENVIRONMENT.md` (or a future `.env.example`).
@@ -16,38 +16,37 @@ npm run start
 
 For process supervision in production, see `docs/OPERATIONS.md` (PM2 recommended).
 
+### Clearing legacy slash commands (temporary helper)
+If Discord still shows outdated slash commands from previous versions, run the purge helper. It deletes both global and guild-scoped commands for live/test apps based on your `.env` values.
+
+```bash
+npm run clear:commands               # uses .env by default
+npm run clear:commands -- path/to/.env.other   # optional alt env file
+```
+
+Run it once after redeploying the GPT-free build, or anytime stray commands linger.
+
 ### Architecture snapshot
 ```mermaid
 graph TD
-	User[Discord Users] -->|Messages/Slash| Bot[Discord Client]
-	Bot --> Handler[chatgpt/handler.js]
-	Handler --> Vector[Vector Store]
-	Handler --> Market[Market Answerers]
-	Market --> Cache[(In-Memory UEX Cache)]
-	Cache --> DB[(PostgreSQL)]
-	Handler --> OpenAI[OpenAI APIs]
-	OpenAI --> Handler
-	subgraph HTTP API
-		ExtSvc[Org Backend] --> API[Express Endpoints]
-		API --> Functions[functions/*]
-		Functions --> Bot
-		Functions --> DB
-	end
-	Bot -->|Embeds/Replies| Discord
+	ExtSvc[Org Backend] --> API[Express Endpoints]
+	API --> Functions[functions/*]
+	Functions --> Bot[Discord Client]
+	Bot --> Discord[Guild Channels]
+	Bot --> Jobs[Scheduled Tasks]
+	Jobs --> DB[(PostgreSQL)]
+	API --> DB
 ```
 
 ## Hit Tracker features
 
-- Create hits via natural language or `/hit-tracker-add`.
-- Edit your hit inside its thread with simple phrases like "edit value to 14000".
-- When creating a hit, the bot will also ask for assists (crew). You can @mention multiple users or reply "none".
-- Delete your own hit via:
-	- Natural language: "delete hit 123" or "remove this hit" (only the original author may delete).
-	- Slash command: `/hit-tracker-remove` with autocomplete for your hits.
+- Hits are created through the backend API (`/hittrackcreate`) or automation jobs instead of slash commands.
+- Edits and deletions are likewise triggered via API payloads (`/hittrackdelete`) and reflected in Discord threads.
+- When a hit arrives, the bot posts crew prompts so you can @mention assists or reply "none" directly in the thread.
+- Deleting a hit removes the database record but leaves a red embed in the thread for historical context.
 
 On deletion, the bot removes the database record but posts a red embed in the thread stating the hit was removed; the thread remains for history.
 
-Tip: To add someone to an existing hit, you can simply say "add @User to the hit" or "add PlayerName to the hit" inside the hit thread (or specify the hit ID). The per-share cuts will be recalculated automatically.
 
 ## Documentation Index
 - `docs/ARCHITECTURE.md` – System overview, diagrams, modules

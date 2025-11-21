@@ -17,19 +17,13 @@ graph LR
   HitIngest --> Vector
   LiveIngest --> Vector
   StatsIngest --> Vector
-  DB --> CachePrime[Prime Market Caches]
-  CachePrime --> MarketCache[(In-Memory Market & Location Objects)]
-  MarketCache --> MarketAnswers[Deterministic Market Answerers]
-  Vector --> Retrieval[Retrieval Layer]
-  Retrieval --> LLM[OpenAI Responses]
-  MarketAnswers --> LLM
-  LLM --> DiscordReply[Discord Replies]
   subgraph External Push
     Backend[Org Backend] --> API[Express API]
     API --> DomainHandlers[Hit/Fleet/Schedule Handlers]
     DomainHandlers --> DB
-    DomainHandlers --> DiscordReply
+    DomainHandlers --> DiscordReply[Discord Notifications]
   end
+  DB --> DiscordReply
   DiscordReply --> Users[Discord Users]
 ```
 
@@ -37,17 +31,15 @@ graph LR
 1. Trigger: Startup (cache warm) or scheduled 24h sequence.
 2. `process-uex-data.js` fetches categories sequentially: terminal_prices, items_by_terminal, other_tables.
 3. Data persisted into DB tables via UEX API helpers.
-4. Cache Prime: `primeMarketCache` loads markets & systems into in-memory structures.
-5. Answerers (`chatgpt/market-answerer.js`) read `state.data` and compose deterministic responses.
-6. Users query via tool-agent or direct prompts; output may augment LLM answers.
+4. Consumers query the DB directly (scheduled jobs, HTTP handlers) — the legacy in-memory market cache and chatgpt answerers have been retired.
 
 ### Accuracy & Freshness
 - Sequence ensures old data replaced after full category cycle; partial failure leaves stale entries.
 - Consider adding timestamp metadata per dataset for monitoring.
 
 ## Hit Logs Flow
-1. Creation: User natural language or `/hit-tracker-add` produces hit thread & DB record.
-2. Updates/Deletes: Natural language or slash command; modification events logged and optionally ingested.
+1. Creation: Org backend POSTs `/hittrackcreate`, producing the hit thread & DB record.
+2. Updates/Deletes: Backend/automation POSTs `/hittrackdelete`; modification events logged and optionally ingested.
 3. Ingestion: `ingestHitLogs` (6h) transforms historical hit content to embeddings.
 4. Retrieval: Vector search surfaces relevant hits for advice or historical reference.
 
@@ -58,7 +50,7 @@ graph LR
 - Event management job reconciles stale events.
 
 ## Chat & Knowledge Vector Flow
-1. Live ingestion (optional): Each `messageCreate` triggers non-blocking embedding of message payload.
+1. Live ingestion (optional): Each `messageCreate` triggers non-blocking embedding of message payload (for analytics/search, not conversational replies).
 2. Daily summaries: Aggregates chat sentiment/summary lines then embeds (`ingestDailyChatSummaries`).
 3. Pruning: Max retention limit (`CHAT_VECTOR_MAX`) culls oldest entries; planned age-based pruning.
 4. Retrieval: Query builder chooses vector vs fallback depending on flags (`KNOWLEDGE_PREFER_VECTOR`).
@@ -80,30 +72,6 @@ graph LR
 3. Prestige Levels: Computed from role sets (RAPTOR/CORSAIR/RAIDER tiers) updated in DB (`editUser`).
 4. Promotion & Awards: Endpoint `/promote` or automated job uses `promotePlayerNotify` & award handlers.
 
-## Retrieval Augmentation Flow
-1. User mentions/replies to bot.
-2. `handler.js` gathers context (recent messages, user state, vector retrieval results, market answers if needed).
-3. LLM prompt assembled using persona (`BOT_INSTRUCTIONS`) + retrieved documents.
-4. Response: Sent to thread/channel; optional fallback pathway if new handler fails.
-
-## Mermaid: LLM Augmented Response
-```mermaid
-sequenceDiagram
-  participant User
-  participant Bot
-  participant Handler
-  participant Vector
-  participant Market
-  participant OpenAI
-  User->>Bot: Message (mention/reply)
-  Bot->>Handler: handleBotConversation()
-  Handler->>Vector: Search embeddings (if enabled)
-  Handler->>Market: Deterministic lookup (if intent matches)
-  Handler->>OpenAI: Compose & send prompt
-  OpenAI-->>Handler: Completion
-  Handler-->>Bot: Formatted content / embeds
-  Bot-->>User: Reply
-```
 
 ## Data Integrity & Consistency
 - Most domain writes originate from single handlers to prevent divergence.

@@ -17,13 +17,7 @@ Thanks for your interest in contributing! This guide explains how to set up your
 - Style: Keep consistent with nearby code; prefer meaningful names and small modules.
 - Errors: Always `try/catch` in scheduled jobs; log with sufficient context.
 - Env flags: Default-safe patterns like `(process.env.FLAG || 'false').toLowerCase() === 'true'`.
-- Exports: For commands, export `{ data, execute, autocomplete? }`.
 - Side effects: Avoid blocking operations in `messageCreate`; favor fire-and-forget with error logging.
-
-## Commands
-- Place under `commands/<group>/<name>.js`.
-- Export `data` (SlashCommandBuilder config) and `execute(interaction, client, openai)`.
-- Optionally support `autocomplete` for dynamic choices.
 
 ## Documentation
 - Update relevant docs in `docs/` when adding features.
@@ -44,7 +38,7 @@ Thanks for your interest in contributing! This guide explains how to set up your
 - Expect feedback on error handling and env flag design.
 
 ## Release & Deployment
-- After merging, redeploy slash commands if new commands were added or names changed.
+- After merging, ensure scheduled jobs and HTTP endpoints are deployed to the correct environment (test vs live) before flipping feature flags.
 - Coordinate production enablement of feature flags with maintainers.
 
 ## Code of Conduct

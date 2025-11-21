@@ -1,15 +1,12 @@
-const { Client, GatewayIntentBits, Collection, Events, ChannelType, Partials } = require("discord.js");
+const { Client, GatewayIntentBits, Events, ChannelType, Partials } = require("discord.js");
 const dotenv = require("dotenv");
 const { OpenAI } = require("openai");
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-// const threadHandler = require("./thread-handler");
 const { preloadFromDb } = require("./common/preload-from-db.js");
 // const queueReminderCheck = require("./queue-functions/queue-controller.js").queueReminderCheck
 const { processUEXData } = require("./common/process-uex-data.js")
-const { handleMessage } = require('./threads/thread-handler.js');
-const { handleBotConversation } = require('./chatgpt/handler.js');
 const { createUser } = require('./api/userlistApi.js');
 const { getUserById } = require('./api/userlistApi.js');
 const { editUser } = require('./api/userlistApi.js');
@@ -50,12 +47,6 @@ const { refreshPlayerStatsView } = require('./api/playerStatsApi.js');
 const { removeProspectFromFriendlies } = require('./common/remove-prospect-from-friendly.js');
 const { syncSkillLevelsFromGuild, updateSkillOnMemberChange } = require('./common/skill-level-assigner.js');
 const { makeMember, updateMemberOnMemberChange } = require('./common/make-member.js');
-// Preloaders for location and market caches
-const { loadSystems } = require('./chatgpt/star-systems-answerer.js');
-const { loadStations } = require('./chatgpt/space-stations-answerer.js');
-const { loadPlanets } = require('./chatgpt/planets-answerer.js');
-const { loadOutposts } = require('./chatgpt/outposts-answerer.js');
-const { primeMarketCache } = require('./chatgpt/market-answerer.js');
 
 
 // Initialize dotenv config file
@@ -146,28 +137,6 @@ const client = new Client({
   partials: [Partials.Channel, Partials.Message, Partials.GuildMember, Partials.Reaction],
 });
 
-client.commands = new Collection();
-
-//collect all of the commands
-// const foldersPath = 'commands';
-const foldersPath = path.join(__dirname, '/commands/');
-const commandFolders = fs.readdirSync(foldersPath);
-
-for (const folder of commandFolders) {
-  const commandsPath = path.join(foldersPath, folder);
-  const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
-  for (const file of commandFiles) {
-    const filePath = path.join(commandsPath, file);
-    const command = require(filePath);
-    // Set a new item in the Collection with the key as the command name and the value as the exported module
-    if ('data' in command && 'execute' in command) {
-      client.commands.set(command.data.name, command);
-    } else {
-      console.error(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
-    }
-  }
-}
-
 // Set channels
 channelIds = process.env.LIVE_ENVIRONMENT === "true" ? process.env.CHANNELS.split(",") : process.env.TEST_CHANNELS.split(",");
 // Ensure HITTRACK forum channel is included in allowed parent list
@@ -199,19 +168,6 @@ channelIds.forEach((channel) => {
     conversation: [],
   });
 });
-
-// // Retrieve the bot assistant (read: personality)
-// myAssistant = openai.beta.assistants;
-// async function retrieveAssistant() {
-//   myAssistant = await openai.beta.assistants.retrieve(
-//     process.env.ASSISTANT_KEY
-//   );
-// }
-
-// //---------------------------------------------------------------------------------//
-
-// //retrieve the chatGPT assistant
-// retrieveAssistant();
 
 //Event Listener: login
 client.on("ready", async () => {
@@ -260,20 +216,6 @@ client.on("ready", async () => {
   // Sequential UEX refresh + cache warmup
   const DAY_MS = 86400000;
   let uexRefreshInProgress = false;
-  const primeLocationAndMarketCaches = async () => {
-    try {
-      // Do a single forced DB refresh via market cache, then non-blocking warms for the rest
-      await primeMarketCache({ force: true });
-      await Promise.allSettled([
-        loadSystems({ force: false }),
-        loadStations({ force: false }),
-        loadPlanets({ force: false }),
-        loadOutposts({ force: false }),
-      ]);
-    } catch (e) {
-      console.error('Cache prime failed:', e);
-    }
-  };
   const runUEXRefreshSequence = async () => {
     if (uexRefreshInProgress) {
       console.warn('UEX refresh already running; skipping this cycle.');
@@ -285,9 +227,7 @@ client.on("ready", async () => {
       await processUEXData("terminal_prices");
       await processUEXData("items_by_terminal");
       await processUEXData("other_tables");
-      // Only after all three complete, warm caches into memory
-      await primeLocationAndMarketCaches();
-      console.log('[UEX] Refresh + cache prime completed.');
+      console.log('[UEX] Refresh completed (chatgpt cache warm disabled).');
     } catch (e) {
       console.error('[UEX] Refresh sequence failed:', e);
     } finally {
@@ -301,9 +241,7 @@ client.on("ready", async () => {
     console.log('[UEX] Fresh load on start enabled. Running UEX refresh sequence now…');
     await runUEXRefreshSequence();
   } else {
-    // Default: only warm caches from existing DB data (no external refresh)
-    await primeLocationAndMarketCaches();
-    console.log('[Cache] Initial in-memory caches primed from DB.');
+    console.log('[Cache] Skipping legacy chatgpt cache warmup.');
   }
   // Indicate bot is fully ready only after caches are primed
   console.log("Ready")
@@ -422,31 +360,6 @@ client.on("messageCreate", async (message) => {
     }
   }
 
-  // Detect if this message is directed at the bot: mention or reply to bot
-  const isMentioningBot = message.mentions?.users?.has?.(client.user.id);
-  const isReplyToBot = Boolean(
-    message.reference?.messageId &&
-    message.mentions?.repliedUser &&
-    message.mentions.repliedUser.id === client.user.id
-  );
-
-  if (isMentioningBot || isReplyToBot) {
-    console.log('[bot] mention or reply detected:', {
-      author: message.author?.username,
-      content: message.content,
-    });
-    try {
-      await handleBotConversation(message, client, openai, preloadedDbTables);
-    } catch (e) {
-      console.error('chatgpt handler failed, falling back to legacy handler:', e);
-      handleMessage(message, openai, client, preloadedDbTables);
-    }
-    return;
-  }
-
-  // Otherwise keep legacy behavior
-  // handleMessage(message, openai, client, preloadedDbTables);
-
 });
 
 // Auto-join new threads created under our allowed forum channels
@@ -461,41 +374,6 @@ client.on(Events.ThreadCreate, async (thread) => {
   }
 });
 
-client.on(Events.InteractionCreate, async interaction => {
-  if (!interaction.isChatInputCommand()) return;
-  
-  const command = interaction.client.commands.get(interaction.commandName);
-
-  if (!command) {
-    console.error(`No command matching ${interaction.commandName} was found.`);
-    return;
-  }
-
-  try {
-    await command.execute(interaction, client, openai);
-  } catch (error) {
-    console.error(error);
-  }
-});
-
-client.on(Events.InteractionCreate, async interaction => {
-  if (interaction.isChatInputCommand()) {
-    // command handling
-  } else if (interaction.isAutocomplete()) {
-    const command = interaction.client.commands.get(interaction.commandName);
-
-    if (!command) {
-      console.error(`No command matching ${interaction.commandName} was found.`);
-      return;
-    }
-
-    try {
-      await command.autocomplete(interaction, client, openai);
-    } catch (error) {
-      console.error(error);
-    }
-  }
-});
 
 // Event Listener: new member joins the server
 client.on('guildMemberAdd', async (member) => {
