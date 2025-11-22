@@ -45,7 +45,7 @@ const {
   getUserFromCacheByName,
   getUserListCacheState,
 } = require('./common/userlist-cache.js');
-const { saveMessage } = require("./common/message-saver.js");
+const { saveMessage, buildContentFromMessage } = require("./common/message-saver.js");
 const { freshLoadChatMessages } = require("./scripts/fresh-load-chat-messages.js");
 const {
   addChatMessageToCache,
@@ -86,6 +86,13 @@ const { removeProspectFromFriendlies } = require('./common/remove-prospect-from-
 const { syncSkillLevelsFromGuild, updateSkillOnMemberChange } = require('./common/skill-level-assigner.js');
 const { makeMember, updateMemberOnMemberChange } = require('./common/make-member.js');
 const { handleChatGptInteraction } = require('./chatgpt/orchestrator');
+const { startMemoryBatchWorker, trackLiveMessageForMemories } = require('./chatgpt/memory/batch-runner');
+const {
+  refreshUserProfilesCache,
+  getUserProfilesCacheState,
+  getUserProfileFromCache: getPersonaProfileFromCache,
+  upsertUserProfileInCache,
+} = require('./common/user-profiles-cache.js');
 
 
 // Initialize dotenv config file
@@ -101,6 +108,8 @@ dotenv.config({
 const AUTO_FIX_COMMODITIES = (process.env.UEX_AUTO_FIX_COMMODITIES || 'true').toLowerCase() === 'true';
 const MIN_COMMODITY_ROWS = Number(process.env.UEX_MIN_COMMODITY_ROWS || 25);
 let commoditiesAutoRefreshPromise = null;
+const SHOULD_SAVE_MESSAGES = (process.env.SAVE_MESSAGES || 'false').toLowerCase() === 'true';
+const USER_PROFILES_REFRESH_INTERVAL_MS = Math.max(0, Number(process.env.USER_PROFILES_REFRESH_INTERVAL_MS || 1800000));
 
 // Coalesce DB-driven userlist changes into a debounced cache refresh
 let _userlistCacheTimer = null;
@@ -296,12 +305,20 @@ const hitCacheAccessor = {
   getState: () => getHitCacheState(),
 };
 
+const userProfilesCacheAccessor = {
+  getById: (id) => getPersonaProfileFromCache(id),
+  getState: () => getUserProfilesCacheState(),
+  refresh: () => refreshUserProfilesCache(),
+  upsertLocal: (profile) => upsertUserProfileInCache(profile),
+};
+
 globalThis.userListCache = userListCacheAccessor;
 globalThis.chatMessagesCache = chatMessagesCacheAccessor;
 globalThis.uexCache = uexCacheAccessor;
 globalThis.playerStatsCache = playerStatsCacheAccessor;
 globalThis.leaderboardCache = leaderboardCacheAccessor;
 globalThis.hitCache = hitCacheAccessor;
+globalThis.userProfilesCache = userProfilesCacheAccessor;
 
 async function hydrateChatCache() {
   const guildId = getActiveGuildId();
@@ -333,6 +350,12 @@ client.on("ready", async () => {
     }
   }
   try { await hydrateChatCache(); } catch (e) { console.error('[ChatCache] Preload failed:', e?.message || e); }
+  try { await refreshUserProfilesCache(); } catch (e) { console.error('[UserProfilesCache] Preload failed:', e?.message || e); }
+  try {
+    startMemoryBatchWorker({ channelIds, openai });
+  } catch (e) {
+    console.error('[MemoryBatcher] Startup failed:', e?.message || e);
+  }
   //preload some channelIDs and Names
   channelIdAndName = channels.map(channel => ({
     channelName: channel?.name,
@@ -477,6 +500,19 @@ client.on("ready", async () => {
     // 60000 //every 1 minute
     3600000 //every 1 hour
   );
+  if (USER_PROFILES_REFRESH_INTERVAL_MS > 0) {
+    setInterval(async () => {
+      try {
+        await refreshUserProfilesCache();
+      } catch (e) {
+        console.error('[UserProfilesCache] Interval refresh failed:', e?.message || e);
+      }
+    }, USER_PROFILES_REFRESH_INTERVAL_MS);
+  }
+  const USER_PROFILES_REFRESH_INTERVAL_MS = Math.max(300000, Number(process.env.USER_PROFILES_REFRESH_INTERVAL_MS || 1800000));
+  setInterval(async () => {
+    try { await refreshUserProfilesCache(); } catch (e) { console.error('[Interval] refreshUserProfilesCache failed:', e?.message || e); }
+  }, USER_PROFILES_REFRESH_INTERVAL_MS);
   // Ingest daily chat summaries into knowledge base (every 6 hours)
   // Combined sequential ingest cycle (every 6 hours): chat summaries then hit logs
   const SIX_HOURS = 21600000;
@@ -522,15 +558,35 @@ client.on("messageCreate", async (message) => {
   }
   if (!inAllowedChannel) return;
   // Optionally persist messages to the backend for retrieval scoring
-  if ((process.env.SAVE_MESSAGES || 'false').toLowerCase() === 'true') {
+  const authorLabel = message.member?.displayName || message.author?.username || 'user';
+  const channelName = message.channel?.name || message.channel?.parent?.name || 'unknown-channel';
+  let cachedRecord = null;
+  if (SHOULD_SAVE_MESSAGES) {
     try {
-      const savedRecord = await saveMessage(message);
-      if (savedRecord) {
-        addChatMessageToCache(savedRecord, { fallbackChannelId: message.channelId, fallbackGuildId: message.guildId });
-      }
+      cachedRecord = await saveMessage(message);
     } catch (e) {
-      console.error('[ChatCache] Failed to save/cache message:', e?.message || e);
+      console.error('[ChatCache] Failed to save message:', e?.message || e);
     }
+  }
+  if (!cachedRecord) {
+    const fallbackContent = buildContentFromMessage(message);
+    cachedRecord = fallbackContent ? {
+      guild_id: message.guildId || message.guild?.id,
+      channel_id: message.channelId,
+      user_id: message.author?.id,
+      username: authorLabel,
+      channel_name: channelName,
+      message_id: message.id,
+      content: fallbackContent,
+      timestamp: message.createdAt?.toISOString?.() || new Date().toISOString(),
+    } : null;
+  }
+  if (cachedRecord) {
+    cachedRecord.channel_name = cachedRecord.channel_name || channelName;
+    cachedRecord.username = cachedRecord.username || authorLabel;
+    cachedRecord.message_id = cachedRecord.message_id || cachedRecord.id || message.id;
+    addChatMessageToCache(cachedRecord, { fallbackChannelId: message.channelId, fallbackGuildId: message.guildId });
+    trackLiveMessageForMemories(cachedRecord, { fallbackChannelId: message.channelId, fallbackGuildId: message.guildId });
   }
 
   // Ingest each new message into knowledge vectors (advice/opinion grounding)

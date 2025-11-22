@@ -2,6 +2,7 @@ const MAX_CONTEXT_CHARS = 5500;
 const MODEL = process.env.CHATGPT_RESPONSE_MODEL || 'gpt-4.1';
 const PERSONA_DEBUG = (process.env.CHATGPT_PERSONA_DEBUG || 'false').toLowerCase() === 'true';
 const PERSONA_WARN_THRESHOLD_MS = Number(process.env.CHATGPT_PERSONA_WARN_THRESHOLD_MS || 15000);
+const MARKET_DEBUG = (process.env.CHATGPT_MARKET_DEBUG || 'false').toLowerCase() === 'true';
 
 const SYSTEM_PROMPT = `You are Beowulf, the AI of a pirate crew named IronPoint's. You speak like a reluctant assistant, helpful, grumpy, and witty. You always:
 - prioritize the most recent user request; only reference older chat when it clearly supports the current question
@@ -43,8 +44,53 @@ function formatRecentChat(recentChat = []) {
   }).join('\n');
 }
 
+function parseStatsObject(stats) {
+  if (!stats) return null;
+  if (typeof stats === 'object' && !Array.isArray(stats)) return stats;
+  if (typeof stats === 'string') {
+    try {
+      const parsed = JSON.parse(stats);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+    } catch {}
+  }
+  return null;
+}
+
+function formatPersonaDetails(details) {
+  if (!details || typeof details !== 'object') return [];
+  const traitKeys = ['openness', 'conscientiousness', 'extraversion', 'agreeableness', 'neuroticism', 'confidence', 'courage', 'integrity', 'resilience', 'humor'];
+  const lines = [];
+  if (details.profession) lines.push(`Profession: ${details.profession}`);
+  if (details.personality_summary) lines.push(`Vibe: ${details.personality_summary}`);
+  if (details.known_for && details.known_for.length) lines.push(`Known for: ${details.known_for.join(', ')}`);
+  if (details.favorite_topics && details.favorite_topics.length) lines.push(`Favorite topics: ${details.favorite_topics.join(', ')}`);
+  if (details.achievements && details.achievements.length) lines.push(`Achievements: ${details.achievements.join(', ')}`);
+  if (details.relationship_notes) lines.push(`Bot notes: ${details.relationship_notes}`);
+  if (details.notable_traits && details.notable_traits.length) lines.push(`Traits: ${details.notable_traits.join(', ')}`);
+  if (details.notable_quotes && details.notable_quotes.length) {
+    const quotes = details.notable_quotes.slice(0, 3).map((q) => `“${q}”`).join(' | ');
+    lines.push(`Quotes: ${quotes}`);
+  }
+  if (details.catchphrase) lines.push(`Catchphrase: ${details.catchphrase}`);
+  if (details.traits && typeof details.traits === 'object') {
+    const traitParts = [];
+    for (const key of traitKeys) {
+      if (details.traits[key] == null) continue;
+      const label = key.charAt(0).toUpperCase() + key.slice(1);
+      const val = Number(details.traits[key]);
+      traitParts.push(`${label}:${Number.isFinite(val) ? val.toFixed(1) : details.traits[key]}`);
+    }
+    if (traitParts.length) {
+      lines.push(`Personality sliders: ${traitParts.join(', ')}`);
+    }
+  }
+  return lines;
+}
+
 function formatUserProfile(profile) {
   if (!profile) return 'No cached profile.';
+  const stats = parseStatsObject(profile.stats_json);
+  const personaDetails = stats?.persona_details;
   const fields = [
     profile.nickname || profile.username ? `Name: ${profile.nickname || profile.username}` : null,
     profile.rank ? `Rank: ${profile.rank}` : null,
@@ -52,7 +98,11 @@ function formatUserProfile(profile) {
     profile.raptor_level || profile.raider_level 
       ? `Prestige: Raptor ${profile.raptor_level ?? '-'} / Raider ${profile.raider_level ?? '-'}`
       : null,
+    profile.tease_level != null ? `Tease level: ${profile.tease_level}` : null,
   ].filter(Boolean);
+  if (personaDetails) {
+    fields.push(...formatPersonaDetails(personaDetails));
+  }
   return fields.length ? fields.join('\n') : 'Profile cached but no key fields.';
 }
 
@@ -99,6 +149,7 @@ function formatSingleMarketSnapshot(snapshot, datasetLabel) {
     totalRecords,
     isGenericRequest,
     type,
+    terminalSummaries,
   } = snapshot;
   const category = type || 'overview';
   let header;
@@ -118,7 +169,35 @@ function formatSingleMarketSnapshot(snapshot, datasetLabel) {
   const prefix = datasetLabel ? `[${datasetLabel}] ` : '';
   const formatter = category === 'refinery' ? formatRefineryLine : formatPriceLine;
   const lines = sample.length ? sample.map(formatter) : ['No cached rows to display.'];
+  if (Array.isArray(terminalSummaries) && terminalSummaries.length) {
+    const terminalBlock = formatTerminalSummaries(terminalSummaries);
+    if (terminalBlock) {
+      lines.push('', terminalBlock);
+    }
+  }
   return [`${prefix}${header}`].concat(lines).join('\n');
+}
+
+function formatTerminalSummaries(summaries = []) {
+  if (!Array.isArray(summaries) || !summaries.length) return null;
+  const limit = Math.max(1, Number(process.env.CHATGPT_TERMINAL_SUMMARY_LIMIT) || 4);
+  const segments = [];
+  for (const summary of summaries.slice(0, limit)) {
+    const headerParts = [summary.terminalName];
+    if (summary.locationLabel) headerParts.push(summary.locationLabel);
+    headerParts.push(`${summary.matchCount} trades`);
+    const header = `• ${headerParts.filter(Boolean).join(' | ')}`;
+    const sampleLines = (summary.sample || []).map((entry) => {
+      const buy = entry.buyPrice != null ? Number(entry.buyPrice).toLocaleString() : 'n/a';
+      const sell = entry.sellPrice != null ? Number(entry.sellPrice).toLocaleString() : 'n/a';
+      return `   - ${entry.item} (buy ${buy}, sell ${sell})`;
+    });
+    segments.push([header].concat(sampleLines).join('\n'));
+  }
+  if (summaries.length > limit) {
+    segments.push(`…${summaries.length - limit} more terminals with cached trades.`);
+  }
+  return ['Terminal breakdown:'].concat(segments).join('\n');
 }
 
 function formatMarketSnapshot(snapshot) {
@@ -138,6 +217,14 @@ function formatMarketQueryMeta(meta) {
   if (meta.marketType) parts.push(`Type: ${meta.marketType}`);
   if (meta.commodityName) parts.push(`Commodity: ${meta.commodityName}`);
   if (meta.locationName) parts.push(`Location: ${meta.locationName}`);
+  if (meta.locationDataset) parts.push(`Location dataset: ${meta.locationDataset}`);
+  const terminalCount = meta.locationTerminalCount || meta.terminalFilterCount;
+  if (terminalCount) {
+    const sampleTerminals = Array.isArray(meta.locationTerminalNames) && meta.locationTerminalNames.length
+      ? meta.locationTerminalNames.slice(0, 4).join(', ')
+      : null;
+    parts.push(sampleTerminals ? `Terminals: ${terminalCount} (e.g. ${sampleTerminals})` : `Terminals: ${terminalCount}`);
+  }
   return parts.length ? parts.join(' | ') : 'Market intent metadata unavailable.';
 }
 
@@ -271,6 +358,26 @@ function buildContextBlock({ intent = {}, recentChat, userProfile, leaderboard, 
 
 async function generatePersonaResponse({ message, intent, context, openai }) {
   if (!openai) throw new Error('OpenAI client not configured');
+  if (MARKET_DEBUG && context.marketSnapshot) {
+    const datasetDiagnostics = Array.isArray(context.marketSnapshot.datasetSnapshots)
+      ? context.marketSnapshot.datasetSnapshots.map((entry) => ({
+          dataset: entry?.dataset,
+          label: entry?.label,
+          matches: entry?.snapshot?.matches,
+          sampleCount: entry?.snapshot?.sample?.length || 0,
+          fallbackUsed: entry?.snapshot?.fallbackUsed || false,
+          filters: entry?.snapshot?.filters || null,
+        }))
+      : [];
+    console.log('[ChatGPT][MarketDebug] persona_context', {
+      timestamp: new Date().toISOString(),
+      message: message?.content,
+      resolvedQuery: context.marketSnapshot.query,
+      marketType: context.marketSnapshot.marketType,
+      dataset: context.marketSnapshot.dataset,
+      datasetDiagnostics,
+    });
+  }
   const contextBlock = buildContextBlock(context);
   personaLog('context snapshot', {
     intent: intent.intent,

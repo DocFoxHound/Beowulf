@@ -13,6 +13,7 @@ const { fetchKnowledgeSnippets } = require('./knowledge-search');
 const { fetchMemorySnippets } = require('./memory-search');
 
 const RECENT_CHAT_LIMIT = Number(process.env.CHATGPT_RECENT_CHAT_LIMIT || 8);
+const MARKET_DEBUG = (process.env.CHATGPT_MARKET_DEBUG || 'false').toLowerCase() === 'true';
 const MARKET_FILLER_WORDS = new Set(['what', 'is', 'the', 'current', 'price', 'for', 'of', 'a', 'an', 'anyone', 'know']);
 const GENERIC_MARKET_WORDS = new Set(['highest', 'value', 'values', 'trade', 'trades', 'route', 'routes', 'profit', 'profits', 'haul', 'hauls', 'cargo', 'run', 'runs', 'best', 'top', 'great', 'good', 'money', 'credits', 'right', 'now', 'today', 'tonight', 'currently', 'biggest', 'largest', 'most', 'high', 'higher', 'low', 'lower']);
 
@@ -69,6 +70,12 @@ async function buildContext({ message, meta, intent, openai }) {
     locationRecord: null,
     hasRefineryKeyword: false,
     datasetPreference: null,
+    locationTerminals: null,
+    locationTerminalIds: [],
+    locationTerminalNames: [],
+    locationTerminalCount: 0,
+    locationTerminalSample: [],
+    locationTerminalFallbackUsed: false,
     catalogSummary: null,
   };
   const extractedTargets = shouldExtractTargets ? extractMarketTargets(content) : null;
@@ -84,8 +91,51 @@ async function buildContext({ message, meta, intent, openai }) {
         locationName: marketTargets.locationName,
         commodityDataset: marketTargets.commodityDataset,
         datasetPreference: marketTargets.datasetPreference,
+        terminalIds: marketTargets.locationTerminalIds,
+        locationDescriptor: marketTargets.locationTerminals
+          ? {
+              locationName: marketTargets.locationName,
+              locationDataset: marketTargets.locationDataset,
+              terminalIds: marketTargets.locationTerminalIds,
+              terminalNames: marketTargets.locationTerminalNames,
+              terminalCount: marketTargets.locationTerminalCount,
+              sampleTerminals: marketTargets.locationTerminalSample,
+              fallbackUsed: marketTargets.locationTerminalFallbackUsed,
+            }
+          : null,
       })
     : null;
+
+  if (MARKET_DEBUG) {
+    if (marketSnapshot) {
+      const datasetDiagnostics = Array.isArray(marketSnapshot.datasetSnapshots)
+        ? marketSnapshot.datasetSnapshots.map((entry) => ({
+            dataset: entry?.dataset,
+            label: entry?.label,
+            matches: entry?.snapshot?.matches,
+            sampleCount: entry?.snapshot?.sample?.length || 0,
+            fallbackUsed: entry?.snapshot?.fallbackUsed || false,
+            filters: entry?.snapshot?.filters || null,
+          }))
+        : [];
+      console.log('[ChatGPT][MarketDebug] snapshot_ready', {
+        timestamp: new Date().toISOString(),
+        requested: marketQueryMeta.requested,
+        resolvedQuery: marketSnapshot.query,
+        marketType: marketSnapshot.marketType,
+        dataset: marketSnapshot.dataset,
+        terminalFilterApplied: marketSnapshot.terminalFilterApplied,
+        terminalFilterCount: marketSnapshot.terminalFilterCount,
+        datasetDiagnostics,
+      });
+    } else if (includeMarket) {
+      console.log('[ChatGPT][MarketDebug] snapshot_missing', {
+        timestamp: new Date().toISOString(),
+        requested: marketQueryMeta.requested,
+        includeMarket,
+      });
+    }
+  }
   const marketCatalogSummary = includeMarket ? marketTargets.catalogSummary : null;
   const marketQuery = includeMarket ? { ...marketQueryMeta, ...marketTargets } : null;
 

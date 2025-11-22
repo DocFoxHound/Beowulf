@@ -63,5 +63,6 @@ async function saveMessage(message) {
 }
 
 module.exports = {
-    saveMessage
+    saveMessage,
+    buildContentFromMessage,
 };

@@ -33,7 +33,8 @@
     "start": "node index.js",
     "postinstall": "mkdir -p logs && mkdir -p chatlogs",
     "ingest:chat": "node vector-handling/chat-ingest.js",
-    "clear:commands": "node scripts/clear-slash-commands.js"
+    "clear:commands": "node scripts/clear-slash-commands.js",
+    "preload:memories": "node scripts/preload-memories.js"
   },
   "devDependencies": {
     "dependency-cruiser": "^16.10.4",

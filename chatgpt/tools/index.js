@@ -16,6 +16,7 @@ const LOCATION_DATASET_FIELDS = {
   star_systems: ['star_system_name', 'system_name', 'name', 'label'],
   refineries_yields: ['refinery_name', 'name', 'label'],
 };
+const TERMINAL_NAME_FIELDS = ['terminal_name', 'name', 'label', 'station', 'location', 'nickname'];
 const REFINERY_KEYWORD_REGEX = /\b(refinery|refine|refining|yield|yields|processing)\b/;
 const REFINERY_LOCATION_FIELDS = [...new Set([...LOCATION_FIELDS, 'star_system_name', 'system_name', 'refinery_name'])];
 const LOCATION_PARENT_FIELDS = ['star_system_name', 'system_name', 'planet_name', 'moon_name', 'orbit_name', 'city_name', 'outpost_name', 'space_station_name'];
@@ -41,6 +42,8 @@ const MARKET_CATALOG_SAMPLE_LIMIT = 25;
 const MARKETPLACE_KEYWORD_REGEX = /\b(player market|marketplace|market averages?|auc|trade board|player listings)\b/;
 const ITEM_MARKET_KEYWORD_REGEX = /\b(weapon|weapons|rifle|pistol|armor|suit|undersuit|component|components|module|modules|item shop|gear)\b/;
 const COMMODITY_KEYWORD_REGEX = /\b(commodity|commodities|ore|hauling|haul|cargo|mining|mined|mineral)\b/;
+const LOCATION_RELATION_REFRESH_MS = 5 * 60 * 1000;
+const LOCATION_ALIAS_CANONICALS = new Map();
 let marketLookupCache = {
   builtAt: 0,
   commodities: { entries: [], names: [] },
@@ -48,6 +51,7 @@ let marketLookupCache = {
   locations: { entries: [], namesByType: {} },
   catalogSummary: null,
 };
+let locationRelationCache = { builtAt: 0, relations: null };
 
 function safeJson(obj) {
   try { return JSON.parse(JSON.stringify(obj)); } catch { return obj; }
@@ -65,6 +69,99 @@ function normalizeName(value) {
   if (!trimmed) return null;
   return trimmed.toLowerCase();
 }
+const LOCATION_ALIAS_MAP = (() => {
+  const map = new Map();
+  const register = (canonical, aliases = []) => {
+    const canonicalNormalized = normalizeName(canonical);
+    if (!canonicalNormalized) return;
+    map.set(canonicalNormalized, canonicalNormalized);
+    const bucket = LOCATION_ALIAS_CANONICALS.get(canonicalNormalized) || new Set();
+    bucket.add(canonicalNormalized);
+    for (const alias of aliases) {
+      const normalizedAlias = normalizeName(alias);
+      if (!normalizedAlias) continue;
+      map.set(normalizedAlias, canonicalNormalized);
+      bucket.add(normalizedAlias);
+    }
+    LOCATION_ALIAS_CANONICALS.set(canonicalNormalized, bucket);
+  };
+
+  register('crusader', ['stanton ii', 'stanton 2', 'stanton-2', 'stanton-ii', 'stantonii', 'stanton2']);
+  register('hurston', ['stanton i', 'stanton 1', 'stanton-1', 'stanton-i', 'stantoni', 'stanton1']);
+  register('arccorp', ['arc corp', 'arc-corp', 'stanton iii', 'stanton 3', 'stanton-3', 'stanton-iii', 'stantoniii', 'stanton3']);
+  register('microtech', ['micro tech', 'micro-tech', 'stanton iv', 'stanton 4', 'stanton-4', 'stanton-iv', 'stantoniv', 'stanton4']);
+
+  return map;
+})();
+
+function canonicalizeLocationName(value) {
+  if (value == null) return null;
+  const normalized = normalizeName(value);
+  if (!normalized) return null;
+  return LOCATION_ALIAS_MAP.get(normalized) || normalized;
+}
+
+function getLocationAliasVariants(value) {
+  const normalized = normalizeName(value);
+  if (!normalized) return [];
+  const canonical = canonicalizeLocationName(normalized);
+  if (!canonical) return [normalized];
+  const bucket = LOCATION_ALIAS_CANONICALS.get(canonical);
+  if (!bucket || !bucket.size) return [canonical];
+  return Array.from(bucket);
+}
+
+function buildLocationNameVariants(name) {
+  const variants = new Set();
+  const normalized = normalizeName(name);
+  if (!normalized) return [];
+  variants.add(normalized);
+  const canonical = canonicalizeLocationName(normalized);
+  if (canonical) variants.add(canonical);
+  const aliasVariants = getLocationAliasVariants(normalized);
+  for (const alias of aliasVariants) {
+    if (alias) variants.add(alias);
+  }
+  if (normalized.includes('(')) {
+    const beforeParen = normalizeName(normalized.split('(')[0]);
+    if (beforeParen && beforeParen.length >= 3) variants.add(beforeParen);
+  }
+  if (normalized.includes(',')) {
+    normalized.split(',').forEach((part) => {
+      const trimmed = normalizeName(part);
+      if (trimmed && trimmed.length >= 3) variants.add(trimmed);
+    });
+  }
+  return Array.from(variants).filter((entry) => entry && entry.length >= 3);
+}
+
+function getLocationDisplayName(record, dataset) {
+  if (!record) return null;
+  const fields = LOCATION_DATASET_FIELDS[dataset] || ['name', 'label'];
+  return getStringField(record, fields) || record.name || record.label || null;
+}
+
+function registerLocationLookup(lookups, dataset, record) {
+  if (!lookups || !lookups[dataset] || !record) return;
+  const id = normalizeId(record.id);
+  const name = getLocationDisplayName(record, dataset);
+  const canonicalName = canonicalizeLocationName(name);
+  if (id) lookups[dataset].byId.set(id, record);
+  if (canonicalName) lookups[dataset].byName.set(canonicalName, record);
+}
+
+function resolveRecordFromLookups(lookups, dataset, idValue, nameValue) {
+  if (!lookups || !lookups[dataset]) return null;
+  const normalizedId = normalizeId(idValue);
+  if (normalizedId && lookups[dataset].byId.has(normalizedId)) {
+    return lookups[dataset].byId.get(normalizedId);
+  }
+  const canonicalName = canonicalizeLocationName(nameValue);
+  if (canonicalName && lookups[dataset].byName.has(canonicalName)) {
+    return lookups[dataset].byName.get(canonicalName);
+  }
+  return null;
+}
 
 function summarizeNames(names = []) {
   const unique = Array.from(new Set(names.filter(Boolean)));
@@ -75,14 +172,336 @@ function summarizeNames(names = []) {
   };
 }
 
-function buildLookupEntries(records, { dataset, type, nameFields }) {
+function ensureLocationRelations() {
+  const now = Date.now();
+  if (locationRelationCache.relations && now - locationRelationCache.builtAt < LOCATION_RELATION_REFRESH_MS) {
+    return locationRelationCache.relations;
+  }
+  const cache = globalThis.uexCache;
+  if (!cache || typeof cache.getRecords !== 'function') {
+    locationRelationCache = { builtAt: now, relations: null };
+    return null;
+  }
+
+  const lookupDatasets = ['star_systems', 'planets', 'moons', 'space_stations', 'cities', 'outposts'];
+  const lookups = {};
+  for (const dataset of lookupDatasets) {
+    lookups[dataset] = { byId: new Map(), byName: new Map() };
+  }
+
+  const relations = {
+    planetToStarSystem: new Map(),
+    moonToPlanet: new Map(),
+    moonToStarSystem: new Map(),
+    cityToPlanet: new Map(),
+    cityToMoon: new Map(),
+    cityToStarSystem: new Map(),
+    outpostToPlanet: new Map(),
+    outpostToMoon: new Map(),
+    outpostToStarSystem: new Map(),
+    stationToPlanet: new Map(),
+    stationToMoon: new Map(),
+    stationToStarSystem: new Map(),
+    lookups,
+  };
+
+  const starSystems = cache.getRecords('star_systems') || [];
+  for (const system of starSystems) {
+    registerLocationLookup(lookups, 'star_systems', system);
+  }
+
+  const planets = cache.getRecords('planets') || [];
+  for (const planet of planets) {
+    registerLocationLookup(lookups, 'planets', planet);
+    const pid = normalizeId(planet.id);
+    const sysId = normalizeId(planet.id_star_system);
+    if (pid && sysId) relations.planetToStarSystem.set(pid, sysId);
+  }
+
+  const moons = cache.getRecords('moons') || [];
+  for (const moon of moons) {
+    registerLocationLookup(lookups, 'moons', moon);
+    const mid = normalizeId(moon.id);
+    if (!mid) continue;
+    const pid = normalizeId(moon.id_planet);
+    const sysId = normalizeId(moon.id_star_system);
+    if (pid) relations.moonToPlanet.set(mid, pid);
+    if (sysId) relations.moonToStarSystem.set(mid, sysId);
+  }
+
+  const cities = cache.getRecords('cities') || [];
+  for (const city of cities) {
+    registerLocationLookup(lookups, 'cities', city);
+    const cid = normalizeId(city.id);
+    if (!cid) continue;
+    const pid = normalizeId(city.id_planet);
+    const mid = normalizeId(city.id_moon);
+    const sysId = normalizeId(city.id_star_system);
+    if (pid) relations.cityToPlanet.set(cid, pid);
+    if (mid) relations.cityToMoon.set(cid, mid);
+    if (sysId) relations.cityToStarSystem.set(cid, sysId);
+  }
+
+  const outposts = cache.getRecords('outposts') || [];
+  for (const outpost of outposts) {
+    registerLocationLookup(lookups, 'outposts', outpost);
+    const oid = normalizeId(outpost.id);
+    if (!oid) continue;
+    const pid = normalizeId(outpost.id_planet);
+    const mid = normalizeId(outpost.id_moon);
+    const sysId = normalizeId(outpost.id_star_system);
+    if (pid) relations.outpostToPlanet.set(oid, pid);
+    if (mid) relations.outpostToMoon.set(oid, mid);
+    if (sysId) relations.outpostToStarSystem.set(oid, sysId);
+  }
+
+  const stations = cache.getRecords('space_stations') || [];
+  for (const station of stations) {
+    registerLocationLookup(lookups, 'space_stations', station);
+    const sid = normalizeId(station.id);
+    if (!sid) continue;
+    const pid = normalizeId(station.id_planet);
+    const mid = normalizeId(station.id_moon);
+    const sysId = normalizeId(station.id_star_system);
+    if (pid) relations.stationToPlanet.set(sid, pid);
+    if (mid) relations.stationToMoon.set(sid, mid);
+    if (sysId) relations.stationToStarSystem.set(sid, sysId);
+  }
+
+  locationRelationCache = { builtAt: now, relations };
+  return relations;
+}
+
+function matchesId(candidate, targetId) {
+  if (!candidate || !targetId) return false;
+  return normalizeId(candidate) === targetId;
+}
+
+function matchesName(candidate, normalizedTarget) {
+  if (!candidate || !normalizedTarget) return false;
+  const candidateCanonical = canonicalizeLocationName(candidate);
+  const targetCanonical = canonicalizeLocationName(normalizedTarget);
+  if (!candidateCanonical || !targetCanonical) return false;
+  return candidateCanonical === targetCanonical;
+}
+
+function looseNameMatch(candidate, target) {
+  if (!candidate || !target) return false;
+  const normalizedCandidate = normalizeName(candidate);
+  const normalizedTarget = normalizeName(target);
+  if (!normalizedCandidate || !normalizedTarget) return false;
+  const candidateCanonical = canonicalizeLocationName(normalizedCandidate);
+  const targetCanonical = canonicalizeLocationName(normalizedTarget);
+  if (candidateCanonical && targetCanonical && candidateCanonical === targetCanonical) return true;
+  return normalizedCandidate === normalizedTarget
+    || normalizedCandidate.includes(normalizedTarget)
+    || normalizedTarget.includes(normalizedCandidate);
+}
+
+function terminalMatchesLocation(terminal, context) {
+  if (!terminal || !context) return false;
+  const { locationDataset, locationId, normalizedLocationName, relations = {} } = context;
+  const lookups = relations.lookups || null;
+  const lookupRecord = (dataset, idValue, nameValue) => resolveRecordFromLookups(lookups, dataset, idValue, nameValue);
+  const matchesParentRecord = (record, idField, nameField) => {
+    if (!record) return false;
+    if (idField && matchesId(record[idField], locationId)) return true;
+    if (nameField && matchesName(record[nameField], normalizedLocationName)) return true;
+    if (!idField && !nameField) {
+      const displayName = getLocationDisplayName(record, locationDataset);
+      if (displayName && matchesName(displayName, normalizedLocationName)) return true;
+    }
+    return false;
+  };
+  const planetId = normalizeId(terminal.id_planet);
+  const moonId = normalizeId(terminal.id_moon);
+  const cityId = normalizeId(terminal.id_city);
+  const outpostId = normalizeId(terminal.id_outpost);
+  const stationId = normalizeId(terminal.id_space_station);
+
+  switch (locationDataset) {
+    case 'star_systems':
+      if (matchesId(terminal.id_star_system, locationId) || matchesName(terminal.star_system_name, normalizedLocationName)) return true;
+      if (planetId && relations.planetToStarSystem?.get(planetId) === locationId) return true;
+      if (moonId && relations.moonToStarSystem?.get(moonId) === locationId) return true;
+      if (cityId && relations.cityToStarSystem?.get(cityId) === locationId) return true;
+      if (outpostId && relations.outpostToStarSystem?.get(outpostId) === locationId) return true;
+      if (stationId && relations.stationToStarSystem?.get(stationId) === locationId) return true;
+      const planetRecord = lookupRecord('planets', terminal.id_planet, terminal.planet_name);
+      if (matchesParentRecord(planetRecord, 'id_star_system', 'star_system_name')) return true;
+      const moonRecord = lookupRecord('moons', terminal.id_moon, terminal.moon_name);
+      if (matchesParentRecord(moonRecord, 'id_star_system', 'star_system_name')) return true;
+      const cityRecord = lookupRecord('cities', terminal.id_city, terminal.city_name);
+      if (matchesParentRecord(cityRecord, 'id_star_system', 'star_system_name')) return true;
+      const outpostRecord = lookupRecord('outposts', terminal.id_outpost, terminal.outpost_name);
+      if (matchesParentRecord(outpostRecord, 'id_star_system', 'star_system_name')) return true;
+      const stationRecord = lookupRecord('space_stations', terminal.id_space_station, terminal.space_station_name);
+      if (matchesParentRecord(stationRecord, 'id_star_system', 'star_system_name')) return true;
+      return false;
+    case 'planets':
+      if (matchesId(terminal.id_planet, locationId) || matchesName(terminal.planet_name, normalizedLocationName)) return true;
+      if (moonId && relations.moonToPlanet?.get(moonId) === locationId) return true;
+      if (cityId && relations.cityToPlanet?.get(cityId) === locationId) return true;
+      if (outpostId && relations.outpostToPlanet?.get(outpostId) === locationId) return true;
+      if (stationId && relations.stationToPlanet?.get(stationId) === locationId) return true;
+      const planetRecordSelf = lookupRecord('planets', terminal.id_planet, terminal.planet_name);
+      if (matchesParentRecord(planetRecordSelf, 'id', null)) return true;
+      const moonRecordForPlanet = lookupRecord('moons', terminal.id_moon, terminal.moon_name);
+      if (matchesParentRecord(moonRecordForPlanet, 'id_planet', 'planet_name')) return true;
+      const cityRecordForPlanet = lookupRecord('cities', terminal.id_city, terminal.city_name);
+      if (matchesParentRecord(cityRecordForPlanet, 'id_planet', 'planet_name')) return true;
+      const outpostRecordForPlanet = lookupRecord('outposts', terminal.id_outpost, terminal.outpost_name);
+      if (matchesParentRecord(outpostRecordForPlanet, 'id_planet', 'planet_name')) return true;
+      const stationRecordForPlanet = lookupRecord('space_stations', terminal.id_space_station, terminal.space_station_name);
+      if (matchesParentRecord(stationRecordForPlanet, 'id_planet', 'planet_name')) return true;
+      return false;
+    case 'moons':
+      if (matchesId(terminal.id_moon, locationId) || matchesName(terminal.moon_name, normalizedLocationName)) return true;
+      if (cityId && relations.cityToMoon?.get(cityId) === locationId) return true;
+      if (outpostId && relations.outpostToMoon?.get(outpostId) === locationId) return true;
+      if (stationId && relations.stationToMoon?.get(stationId) === locationId) return true;
+      const moonRecordSelf = lookupRecord('moons', terminal.id_moon, terminal.moon_name);
+      if (matchesParentRecord(moonRecordSelf, 'id', null)) return true;
+      const cityRecordForMoon = lookupRecord('cities', terminal.id_city, terminal.city_name);
+      if (matchesParentRecord(cityRecordForMoon, 'id_moon', 'moon_name')) return true;
+      const outpostRecordForMoon = lookupRecord('outposts', terminal.id_outpost, terminal.outpost_name);
+      if (matchesParentRecord(outpostRecordForMoon, 'id_moon', 'moon_name')) return true;
+      const stationRecordForMoon = lookupRecord('space_stations', terminal.id_space_station, terminal.space_station_name);
+      if (matchesParentRecord(stationRecordForMoon, 'id_moon', 'moon_name')) return true;
+      return false;
+    case 'cities':
+      return matchesId(terminal.id_city, locationId) || matchesName(terminal.city_name, normalizedLocationName);
+    case 'space_stations':
+      return matchesId(terminal.id_space_station, locationId) || matchesName(terminal.space_station_name, normalizedLocationName);
+    case 'outposts':
+      return matchesId(terminal.id_outpost, locationId) || matchesName(terminal.outpost_name, normalizedLocationName);
+    case 'terminals':
+      if (matchesId(terminal.id, locationId)) return true;
+      const terminalName = getStringField(terminal, TERMINAL_NAME_FIELDS) || terminal.name || terminal.terminal_name;
+      return matchesName(terminalName, normalizedLocationName);
+    default:
+      return false;
+  }
+}
+
+function buildTerminalFallbackMatcher(dataset, normalizedTarget) {
+  if (!normalizedTarget) return null;
+  const matchFields = ({ planet = false, moon = false, city = false, outpost = false, station = false, system = false, terminal = false }) => {
+    return (terminal) => {
+      if (!terminal) return false;
+      if (system && looseNameMatch(terminal.star_system_name, normalizedTarget)) return true;
+      if (planet && looseNameMatch(terminal.planet_name, normalizedTarget)) return true;
+      if (moon && looseNameMatch(terminal.moon_name, normalizedTarget)) return true;
+      if (city && looseNameMatch(terminal.city_name, normalizedTarget)) return true;
+      if (outpost && looseNameMatch(terminal.outpost_name, normalizedTarget)) return true;
+      if (station && looseNameMatch(terminal.space_station_name, normalizedTarget)) return true;
+      if (terminal && (looseNameMatch(terminal.terminal_name, normalizedTarget) || looseNameMatch(terminal.name, normalizedTarget))) return true;
+      return false;
+    };
+  };
+
+  switch (dataset) {
+    case 'star_systems':
+      return matchFields({ system: true, planet: true, moon: true, city: true, outpost: true, station: true });
+    case 'planets':
+      return matchFields({ planet: true, moon: true, city: true, outpost: true, station: true });
+    case 'moons':
+      return matchFields({ moon: true, city: true, outpost: true, station: true });
+    case 'cities':
+      return matchFields({ city: true, planet: true, station: true });
+    case 'space_stations':
+      return matchFields({ station: true, city: true, planet: true });
+    case 'outposts':
+      return matchFields({ outpost: true, moon: true, planet: true });
+    case 'terminals':
+      return matchFields({ terminal: true, city: true, station: true, planet: true });
+    default:
+      return null;
+  }
+}
+
+function resolveTerminalsForLocation(locationRecord, locationDataset) {
+  try {
+    if (!locationRecord || !locationDataset) return null;
+    const cache = globalThis.uexCache;
+    if (!cache || typeof cache.getRecords !== 'function') return null;
+    const terminals = cache.getRecords('terminals') || [];
+    if (!terminals.length) return null;
+
+    const relations = ensureLocationRelations() || {};
+    const locationId = normalizeId(locationRecord.id);
+    const locationName = getStringField(locationRecord, LOCATION_DATASET_FIELDS[locationDataset] || ['name', 'label'])
+      || locationRecord.name
+      || locationRecord.label
+      || null;
+    const normalizedLocationNameRaw = normalizeName(locationName);
+    const normalizedLocationName = canonicalizeLocationName(normalizedLocationNameRaw) || normalizedLocationNameRaw;
+
+    const context = { locationDataset, locationId, normalizedLocationName, relations };
+    let matches = terminals.filter((terminal) => terminalMatchesLocation(terminal, context));
+    let usedFallback = false;
+
+    if (!matches.length) {
+      const fallbackMatcher = buildTerminalFallbackMatcher(locationDataset, normalizedLocationNameRaw || normalizedLocationName);
+      if (fallbackMatcher) {
+        const fuzzyMatches = terminals.filter((terminal) => fallbackMatcher(terminal));
+        if (fuzzyMatches.length) {
+          matches = fuzzyMatches;
+          usedFallback = true;
+        }
+      }
+    }
+
+    const terminalIds = [];
+    const terminalNames = [];
+    const samples = matches.slice(0, 10).map((terminal) => {
+      const id = normalizeId(terminal.id);
+      if (id) terminalIds.push(id);
+      const prettyName = getStringField(terminal, TERMINAL_NAME_FIELDS) || terminal.terminal_name || terminal.name || `Terminal ${terminal.id}`;
+      if (prettyName) terminalNames.push(prettyName);
+      return {
+        id: terminal.id,
+        name: prettyName,
+        star_system_name: terminal.star_system_name || null,
+        planet_name: terminal.planet_name || null,
+        moon_name: terminal.moon_name || null,
+        city_name: terminal.city_name || null,
+        outpost_name: terminal.outpost_name || null,
+        space_station_name: terminal.space_station_name || null,
+      };
+    });
+
+    const uniqueIds = Array.from(new Set(terminalIds.filter(Boolean)));
+    const uniqueNames = Array.from(new Set(terminalNames.filter(Boolean))).slice(0, 10);
+
+    return {
+      locationId,
+      locationName,
+      locationDataset,
+      terminalCount: matches.length,
+      terminalIds: uniqueIds,
+      terminalNames: uniqueNames,
+      sampleTerminals: samples,
+      usedFallback,
+    };
+  } catch (error) {
+    console.error('[ChatGPT][Tools] terminal resolution failed:', error?.message || error);
+    return null;
+  }
+}
+
+function buildLookupEntries(records, { dataset, type, nameFields, aliasLocations = false }) {
   const entries = [];
   const names = [];
   for (const record of records || []) {
     const name = getStringField(record, nameFields);
     const normalized = normalizeName(name);
     if (!normalized || normalized.length < 3) continue; // avoid noisy 1-2 char hits
-    entries.push({ name, normalized, dataset, type, record });
+    const normalizedValues = aliasLocations ? buildLocationNameVariants(name) : [normalized];
+    for (const normalizedValue of normalizedValues) {
+      if (!normalizedValue || normalizedValue.length < 3) continue;
+      entries.push({ name, normalized: normalizedValue, dataset, type, record });
+    }
     names.push(name);
   }
   entries.sort((a, b) => b.normalized.length - a.normalized.length);
@@ -114,7 +533,7 @@ function buildMarketLookupCache() {
   for (const [dataset, fields] of locationDatasets) {
     const type = dataset.replace(/_/g, '-');
     const rows = cache.getRecords(dataset) || [];
-    const lookup = buildLookupEntries(rows, { dataset, type, nameFields: fields });
+    const lookup = buildLookupEntries(rows, { dataset, type, nameFields: fields, aliasLocations: true });
     locationEntries.push(...lookup.entries);
     locationNamesByType[type] = summarizeNames(lookup.names);
   }
@@ -200,6 +619,10 @@ function extractMarketTargets(content) {
     datasetPreference = 'refinery';
   }
 
+  const locationTerminals = locationMatch?.record
+    ? resolveTerminalsForLocation(locationMatch.record, locationMatch.dataset)
+    : null;
+
   return {
     marketType,
     commodityName: commodityMatch?.name || itemMatch?.name || null,
@@ -210,6 +633,12 @@ function extractMarketTargets(content) {
     locationRecord: locationMatch?.record || null,
     hasRefineryKeyword,
     datasetPreference,
+    locationTerminals,
+    locationTerminalIds: locationTerminals?.terminalIds || [],
+    locationTerminalNames: locationTerminals?.terminalNames || [],
+    locationTerminalCount: locationTerminals?.terminalCount || 0,
+    locationTerminalSample: locationTerminals?.sampleTerminals || [],
+    locationTerminalFallbackUsed: locationTerminals?.usedFallback || false,
     catalogSummary: lookup.catalogSummary,
   };
 }
@@ -235,6 +664,11 @@ function getRecentChatForChannel(channelId, limit = 10) {
 function getUserProfileFromCache(userId) {
   try {
     if (!userId) return null;
+    const personaCache = globalThis.userProfilesCache;
+    if (personaCache && typeof personaCache.getById === 'function') {
+      const profile = personaCache.getById(userId);
+      if (profile) return safeJson(profile);
+    }
     const cache = globalThis.userListCache;
     if (!cache || typeof cache.getById !== 'function') return null;
     const row = cache.getById(userId);
@@ -312,6 +746,34 @@ function formatUpdatedAt(value) {
   }
 }
 
+function buildTerminalMetaMap(terminals = []) {
+  const map = new Map();
+  for (const terminal of terminals) {
+    const id = normalizeId(terminal?.id);
+    if (!id) continue;
+    const name = getStringField(terminal, TERMINAL_NAME_FIELDS) || terminal?.terminal_name || terminal?.name || `Terminal ${terminal.id}`;
+    const locationParts = [
+      terminal?.city_name,
+      terminal?.outpost_name,
+      terminal?.space_station_name,
+      terminal?.moon_name,
+      terminal?.planet_name,
+      terminal?.star_system_name,
+    ].map((value) => (value ? String(value).trim() : '')).filter(Boolean);
+    map.set(id, {
+      id,
+      name,
+      locationLabel: locationParts.length ? locationParts.join(' / ') : null,
+      planetName: terminal?.planet_name || null,
+      moonName: terminal?.moon_name || null,
+      cityName: terminal?.city_name || null,
+      stationName: terminal?.space_station_name || null,
+      systemName: terminal?.star_system_name || null,
+    });
+  }
+  return map;
+}
+
 function projectMarketEntry(entry, dataset = 'terminal_prices') {
   const item = getStringField(entry, ITEM_NAME_FIELDS) || 'Unknown item';
   const location = getStringField(entry, LOCATION_FIELDS) || 'Unknown terminal';
@@ -343,22 +805,71 @@ function projectRecordSample(records, { limit = 5, dataset = 'terminal_prices', 
   return unique;
 }
 
-function filterRecordsByField(records, fields, needle) {
+function buildTerminalCommoditySummary(priceRecords = [], terminalMetaMap = new Map(), { limitPerTerminal = 3 } = {}) {
+  if (!Array.isArray(priceRecords) || !priceRecords.length) return [];
+  const grouped = new Map();
+  for (const entry of priceRecords) {
+    const terminalId = normalizeId(entry?.id_terminal);
+    if (!terminalId) continue;
+    if (!grouped.has(terminalId)) grouped.set(terminalId, []);
+    grouped.get(terminalId).push(entry);
+  }
+  const summaries = [];
+  for (const [terminalId, entries] of grouped.entries()) {
+    const meta = terminalMetaMap.get(terminalId) || {};
+    const projected = entries.map((entry) => projectMarketEntry(entry, 'terminal_prices')).sort(sortByValueDesc);
+    const sample = projected.slice(0, limitPerTerminal);
+    summaries.push({
+      terminalId,
+      terminalName: meta.name || sample[0]?.location || `Terminal ${terminalId}`,
+      locationLabel: meta.locationLabel || null,
+      planetName: meta.planetName || null,
+      moonName: meta.moonName || null,
+      cityName: meta.cityName || null,
+      stationName: meta.stationName || null,
+      systemName: meta.systemName || null,
+      matchCount: entries.length,
+      sample,
+    });
+  }
+  summaries.sort((a, b) => {
+    const aValue = a.sample?.[0]?.sellPrice ?? a.sample?.[0]?.buyPrice ?? 0;
+    const bValue = b.sample?.[0]?.sellPrice ?? b.sample?.[0]?.buyPrice ?? 0;
+    return bValue - aValue;
+  });
+  return summaries;
+}
+
+function filterRecordsByField(records, fields, needle, options = {}) {
+  const { useLocationAlias = false } = options;
   const normalized = normalizeName(needle);
   if (!normalized) return [];
+  const canonicalNeedle = useLocationAlias ? canonicalizeLocationName(normalized) : null;
   const exact = [];
   const partial = [];
   for (const entry of records || []) {
     const value = getStringField(entry, fields);
     if (!value) continue;
-    const lower = value.toLowerCase();
-    if (lower === normalized) {
+    const lower = normalizeName(value);
+    if (!lower) continue;
+    const canonicalValue = useLocationAlias ? canonicalizeLocationName(lower) : null;
+    const aliasExact = canonicalNeedle && canonicalValue && canonicalNeedle === canonicalValue;
+    if (lower === normalized || aliasExact) {
       exact.push(entry);
     } else if (lower.includes(normalized)) {
       partial.push(entry);
     }
   }
   return exact.length ? exact : partial;
+}
+
+function filterRecordsByTerminalIds(records, idField, terminalIdSet) {
+  if (!Array.isArray(records) || !terminalIdSet || !terminalIdSet.size) return records || [];
+  return records.filter((entry) => {
+    const value = entry ? entry[idField] : null;
+    if (value == null) return false;
+    return terminalIdSet.has(normalizeId(value));
+  });
 }
 
 function projectCatalogRecord(record, dataset) {
@@ -468,11 +979,17 @@ function buildCommoditySnapshot({
   let filtered = priceMatches;
   if (locationName && filtered.length) {
     const normalizedLocation = normalizeName(locationName);
+    const canonicalLocation = canonicalizeLocationName(normalizedLocation);
     filtered = priceMatches.filter((entry) => {
       const location = getStringField(entry, LOCATION_FIELDS);
       if (!location) return false;
       const lower = normalizeName(location);
-      return lower ? lower.includes(normalizedLocation) : false;
+      if (!lower) return false;
+      if (canonicalLocation) {
+        const candidateCanonical = canonicalizeLocationName(lower);
+        if (candidateCanonical && candidateCanonical === canonicalLocation) return true;
+      }
+      return normalizedLocation ? lower.includes(normalizedLocation) : false;
     });
     if (!filtered.length) filtered = priceMatches;
   }
@@ -525,11 +1042,17 @@ function buildItemsByTerminalSnapshot({
   if (locationName) {
     const normalizedLocation = normalizeName(locationName);
     if (normalizedLocation) {
+      const canonicalLocation = canonicalizeLocationName(normalizedLocation);
       const narrowed = filtered.filter((entry) => {
         const locationValue = getStringField(entry, LOCATION_FIELDS);
         if (!locationValue) return false;
         const lower = normalizeName(locationValue);
-        return lower ? lower.includes(normalizedLocation) : false;
+        if (!lower) return false;
+        if (canonicalLocation) {
+          const candidateCanonical = canonicalizeLocationName(lower);
+          if (candidateCanonical && candidateCanonical === canonicalLocation) return true;
+        }
+        return lower.includes(normalizedLocation);
       });
       if (narrowed.length) {
         filtered = narrowed;
@@ -555,7 +1078,7 @@ function buildItemsByTerminalSnapshot({
 
 function buildLocationSnapshot({ locationName, priceRecords, limit }) {
   if (!locationName) return null;
-  const locationMatches = filterRecordsByField(priceRecords, LOCATION_FIELDS, locationName);
+  const locationMatches = filterRecordsByField(priceRecords, LOCATION_FIELDS, locationName, { useLocationAlias: true });
   if (!locationMatches.length) return null;
   const sample = projectRecordSample(locationMatches, { limit, dataset: 'terminal_prices', dedupeByItem: true });
   if (!sample.length) return null;
@@ -621,11 +1144,11 @@ function buildRefinerySnapshot({ commodityName, locationName, refineryRecords, l
   }
 
   if (locationName) {
-    const matches = filterRecordsByField(filtered, REFINERY_LOCATION_FIELDS, locationName);
+    const matches = filterRecordsByField(filtered, REFINERY_LOCATION_FIELDS, locationName, { useLocationAlias: true });
     if (matches.length) {
       filtered = matches;
     } else {
-      const fallbackMatches = filterRecordsByField(refineryRecords, REFINERY_LOCATION_FIELDS, locationName);
+      const fallbackMatches = filterRecordsByField(refineryRecords, REFINERY_LOCATION_FIELDS, locationName, { useLocationAlias: true });
       if (fallbackMatches.length) {
         filtered = fallbackMatches;
         fallbackUsed = true;
@@ -731,7 +1254,12 @@ function getLocationSnapshotFromCache({
     for (const dataset of datasets) {
       const rows = cache.getRecords(dataset) || [];
       if (!rows.length) continue;
-      const matches = filterRecordsByField(rows, LOCATION_DATASET_FIELDS[dataset] || ['name', 'label'], resolvedName);
+      const matches = filterRecordsByField(
+        rows,
+        LOCATION_DATASET_FIELDS[dataset] || ['name', 'label'],
+        resolvedName,
+        { useLocationAlias: true },
+      );
       if (!matches.length) continue;
       const sample = matches
         .slice(0, limit)
@@ -763,16 +1291,43 @@ function getMarketSnapshotFromCache(query, {
   locationName = null,
   commodityDataset = null,
   datasetPreference = null,
+  terminalIds = null,
+  locationDescriptor = null,
 } = {}) {
   try {
     const cache = globalThis.uexCache;
     if (!cache || typeof cache.getRecords !== 'function') return null;
-    const priceRecords = cache.getRecords('terminal_prices') || [];
+    const allPriceRecords = cache.getRecords('terminal_prices') || [];
     const commodityRecords = cache.getRecords('commodities') || [];
     const itemRecords = cache.getRecords('items') || [];
-    const itemTerminalRecords = cache.getRecords('items_by_terminal') || [];
+    const allItemTerminalRecords = cache.getRecords('items_by_terminal') || [];
     const marketplaceRecords = cache.getRecords('marketplace_averages') || [];
-    const refineryRecords = cache.getRecords('refineries_yields') || [];
+    const allRefineryRecords = cache.getRecords('refineries_yields') || [];
+    const allTerminals = cache.getRecords('terminals') || [];
+    const terminalMetaMap = buildTerminalMetaMap(allTerminals);
+
+    const locationMeta = locationDescriptor ? { ...locationDescriptor } : null;
+    const terminalSource = Array.isArray(terminalIds) && terminalIds.length
+      ? terminalIds
+      : Array.isArray(locationMeta?.terminalIds)
+        ? locationMeta.terminalIds
+        : [];
+    const terminalIdSet = new Set(terminalSource.map(normalizeId).filter(Boolean));
+    const hasTerminalFilter = terminalIdSet.size > 0;
+    const terminalIdList = hasTerminalFilter ? Array.from(terminalIdSet) : [];
+
+    const priceRecords = hasTerminalFilter
+      ? filterRecordsByTerminalIds(allPriceRecords, 'id_terminal', terminalIdSet)
+      : allPriceRecords;
+    const itemTerminalRecords = hasTerminalFilter
+      ? filterRecordsByTerminalIds(allItemTerminalRecords, 'id_terminal', terminalIdSet)
+      : allItemTerminalRecords;
+    const refineryRecords = hasTerminalFilter
+      ? filterRecordsByTerminalIds(allRefineryRecords, 'id_terminal', terminalIdSet)
+      : allRefineryRecords;
+    const terminalSummaries = hasTerminalFilter
+      ? buildTerminalCommoditySummary(priceRecords, terminalMetaMap, { limitPerTerminal: 4 })
+      : [];
 
     const preferredFromDataset = commodityDataset === 'items' ? 'items' : commodityDataset === 'commodities' ? 'commodities' : null;
     const preferredDataset = datasetPreference || preferredFromDataset || null;
@@ -787,13 +1342,35 @@ function getMarketSnapshotFromCache(query, {
       ? [preferredDataset, ...datasetOrderBase.filter((entry) => entry !== preferredDataset)]
       : datasetOrderBase;
 
+    const resolvedLocationMeta = locationMeta
+      ? { ...locationMeta, filterApplied: hasTerminalFilter, filterTerminalCount: terminalIdList.length }
+      : (hasTerminalFilter ? { filterApplied: true, filterTerminalCount: terminalIdList.length } : null);
+
     const datasetSnapshots = [];
     const recordSnapshot = (dataset, snapshot) => {
       if (!snapshot) return;
+      const filters = { ...(snapshot.filters || {}) };
+      if (resolvedLocationMeta?.locationName && !filters.locationName) {
+        filters.locationName = resolvedLocationMeta.locationName;
+      }
+      if (hasTerminalFilter && terminalIdList.length) {
+        filters.terminalIds = terminalIdList;
+      }
+      const enrichedSnapshot = {
+        ...snapshot,
+        dataset,
+        filters,
+      };
+      if (resolvedLocationMeta) {
+        enrichedSnapshot.locationMeta = resolvedLocationMeta;
+      }
+      if (dataset === 'commodities' && terminalSummaries.length) {
+        enrichedSnapshot.terminalSummaries = terminalSummaries;
+      }
       datasetSnapshots.push({
         dataset,
         label: datasetLabels[dataset] || dataset,
-        snapshot: { ...snapshot, dataset },
+        snapshot: enrichedSnapshot,
       });
     };
 
@@ -848,9 +1425,14 @@ function getMarketSnapshotFromCache(query, {
     }
 
     if (!datasetSnapshots.length) {
-      const fallback = buildOverviewSnapshot({ priceRecords, limit })
+      const scopedFallback = buildOverviewSnapshot({ priceRecords, limit });
+      recordSnapshot('commodities', scopedFallback);
+    }
+
+    if (!datasetSnapshots.length) {
+      const globalFallback = buildOverviewSnapshot({ priceRecords: allPriceRecords, limit })
         || buildFallbackSnapshot({ commodities: commodityRecords, items: itemRecords, limit });
-      recordSnapshot('commodities', fallback);
+      recordSnapshot('commodities', globalFallback);
     }
 
     if (!datasetSnapshots.length) return null;
@@ -869,6 +1451,9 @@ function getMarketSnapshotFromCache(query, {
       isGenericRequest: Boolean(isGeneric),
       marketType: primarySnapshot.type || marketType,
       datasetSnapshots,
+      terminalFilterApplied: hasTerminalFilter,
+      terminalFilterCount: terminalIdList.length,
+      locationMeta: resolvedLocationMeta || null,
     };
   } catch (error) {
     console.error('[ChatGPT][Tools] market snapshot lookup failed:', error?.message || error);

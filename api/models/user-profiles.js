@@ -102,7 +102,7 @@ const UserProfilesModel = {
   async update(userId, patch) {
     const { ok, errors, value } = validate(patch, { partial: true });
     if (!ok) return { ok: false, errors };
-    const updated = await api.patchUserProfile(userId, value);
+    const updated = await api.updateUserProfile(userId, value);
     return updated ? { ok: true, data: fromApiRow(updated) || updated } : { ok: false, errors: ['update failed'] };
   },
 

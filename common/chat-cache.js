@@ -8,12 +8,24 @@ function normalizeCacheRecord(record = {}, fallbackChannelId, fallbackGuildId) {
   const channelId = record.channel_id || record.channelId || fallbackChannelId;
   const guildId = record.guild_id || record.guildId || fallbackGuildId;
   const userId = record.user_id || record.userId;
+  const username = record.username || record.display_name || record.displayName || record.member_name || record.memberName;
+  const channelName = record.channel_name || record.channelName || record.channel || record.channel_label || null;
+  const messageId = record.message_id || record.messageId || record.id || null;
   const rawContent = typeof record.content === "string" ? record.content : "";
   const content = rawContent.trim();
   const tsSource = record.timestamp || record.created_at || record.createdAt;
   const timestamp = tsSource ? new Date(tsSource).toISOString() : new Date().toISOString();
   if (!channelId || !guildId || !userId || !content) return null;
-  return { channel_id: channelId, guild_id: guildId, user_id: userId, content, timestamp };
+  return {
+    channel_id: channelId,
+    guild_id: guildId,
+    user_id: userId,
+    username: username || null,
+    channel_name: channelName || null,
+    message_id: messageId,
+    content,
+    timestamp,
+  };
 }
 
 function addChatMessageToCache(record, { fallbackChannelId, fallbackGuildId } = {}) {
