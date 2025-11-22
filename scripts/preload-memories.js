@@ -6,6 +6,7 @@ const { listChatMessages } = require('../api/chatMessagesApi');
 const { handleMemoryBatch } = require('../chatgpt/memory/batch-processor');
 const { refreshUserProfilesCache } = require('../common/user-profiles-cache');
 const { parseChannels } = require('./fresh-load-chat-messages');
+const { isBotUser } = require('../common/bot-identity');
 
 const HISTORY_LIMIT = Number(process.env.MEMORY_PRELOAD_CHANNEL_LIMIT || 1000);
 const CHUNK_SIZE = Math.max(1, Number(process.env.MEMORY_PRELOAD_CHUNK_SIZE || 10));
@@ -37,6 +38,7 @@ function chunkMessages(list, size = CHUNK_SIZE) {
 
 function normalizeMessage(row, { guildId, channelId, channelName }) {
   if (!row || !row.content) return null;
+  if (isBotUser(row.user_id)) return null;
   return {
     id: row.id,
     guild_id: row.guild_id || guildId,

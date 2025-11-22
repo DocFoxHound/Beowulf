@@ -282,8 +282,9 @@ The GPT module responsible for final response generation.
 Analyzes conversations and stores new memories with embeddings.
 
 **Batch Worker:** `chatgpt/memory/batch-runner.js` watches cached chat logs per channel. It buffers live messages, flushing either when 10 new entries arrive or when a 3-minute interval elapses (whichever happens first). Batches are forwarded to `chatgpt/memory/batch-processor.js`, which now:
-- Builds a JSON transcript of the batch and calls `CHATGPT_MEMORY_MODEL` (default `gpt-4o-mini`) with a strict JSON schema request.
-- Saves high-importance summaries into the knowledge vector store via `ingestChatMessage`, tagging them as “Beowulf Memory”.
+- Ignores any messages authored by Beowulf (so the bot never reinforces its own statements) before building the JSON transcript.
+- Calls `CHATGPT_MEMORY_MODEL` (default `gpt-4o-mini`) with a strict JSON schema request that supports six memory types: `episodic`, `inside_joke`, `profile`, `lore`, plus the advice-specific `dogfighting_advice` (ship combat tactics) and `piracy_advice` (routes, snare setups, loot intel).
+- Writes approved summaries into the dedicated `memories` table via `chatgpt/memory/memory-store.js`, embedding each entry for vector recall.
 - Applies persona tweaks by upserting rows in `user_profiles` (nickname, tease level, style preferences, `persona_details` fields, numeric trait sliders) and updating the runtime cache so the persona responder immediately sees the new profile data.
 
 **Persona Consumption:** `globalThis.userProfilesCache` hydrates from `/api/userprofiles` (`common/user-profiles-cache.js`). `chatgpt/context/builder.js` now prefers this cache when populating `context.userProfile`, ensuring the responder sees any adjustments emitted by the memory curator, including the extended `persona_details` (profession, known_for, favorite_topics, quotes, achievements, relationship notes, catchphrases, personality summary, trait sliders for Openness/Conscientiousness/Extraversion/Agreeableness/Neuroticism plus Confidence, Courage, Integrity, Resilience, Humor).

@@ -1,35 +1,30 @@
-const { ingestChatMessage } = require('../../vector-handling/chat-ingest');
+const { saveMemoryEntry } = require('./memory-store');
+const { isBotUser } = require('../../common/bot-identity');
 
 function shouldWriteMemories() {
   return (process.env.KNOWLEDGE_INGEST_ENABLE || 'false').toLowerCase() === 'true';
 }
 
-function toPayload(message, contentOverride) {
-  return {
-    id: message.id,
-    content: contentOverride || message.content,
-    username: message.member?.displayName || message.author?.username || 'user',
-    channel_name: message.channel?.name || 'unknown-channel',
-    timestamp: message.createdAt?.toISOString?.() || new Date().toISOString(),
-  };
+async function persistUserMessageMemory({ message, meta, openai }) {
+  if (!message || !meta?.guildId) return;
+  if (isBotUser(message.author?.id)) return;
+  const content = (message.content || '').trim();
+  if (!content) return;
+  await saveMemoryEntry({
+    content,
+    type: 'episodic',
+    importance: 1,
+    tags: ['chatlog', 'user_message'],
+    guildId: meta.guildId,
+    channelId: meta.channelId,
+    userId: meta.authorId,
+    openai,
+  });
 }
 
-async function writeMemories({ message, personaResponse, replyMessage, openai }) {
+async function writeMemories({ message, meta, openai }) {
   if (!shouldWriteMemories()) return;
-  try {
-    await ingestChatMessage(toPayload(message), openai);
-  } catch (error) {
-    console.error('[ChatGPT][Memory] failed to ingest user message:', error?.message || error);
-  }
-  if (personaResponse?.text) {
-    try {
-      const payload = toPayload(replyMessage || message, personaResponse.text);
-      payload.username = 'Beowulf';
-      await ingestChatMessage(payload, openai);
-    } catch (error) {
-      console.error('[ChatGPT][Memory] failed to ingest response:', error?.message || error);
-    }
-  }
+  await persistUserMessageMemory({ message, meta, openai });
 }
 
 module.exports = {

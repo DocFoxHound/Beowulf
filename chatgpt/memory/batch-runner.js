@@ -87,8 +87,13 @@ async function flushChannel(channelId, reason = 'interval') {
     return null;
   }
 
-  const shouldLimit = reason !== 'interval' && pending.length > MIN_BATCH_COUNT;
-  const batch = shouldLimit ? pending.slice(0, MIN_BATCH_COUNT) : pending;
+  if (pending.length < MIN_BATCH_COUNT) {
+    state.accumulated = pending.length;
+    state.lastFlushAt = Date.now();
+    return null;
+  }
+
+  const batch = pending.slice(0, MIN_BATCH_COUNT);
 
   state.isProcessing = true;
   debugLog(`Flushing channel ${channelId} reason=${reason} count=${batch.length}`);
@@ -104,8 +109,8 @@ async function flushChannel(channelId, reason = 'interval') {
   }
 
   const remainder = pending.length - batch.length;
-  if (remainder > 0) {
-    state.accumulated = Math.max(state.accumulated, remainder);
+  state.accumulated = remainder;
+  if (remainder >= MIN_BATCH_COUNT) {
     queueFlush(channelId, 'backlog');
   }
 
@@ -135,18 +140,13 @@ function startIntervalTimer() {
   if (typeof intervalHandle.unref === 'function') intervalHandle.unref();
 }
 
-function startMemoryBatchWorker({ channelIds = [], onBatch, intervalMsOverride, replayFromHistory = false, openai } = {}) {
+function startMemoryBatchWorker({ channelIds = [], onBatch, intervalMsOverride, replayFromHistory = false } = {}) {
   if (!ENABLED) {
     debugLog('Batcher disabled via env.');
     return false;
   }
-  if (openai) {
-    sharedOpenAi = openai;
-  }
   if (typeof onBatch === 'function') {
     batchHandler = onBatch;
-  } else {
-    batchHandler = (payload) => handleMemoryBatch({ ...payload, openai: sharedOpenAi || payload.openai });
   }
   if (intervalMsOverride) {
     intervalMs = Math.max(15000, Number(intervalMsOverride));

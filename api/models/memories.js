@@ -2,7 +2,7 @@
 const api = require('../memoriesApi');
 const { limitStr } = require('./_utils');
 
-const MEMORY_TYPES = ['episodic', 'inside_joke', 'profile', 'lore'];
+const MEMORY_TYPES = ['episodic', 'inside_joke', 'profile', 'lore', 'dogfighting_advice', 'piracy_advice'];
 const VECTOR_DIM = 1536;
 const MAX_CONTENT_LEN = 8000;
 const MAX_TAGS = 24;

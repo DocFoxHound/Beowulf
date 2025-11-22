@@ -1,17 +1,16 @@
-const { randomUUID } = require('node:crypto');
-const { ingestChatMessage } = require('../../vector-handling/chat-ingest');
+const { saveMemoryEntry } = require('./memory-store');
 const { UserProfilesModel } = require('../../api/models/user-profiles');
 const {
   getUserProfileFromCache,
   upsertUserProfileInCache,
+  refreshUserProfilesCache,
 } = require('../../common/user-profiles-cache');
+const { isBotUser } = require('../../common/bot-identity');
 
-const PREVIEW_LIMIT = Number(process.env.MEMORY_BATCH_PREVIEW_LIMIT || 2);
-const PREVIEW_CHAR_LIMIT = Number(process.env.MEMORY_BATCH_PREVIEW_CHAR_LIMIT || 80);
 const MEMORY_MODEL = process.env.CHATGPT_MEMORY_MODEL || process.env.CHATGPT_PERSONA_MODEL || 'gpt-4o-mini';
-const MEMORY_IMPORTANCE_THRESHOLD = Math.max(1, Number(process.env.MEMORY_IMPORTANCE_THRESHOLD || 2));
+const MEMORY_IMPORTANCE_THRESHOLD = Math.max(1, Number(process.env.MEMORY_IMPORTANCE_THRESHOLD || 3));
 const MAX_MEMORIES_PER_BATCH = Math.max(1, Number(process.env.MEMORY_BATCH_MAX_MEMORIES || 3));
-const MEMORY_BATCH_DEBUG = process.env.MEMORY_BATCH_DEBUG === '1';
+const MEMORY_BATCH_DEBUG = 0
 const MAX_SERIALIZED_MESSAGES = Math.max(5, Number(process.env.MEMORY_BATCH_MAX_MESSAGES || 20));
 const MESSAGE_CHAR_LIMIT = Math.max(80, Number(process.env.MEMORY_BATCH_MESSAGE_CHAR_LIMIT || 400));
 const PROMPT_CHAR_LIMIT = Math.max(2000, Number(process.env.MEMORY_BATCH_PROMPT_CHAR_LIMIT || 9000));
@@ -19,6 +18,32 @@ const PROFILE_NOTES_KEY = 'notes';
 const PERSONA_STRING_FIELDS = ['profession', 'demeanor', 'relationship_notes', 'personality_summary', 'catchphrase'];
 const PERSONA_ARRAY_FIELDS = ['known_for', 'notable_quotes', 'favorite_topics', 'achievements', 'notable_traits', 'warnings'];
 const PERSONA_TRAIT_FIELDS = ['openness', 'conscientiousness', 'extraversion', 'agreeableness', 'neuroticism', 'confidence', 'courage', 'integrity', 'resilience', 'humor'];
+const ALLOWED_MEMORY_TYPES = new Set(['episodic', 'inside_joke', 'profile', 'lore', 'dogfighting_advice', 'piracy_advice']);
+
+function logMemoryError(context, error, meta = {}) {
+  const safeMeta = (() => {
+    try {
+      return JSON.stringify(meta);
+    } catch {
+      return String(meta);
+    }
+  })();
+  const details = error?.stack || error?.message || String(error);
+  console.error(`[MemoryBatcher][error] ${context} meta=${safeMeta}\n${details}`);
+}
+
+function emitHeartbeat({ channelId, reason, processed, status, memories = 0, adjustments = 0 }) {
+  console.log(`[MemoryBatcher][heartbeat] channel=${channelId || 'unknown'} reason=${reason || 'n/a'} processed=${processed} memories=${memories} adjustments=${adjustments} status=${status}`);
+}
+
+async function refreshProfilesCacheSafe() {
+  if (typeof refreshUserProfilesCache !== 'function') return;
+  try {
+    await refreshUserProfilesCache();
+  } catch (error) {
+    console.error('[MemoryBatcher] User profiles cache refresh failed:', error?.message || error);
+  }
+}
 
 function toArrayOfStrings(value) {
   if (!value) return [];
@@ -155,19 +180,6 @@ function clampTeaseLevel(value) {
   return clamped === null ? null : Math.round(clamped);
 }
 
-function renderPreview(messages = []) {
-  if (!Array.isArray(messages) || messages.length === 0) return 'no-preview';
-  return messages
-    .slice(0, PREVIEW_LIMIT)
-    .map((msg) => {
-      const ts = msg?.timestamp || 'unknown-time';
-      const user = msg?.username || msg?.user_id || 'user';
-      const content = (msg?.content || '').replace(/\s+/g, ' ').slice(0, PREVIEW_CHAR_LIMIT);
-      return `[${ts}] ${user}: ${content}`;
-    })
-    .join(' | ');
-}
-
 function safeJsonParse(text) {
   if (!text) return null;
   const cleaned = text.replace(/```json|```/gi, '').trim();
@@ -265,7 +277,7 @@ function buildPersonaGuidance(profilesMap) {
 }
 
 function buildPrompts({ channelId, channelName, guildId, reason, serializedMessages, speakerSummary, personaGuidance }) {
-  const systemPrompt = `You are Beowulf's memory curator. Analyze recent Discord chat logs and decide if any information deserves a long-term memory or a user profile tweak. Store only durable info: preferences, ongoing plans, lore, achievements, or personality markers. Rate importance 1-5 (5 = core lore). Output JSON strictly matching the requested schema. If nothing qualifies, return empty arrays.`;
+  const systemPrompt = `You are Beowulf's memory curator. Analyze recent Discord chat logs and decide if any information deserves a long-term memory or a user profile tweak. Store durable info: achievements, battle results, logistics, BUT ALSO capture memorable banter, recurring jokes, or strong opinions that reveal personality or relationships. Additionally classify any actionable pilotry/fighter tactics as dogfighting_advice, and any piracy strategies, market ambush intel, or profit routes as piracy_advice. Rate importance 1-5 (5 = core lore). Output JSON strictly matching the requested schema. If nothing qualifies, return empty arrays.`;
   const instructions = [
     `Guild ID: ${guildId || 'unknown'}`,
     `Channel: ${channelName || channelId || 'unknown'}`,
@@ -275,8 +287,8 @@ function buildPrompts({ channelId, channelName, guildId, reason, serializedMessa
     'Messages JSON follows:',
     JSON.stringify(serializedMessages, null, 2),
     'Desired JSON schema:',
-    '{"memories":[{"summary":"string","importance":1-5,"type":"episodic|inside_joke|profile|lore|fact","related_users":["discordId"],"tags":["string"],"should_store":true|false}],"profile_adjustments":[{"user_id":"string","nickname":"string?","tease_level":0-100,"tease_level_delta":-10-10,"style_preferences":{"tone_preference":"short text"},"persona_details":{"profession":"string?","known_for":["string"],"notable_quotes":["string"],"favorite_topics":["string"],"achievements":["string"],"personality_summary":"string?","relationship_notes":"string?","catchphrase":"string?","traits":{"openness":0-10,"conscientiousness":0-10,"extraversion":0-10,"agreeableness":0-10,"neuroticism":0-10,"confidence":0-10,"courage":0-10,"integrity":0-10,"resilience":0-10,"humor":0-10}},"notes":"short guidance"}]}',
-    `Limit memories to ${MAX_MEMORIES_PER_BATCH} items. Set should_store=false for trivial banter. Only populate persona_details when the chat gives reliable signals (profession, what they are known for, quotes, quirks, etc.). When updating trait sliders, reference the baseline above and adjust gradually (no jumps bigger than 1 point).`
+    '{"memories":[{"summary":"string","details":"include concrete facts, stats, or quotes","importance":1-5,"type":"episodic|inside_joke|profile|lore|dogfighting_advice|piracy_advice|fact","related_users":["discordId"],"tags":["string"],"should_store":true|false}],"profile_adjustments":[{"user_id":"string","nickname":"string?","tease_level":0-100,"tease_level_delta":-10-10,"style_preferences":{"tone_preference":"short text"},"persona_details":{"profession":"string?","known_for":["string"],"notable_quotes":["string"],"favorite_topics":["string"],"achievements":["string"],"personality_summary":"string?","relationship_notes":"string?","catchphrase":"string?","traits":{"openness":0-10,"conscientiousness":0-10,"extraversion":0-10,"agreeableness":0-10,"neuroticism":0-10,"confidence":0-10,"courage":0-10,"integrity":0-10,"resilience":0-10,"humor":0-10}},"notes":"short guidance"}]}',
+    `Limit memories to ${MAX_MEMORIES_PER_BATCH} items. Reject mundane updates unless they include a concrete plan, metric, or character insight. Classify fighter tactics, formation calls, joust angles, missile baiting, or EVA boarding plans as dogfighting_advice. Classify profitable commodity intel, piracy routes, snare traps, loot valuations, or fence strategies as piracy_advice. If someone states a strong opinion, shares a recurring joke, or teases another member in a way that defines their relationship, capture it as an inside_joke (with the direct quote in details). If you keep a memory, ensure the summary explains why it matters AND populate the details field with supporting numbers, names, timestamps, or direct quotes. Set should_store=false for filler banter. Only populate persona_details when the chat gives reliable signals (profession, what they are known for, quotes, quirks, etc.). When updating trait sliders, reference the baseline above and adjust gradually (no jumps bigger than 1 point).`
   ].join('\n');
   return { systemPrompt, userPrompt: instructions };
 }
@@ -317,12 +329,19 @@ async function callMemoryModel({ channelId, channelName, guildId, reason, messag
 function normalizeMemory(entry = {}) {
   const summary = typeof entry.summary === 'string' ? entry.summary.trim() : '';
   if (!summary) return null;
+  let type = typeof entry.type === 'string' ? entry.type.toLowerCase() : 'episodic';
+  if (!ALLOWED_MEMORY_TYPES.has(type)) {
+    type = type === 'fact' ? 'lore' : 'episodic';
+  }
   const importance = clamp(entry.importance, 1, 5) || 1;
   const shouldStore = entry.should_store !== false;
   const explicitStore = entry.should_store === true;
   if (!shouldStore) return null;
-  if (!explicitStore && importance < MEMORY_IMPORTANCE_THRESHOLD) return null;
-  const type = typeof entry.type === 'string' ? entry.type : 'episodic';
+  const relaxedThreshold = ALLOWED_MEMORY_TYPES.has(type) && (type === 'inside_joke' || type === 'profile')
+    ? Math.max(1, MEMORY_IMPORTANCE_THRESHOLD - 1)
+    : MEMORY_IMPORTANCE_THRESHOLD;
+  if (!explicitStore && importance < relaxedThreshold) return null;
+  const details = typeof entry.details === 'string' ? entry.details.trim() : '';
   const tags = Array.isArray(entry.tags) ? entry.tags.map((tag) => String(tag).trim()).filter(Boolean) : [];
   const relatedUsers = Array.isArray(entry.related_users)
     ? entry.related_users.map((id) => String(id).trim()).filter(Boolean)
@@ -330,6 +349,7 @@ function normalizeMemory(entry = {}) {
   return {
     id: entry.id || null,
     summary,
+    details,
     importance,
     type,
     tags,
@@ -379,26 +399,45 @@ function normalizeProfileAdjustment(entry = {}) {
   return adjustment;
 }
 
-async function persistMemories(memories = [], { channelId, channelName, openai }) {
+async function persistMemories(memories = [], { channelId, channelName, guildId, openai }) {
   const stored = [];
+  if (!guildId) {
+    console.warn('[MemoryBatcher] Missing guild_id; skipping memory persistence.');
+    return stored;
+  }
   for (const memory of memories) {
     if (!memory) continue;
     const tags = memory.tags?.length ? `\nTags: ${memory.tags.join(', ')}` : '';
     const related = memory.relatedUsers?.length ? `\nRelated Users: ${memory.relatedUsers.join(', ')}` : '';
-    const content = `Memory Type: ${memory.type}\nImportance: ${memory.importance}\nSummary: ${memory.summary}${tags}${related}`;
-    const payload = {
-      id: memory.id || `memory-${channelId || 'channel'}-${randomUUID()}`,
-      content,
-      username: 'Beowulf Memory',
-      channel_name: channelName || `channel-${channelId || 'unknown'}`,
-      timestamp: new Date().toISOString(),
-    };
+    const detailLine = memory.details ? `\nDetails: ${memory.details}` : '';
+    const content = `Summary: ${memory.summary}${detailLine}${tags}${related}`;
+    const tagsList = Array.isArray(memory.tags) && memory.tags.length
+      ? memory.tags
+      : ['memory-batcher'];
+    let result;
     try {
-      const result = await ingestChatMessage(payload, openai);
-      stored.push({ ok: result?.ok, id: payload.id });
+      result = await saveMemoryEntry({
+        content,
+        type: memory.type || 'episodic',
+        importance: memory.importance,
+        tags: tagsList,
+        guildId,
+        channelId,
+        userId: memory.relatedUsers?.[0],
+        openai,
+      });
     } catch (error) {
-      console.error('[MemoryBatcher] Failed to ingest memory entry:', error?.message || error);
+      logMemoryError('saveMemoryEntry exception', error, { channelId, guildId, summary: memory.summary?.slice?.(0, 120) });
+      stored.push({ ok: false, id: null });
+      continue;
     }
+    const ok = !!result?.ok;
+    if (!ok) {
+      logMemoryError('saveMemoryEntry failed', result?.errors || 'unknown-error', { channelId, guildId, summary: memory.summary?.slice?.(0, 120) });
+    } else if (MEMORY_BATCH_DEBUG) {
+      console.log('[MemoryBatcher] Stored memory', { summary: memory.summary.slice(0, 120) });
+    }
+    stored.push({ ok, id: result?.data?.id || null });
   }
   return stored;
 }
@@ -466,10 +505,10 @@ async function applyProfileAdjustment(adjustment) {
       upsertUserProfileInCache(result.data);
       return result.data;
     }
-    console.warn('[MemoryBatcher] Failed to persist profile adjustment:', result?.errors || 'unknown-error');
+    logMemoryError('profile adjustment persistence failed', result?.errors || 'unknown-error', { userId });
     return null;
   } catch (error) {
-    console.error('[MemoryBatcher] Profile adjustment write failed:', error?.message || error);
+    logMemoryError('profile adjustment write failed', error, { userId });
     return null;
   }
 }
@@ -487,18 +526,19 @@ async function persistProfileAdjustments(adjustments = []) {
 
 async function handleMemoryBatch({ channelId, reason, messages, openai }) {
   if (!Array.isArray(messages) || messages.length === 0) return;
-  const firstTs = messages[0]?.timestamp || 'unknown-start';
-  const lastTs = messages[messages.length - 1]?.timestamp || 'unknown-end';
-  console.log(`[MemoryBatcher] channel=${channelId} reason=${reason} count=${messages.length} window=${firstTs} -> ${lastTs} preview=${renderPreview(messages)}`);
+  const filtered = messages.filter((msg) => msg && !isBotUser(msg.user_id));
+  if (!filtered.length) return;
+  const processedCount = filtered.length;
   if (!openai) {
     console.warn('[MemoryBatcher] Skipping batch; OpenAI client missing.');
+    emitHeartbeat({ channelId, reason, processed: processedCount, status: 'skipped-no-openai' });
     return;
   }
-  const channelName = messages[messages.length - 1]?.channel_name || messages[0]?.channel_name || null;
-  const guildId = messages[0]?.guild_id || null;
-  const decision = await callMemoryModel({ channelId, channelName, guildId, reason, messages, openai });
+  const channelName = filtered[filtered.length - 1]?.channel_name || filtered[0]?.channel_name || null;
+  const guildId = filtered[0]?.guild_id || messages[0]?.guild_id || null;
+  const decision = await callMemoryModel({ channelId, channelName, guildId, reason, messages: filtered, openai });
   if (!decision) {
-    console.log('[MemoryBatcher] Model returned no decision payload.');
+    emitHeartbeat({ channelId, reason, processed: processedCount, status: 'no-decision' });
     return;
   }
   if (MEMORY_BATCH_DEBUG) {
@@ -512,17 +552,32 @@ async function handleMemoryBatch({ channelId, reason, messages, openai }) {
     : [];
 
   if (!memories.length && !adjustments.length) {
-    const debugHint = MEMORY_BATCH_DEBUG ? '' : ' (set MEMORY_BATCH_DEBUG=1 to print raw model output)';
-    console.log(`[MemoryBatcher] No memories or profile adjustments generated.${debugHint}`);
+    emitHeartbeat({ channelId, reason, processed: processedCount, status: 'no-output' });
     return;
   }
 
-  if (memories.length) {
-    await persistMemories(memories, { channelId, channelName, openai });
+  const generatedMemoriesCount = memories.length;
+  if (generatedMemoriesCount) {
+    await persistMemories(memories, { channelId, channelName, guildId, openai });
   }
+  let appliedAdjustmentsCount = 0;
   if (adjustments.length) {
-    await persistProfileAdjustments(adjustments);
+    const applied = await persistProfileAdjustments(adjustments);
+    appliedAdjustmentsCount = Array.isArray(applied) ? applied.length : 0;
   }
+
+  if (generatedMemoriesCount > 0 || appliedAdjustmentsCount > 0) {
+    await refreshProfilesCacheSafe();
+  }
+
+  emitHeartbeat({
+    channelId,
+    reason,
+    processed: processedCount,
+    status: 'completed',
+    memories: generatedMemoriesCount,
+    adjustments: appliedAdjustmentsCount,
+  });
 }
 
 module.exports = {

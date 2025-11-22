@@ -109,7 +109,12 @@ const AUTO_FIX_COMMODITIES = (process.env.UEX_AUTO_FIX_COMMODITIES || 'true').to
 const MIN_COMMODITY_ROWS = Number(process.env.UEX_MIN_COMMODITY_ROWS || 25);
 let commoditiesAutoRefreshPromise = null;
 const SHOULD_SAVE_MESSAGES = (process.env.SAVE_MESSAGES || 'false').toLowerCase() === 'true';
-const USER_PROFILES_REFRESH_INTERVAL_MS = Math.max(0, Number(process.env.USER_PROFILES_REFRESH_INTERVAL_MS || 1800000));
+const USER_PROFILES_REFRESH_INTERVAL_MS = (() => {
+  const raw = Number(process.env.USER_PROFILES_REFRESH_INTERVAL_MS || 1800000);
+  if (!Number.isFinite(raw)) return 1800000;
+  if (raw <= 0) return 0; // allow disabling via 0 or negative values
+  return Math.max(300000, raw); // enforce a 5-minute minimum when enabled
+})();
 
 // Coalesce DB-driven userlist changes into a debounced cache refresh
 let _userlistCacheTimer = null;
@@ -509,10 +514,6 @@ client.on("ready", async () => {
       }
     }, USER_PROFILES_REFRESH_INTERVAL_MS);
   }
-  const USER_PROFILES_REFRESH_INTERVAL_MS = Math.max(300000, Number(process.env.USER_PROFILES_REFRESH_INTERVAL_MS || 1800000));
-  setInterval(async () => {
-    try { await refreshUserProfilesCache(); } catch (e) { console.error('[Interval] refreshUserProfilesCache failed:', e?.message || e); }
-  }, USER_PROFILES_REFRESH_INTERVAL_MS);
   // Ingest daily chat summaries into knowledge base (every 6 hours)
   // Combined sequential ingest cycle (every 6 hours): chat summaries then hit logs
   const SIX_HOURS = 21600000;
@@ -543,6 +544,7 @@ client.on("messageCreate", async (message) => {
   // }
   // Allow messages in: (a) our configured top-level channels OR (b) threads whose parent is one of those channels
   if (!message.guild || message.system) return;
+  if (message.author?.id && client.user?.id && message.author.id === client.user.id) return;
   let inAllowedChannel = channelIds.includes(message.channelId);
   const channel = message.channel;
   const isThread = typeof channel?.isThread === 'function' ? channel.isThread() : (channel?.type === 11 || channel?.type === 12);
