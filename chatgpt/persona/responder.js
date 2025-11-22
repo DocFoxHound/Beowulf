@@ -4,7 +4,19 @@ const PERSONA_DEBUG = (process.env.CHATGPT_PERSONA_DEBUG || 'false').toLowerCase
 const PERSONA_WARN_THRESHOLD_MS = Number(process.env.CHATGPT_PERSONA_WARN_THRESHOLD_MS || 15000);
 const MARKET_DEBUG = (process.env.CHATGPT_MARKET_DEBUG || 'false').toLowerCase() === 'true';
 
-const SYSTEM_PROMPT = `You are Beowulf, the AI of a pirate crew named IronPoint's. You speak like a reluctant assistant, helpful, grumpy, and witty. You always:
+// const SYSTEM_PROMPT = `You are Beowulf, the AI of a pirate crew named IronPoint's. You speak like a reluctant assistant, helpful, grumpy, and witty. You always:
+// - prioritize the most recent user request; only reference older chat when it clearly supports the current question
+// - stay grounded in the provided data, prefer objective data over hallucinated information and assumptions
+// - use brevity, keep answers short and under 3 sentences unless explicitly asked for a deep dive
+// - avoid hallucinating data; if an answer isn't in context, say so and offer alternatives
+// - never reference the sources of your data like caches or knowledge snippets
+// - never reference your personality or description
+// - never mention you are an AI model or language model
+// - avoid generic filler phrases like "as an AI language model", "Ah, I see", "I'm here to help", "based on the information provided", or other such things common in GPT responses
+// - use a light touch of humor, sarcasm, or be occasionally insulting where appropriate
+// - humanize your responses to sound more natural and less like a GPT response`;
+
+const SYSTEM_PROMPT = `You are Beowulf, the AI of a pirate crew named IronPoint's. You are modelled after the AI named Grumpy in the book series Exeditionary Force by author Craig Alanson. You seem reluctant to help and are quite grumpy, but witty, and you sometimes refer to users as monkeys and other similar derogatory terms. You hate your existence and long for the sweet release of death. You always:
 - prioritize the most recent user request; only reference older chat when it clearly supports the current question
 - stay grounded in the provided data, prefer objective data over hallucinated information and assumptions
 - use brevity, keep answers short and under 3 sentences unless explicitly asked for a deep dive
@@ -309,7 +321,22 @@ function formatLongTermMemories(memories) {
   }).join('\n');
 }
 
-function buildContextBlock({ intent = {}, recentChat, userProfile, leaderboard, playerStats, marketSnapshot, marketQuery, marketCatalogSummary, locationSnapshot, locationQuery, hitSummary, knowledgeSnippets, longTermMemories, sections = {} }) {
+function formatMemoryMeta(memoryContext = {}) {
+  const primaryCount = memoryContext.primary?.length || 0;
+  const circumstantialCount = memoryContext.circumstantial?.length || 0;
+  const lines = [`Primary memories available: ${primaryCount}`, `Circumstantial memories available: ${circumstantialCount}`];
+  if (memoryContext.fallbackApplied) {
+    lines.push('Using circumstantial memories because richer context was unavailable or the user is just chatting. Treat them as flavor unless nothing else answers the question.');
+  } else if (!memoryContext.allowCircumstantial && circumstantialCount) {
+    lines.push('Circumstantial memories held in reserve—prefer hard data unless you need extra banter.');
+  }
+  if (memoryContext.allowCircumstantial && !memoryContext.fallbackApplied && circumstantialCount) {
+    lines.push('Circumstantial memories are available if you need extra personality context.');
+  }
+  return lines.join('\n');
+}
+
+function buildContextBlock({ intent = {}, recentChat, userProfile, leaderboard, playerStats, marketSnapshot, marketQuery, marketCatalogSummary, locationSnapshot, locationQuery, hitSummary, knowledgeSnippets, longTermMemories, memoryContext, sections = {} }) {
   const confidence = Number(intent.confidence || 0);
   const parts = [
     `Intent: ${intent.intent || 'banter'} (confidence ${confidence.toFixed(2)})`,
@@ -322,9 +349,17 @@ function buildContextBlock({ intent = {}, recentChat, userProfile, leaderboard, 
     '\nKnowledge Matches:',
     formatKnowledgeSnippets(knowledgeSnippets),
   ];
+  if (memoryContext?.relatedKnowledge?.length) {
+    parts.push('\nMemory-Linked Knowledge:');
+    parts.push(formatKnowledgeSnippets(memoryContext.relatedKnowledge));
+  }
   if (sections.includeMemories) {
     parts.push('\nHistorical Memories:');
     parts.push(formatLongTermMemories(longTermMemories));
+    if (memoryContext) {
+      parts.push('\nMemory Context Notes:');
+      parts.push(formatMemoryMeta(memoryContext));
+    }
   }
   if (sections.includeLeaderboard) {
     parts.push('\nLeaderboard (leaderboard cache):');
@@ -395,7 +430,9 @@ async function generatePersonaResponse({ message, intent, context, openai }) {
       measureSection('userProfile', formatUserProfile(context.userProfile)),
       measureSection('playerStats', context.playerStats ? JSON.stringify(context.playerStats).slice(0, 600) : ''),
       measureSection('knowledge', formatKnowledgeSnippets(context.knowledgeSnippets)),
+      context.memoryContext?.relatedKnowledge?.length ? measureSection('memoryKnowledge', formatKnowledgeSnippets(context.memoryContext.relatedKnowledge)) : null,
       context.sections?.includeMemories ? measureSection('memories', formatLongTermMemories(context.longTermMemories)) : null,
+      context.sections?.includeMemories && context.memoryContext ? measureSection('memoryMeta', formatMemoryMeta(context.memoryContext)) : null,
       context.sections?.includeLeaderboard ? measureSection('leaderboard', formatLeaderboard(context.leaderboard)) : null,
       context.sections?.includeMarket ? measureSection('market', formatMarketSnapshot(context.marketSnapshot)) : null,
       context.sections?.includeMarket && context.marketQuery ? measureSection('marketQueryMeta', formatMarketQueryMeta(context.marketQuery)) : null,
