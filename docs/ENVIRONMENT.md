@@ -49,6 +49,13 @@ This document enumerates all environment variables referenced in the codebase an
 - `BANTER_USE_LLM` (default 'true') – Enables LLM for banter messages.
 - `KNOWLEDGE_RETRIEVAL` (default 'true') – Enables retrieval augmentation.
 - `KNOWLEDGE_PREFER_VECTOR` (default 'true') – Prefers vector store over other sources.
+- `CHATGPT_KNOWLEDGE_LOOKUP` / `CHATGPT_KNOWLEDGE_LIMIT` – Legacy `/api/knowledge` search toggle + per-query row cap.
+- `CHATGPT_KNOWLEDGE_DOC_LOOKUP` / `CHATGPT_KNOWLEDGE_DOC_LIMIT` – Enables `knowledge_docs` (doc-ingest) retrieval and caps surfaced chunks per request.
+- `CHATGPT_KNOWLEDGE_DOC_MIN_SCORE` – Semantic similarity cutoff (0–1) for doc vector hits.
+- `CHATGPT_KNOWLEDGE_DOC_SCAN_LIMIT` / `CHATGPT_KNOWLEDGE_DOC_SCAN_PAGE` – Keyword fallback scanner caps (set scan limit to 0 to disable lexical fallback when vectors are missing).
+- `CHATGPT_ENTITY_TOP_K` – Number of top entity catalog matches surfaced per request (drives prompt → intent → entity flow).
+- `CHATGPT_ENTITY_INDEX_REFRESH_MS` – Rebuild cadence for the entity catalog (defaults to 30 minutes).
+- `CHATGPT_ENTITY_DOC_LIMIT` – Knowledge documents sampled into the entity catalog (controls doc-topic entity breadth).
 - `USER_OPINION_USE_LLM` (default 'true') – Generates opinion responses via LLM.
 - `KNOWLEDGE_INGEST_ENABLE` – Master flag controlling ingestion pipelines (chat/hits/stats).
 - `CHAT_VECTOR_INGEST_ON_START` – Batch ingest historical chat logs at startup.

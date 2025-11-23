@@ -86,6 +86,7 @@ const { removeProspectFromFriendlies } = require('./common/remove-prospect-from-
 const { syncSkillLevelsFromGuild, updateSkillOnMemberChange } = require('./common/skill-level-assigner.js');
 const { makeMember, updateMemberOnMemberChange } = require('./common/make-member.js');
 const { handleChatGptInteraction } = require('./chatgpt/orchestrator');
+const { handleSlashCommand } = require('./commands');
 const { startMemoryBatchWorker, trackLiveMessageForMemories } = require('./chatgpt/memory/batch-runner');
 const {
   refreshUserProfilesCache,
@@ -715,18 +716,29 @@ client.on('guildMemberRemove', async (member) => {
 });
 
 client.on('interactionCreate', async (interaction) => {
-  if (interaction.isButton()) {
-    // Handle DM verification buttons for join_member and join_guest
-    // if (interaction.customId === 'join_member' || interaction.customId === 'join_guest') {
-    //   try {
-    //     await handleMemberOrGuestJoin(interaction, client, openai);
-    //   } catch (err) {
-    //     console.error('Error handling member/guest join:', err);
-    //     await interaction.reply({ content: 'There was an error processing your request.', ephemeral: true });
-    //   }
-    //   return;
-    // }
+  if (interaction.isChatInputCommand()) {
+    try {
+      const handled = await handleSlashCommand(interaction, { client, openai });
+      if (!handled && !interaction.replied && !interaction.deferred) {
+        await interaction.reply({ content: 'This command is not supported yet.', ephemeral: true });
+      }
+    } catch (err) {
+      console.error(`[SlashCommand] ${interaction.commandName || interaction.commandId} failed:`, err?.message || err);
+      const errorMessage = 'Something went wrong while running that command.';
+      if (interaction.deferred || interaction.replied) {
+        try {
+          await interaction.followUp({ content: errorMessage, ephemeral: true });
+        } catch {}
+      } else {
+        try {
+          await interaction.reply({ content: errorMessage, ephemeral: true });
+        } catch {}
+      }
+    }
+    return;
   }
+
+  if (!interaction.isButton()) return;
 
   // Only allow in specific event channels for RSVP buttons
   const allowedChannels = [
@@ -740,7 +752,6 @@ client.on('interactionCreate', async (interaction) => {
   const match = interaction.customId.match(/^([^_]+)_([^_]+)_(.+)$/);
   if (!match) return;
 
-  const type = match[1];
   const scheduleId = match[2];
   const optName = match[3];
   const userId = interaction.user.id;

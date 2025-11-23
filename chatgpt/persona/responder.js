@@ -309,6 +309,17 @@ function formatKnowledgeSnippets(snippets) {
   }).join('\n');
 }
 
+function formatEntityMatches(matches = []) {
+  if (!Array.isArray(matches) || !matches.length) return 'No entity matches.';
+  return matches.map((entry) => {
+    const confidence = entry.confidence != null ? `${Math.round(entry.confidence * 100)}%` : 'n/a';
+    const typeLabel = [entry.type, entry.subtype].filter(Boolean).join('/');
+    const header = `• ${entry.name}${typeLabel ? ` (${typeLabel})` : ''} – confidence ${confidence}`;
+    const summary = entry.summary ? `\n  ${entry.summary}` : '';
+    return `${header}${summary}`;
+  }).join('\n');
+}
+
 function formatLongTermMemories(memories) {
   if (!Array.isArray(memories) || !memories.length) return 'No historical memories matched.';
   return memories.map((memory) => {
@@ -336,7 +347,7 @@ function formatMemoryMeta(memoryContext = {}) {
   return lines.join('\n');
 }
 
-function buildContextBlock({ intent = {}, recentChat, userProfile, leaderboard, playerStats, marketSnapshot, marketQuery, marketCatalogSummary, locationSnapshot, locationQuery, hitSummary, knowledgeSnippets, longTermMemories, memoryContext, sections = {} }) {
+function buildContextBlock({ intent = {}, recentChat, userProfile, leaderboard, playerStats, marketSnapshot, marketQuery, marketCatalogSummary, locationSnapshot, locationQuery, hitSummary, knowledgeSnippets, entityMatches, longTermMemories, memoryContext, sections = {} }) {
   const confidence = Number(intent.confidence || 0);
   const parts = [
     `Intent: ${intent.intent || 'banter'} (confidence ${confidence.toFixed(2)})`,
@@ -360,6 +371,10 @@ function buildContextBlock({ intent = {}, recentChat, userProfile, leaderboard, 
       parts.push('\nMemory Context Notes:');
       parts.push(formatMemoryMeta(memoryContext));
     }
+  }
+  if (sections.includeEntities) {
+    parts.push('\nEntity Matches (catalog):');
+    parts.push(formatEntityMatches(entityMatches));
   }
   if (sections.includeLeaderboard) {
     parts.push('\nLeaderboard (leaderboard cache):');

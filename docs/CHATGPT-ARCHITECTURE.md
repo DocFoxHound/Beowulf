@@ -247,6 +247,13 @@ Assembles everything GPT needs to respond correctly.
 3. **Knowledge documents**  
 4. **External data**
 
+### **Entity Catalog Layer**
+
+- `chatgpt/context/entity-index.js` builds a lightweight catalog from UEX caches (commodities, items, terminals, locations) plus tagged knowledge-doc topics.
+- `searchGameEntities()` runs between intent classification and cache lookups, ensuring every prompt flows through **prompt → intent → entity detection → dataset retrieval**.
+- Entity matches feed back into `context.builder` for two reasons: (1) they teach the persona whether a noun is a ship, component, or location before touching market datasets, and (2) they seed `marketTargets`/`locationTargets` when the user never mentioned "price" but clearly referenced a tradable object.
+- Keep `CHATGPT_ENTITY_TOP_K`, `CHATGPT_ENTITY_INDEX_REFRESH_MS`, and `CHATGPT_ENTITY_DOC_LIMIT` tuned so the catalog stays fresh without hammering the DB.
+
 ### **Output Interface:**
 ```ts
 interface BuiltContext {

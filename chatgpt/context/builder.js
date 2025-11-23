@@ -11,6 +11,7 @@ const {
 const { ensureCachesReady } = require('./cache-readiness');
 const { fetchKnowledgeSnippets } = require('./knowledge-search');
 const { fetchMemorySnippets } = require('./memory-search');
+const { searchGameEntities } = require('./entity-index');
 
 const RECENT_CHAT_LIMIT = Number(process.env.CHATGPT_RECENT_CHAT_LIMIT || 8);
 const MEMORY_PRIMARY_IMPORTANCE = Number(process.env.CHATGPT_MEMORY_PRIMARY_IMPORTANCE || 3);
@@ -19,6 +20,25 @@ const MEMORY_KNOWLEDGE_LIMIT = Number(process.env.CHATGPT_MEMORY_KNOWLEDGE_LIMIT
 const MARKET_DEBUG = (process.env.CHATGPT_MARKET_DEBUG || 'false').toLowerCase() === 'true';
 const MARKET_FILLER_WORDS = new Set(['what', 'is', 'the', 'current', 'price', 'for', 'of', 'a', 'an', 'anyone', 'know']);
 const GENERIC_MARKET_WORDS = new Set(['highest', 'value', 'values', 'trade', 'trades', 'route', 'routes', 'profit', 'profits', 'haul', 'hauls', 'cargo', 'run', 'runs', 'best', 'top', 'great', 'good', 'money', 'credits', 'right', 'now', 'today', 'tonight', 'currently', 'biggest', 'largest', 'most', 'high', 'higher', 'low', 'lower']);
+
+const ENTITY_LOCATION_TYPES = new Set([
+  'location',
+  'terminal',
+  'terminals',
+  'city',
+  'cities',
+  'planet',
+  'planets',
+  'moon',
+  'moons',
+  'outpost',
+  'outposts',
+  'space_station',
+  'space_stations',
+  'star_system',
+  'star_systems',
+]);
+const ENTITY_ITEM_TYPES = new Set(['component', 'components', 'commodity', 'commodities', 'item', 'items']);
 
 function classifyMemoryImportance(memory) {
   if (!memory) return 'circumstantial';
@@ -95,6 +115,37 @@ function extractMarketQuery(text) {
   };
 }
 
+function applyEntityHints(targets, entities = []) {
+  if (!targets || !Array.isArray(entities) || entities.length === 0) return;
+  const itemMatch = entities.find((entry) => ENTITY_ITEM_TYPES.has(entry.type));
+  const locationMatch = entities.find((entry) => ENTITY_LOCATION_TYPES.has(entry.type) || ENTITY_LOCATION_TYPES.has(entry.subtype));
+  if (itemMatch && !targets.commodityName) {
+    targets.commodityName = itemMatch.name;
+    targets.commodityDataset = itemMatch.dataset || null;
+    targets.datasetPreference = targets.datasetPreference || itemMatch.dataset || null;
+    if (!targets.catalogSummary && itemMatch.record) {
+      targets.catalogSummary = itemMatch.summary || null;
+    }
+  }
+  if (locationMatch && !targets.locationName) {
+    targets.locationName = locationMatch.name;
+    targets.locationDataset = locationMatch.dataset || null;
+    targets.locationType = locationMatch.subtype || locationMatch.type || null;
+    targets.locationRecord = locationMatch.record || null;
+  }
+}
+
+function deriveLocationTargets(rawTargets, marketTargets) {
+  if (rawTargets) return rawTargets;
+  if (!marketTargets?.locationName) return null;
+  return {
+    locationName: marketTargets.locationName,
+    locationDataset: marketTargets.locationDataset,
+    locationType: marketTargets.locationType,
+    locationRecord: marketTargets.locationRecord,
+  };
+}
+
 async function buildContext({ message, meta, intent, openai }) {
   await ensureCachesReady();
   const channelId = meta.channelId;
@@ -118,7 +169,7 @@ async function buildContext({ message, meta, intent, openai }) {
   const includeLocationInfo = intent.intent === 'location_info';
   const marketQueryMeta = extractMarketQuery(content);
   const shouldExtractTargets = includeMarket || includeLocationInfo;
-  const emptyTargets = {
+  const createEmptyTargets = () => ({
     marketType: 'overview',
     commodityName: null,
     commodityDataset: null,
@@ -135,10 +186,19 @@ async function buildContext({ message, meta, intent, openai }) {
     locationTerminalSample: [],
     locationTerminalFallbackUsed: false,
     catalogSummary: null,
-  };
+  });
   const extractedTargets = shouldExtractTargets ? extractMarketTargets(content) : null;
-  const marketTargets = includeMarket ? (extractedTargets || emptyTargets) : emptyTargets;
-  const locationTargets = includeLocationInfo ? extractedTargets : null;
+  const marketTargets = includeMarket ? (extractedTargets || createEmptyTargets()) : createEmptyTargets();
+  let entityMatches = [];
+  if (content) {
+    try {
+      entityMatches = await searchGameEntities({ query: content });
+    } catch (error) {
+      console.error('[ChatGPT][Context] entity search failed', error?.message || error);
+    }
+  }
+  applyEntityHints(marketTargets, entityMatches);
+  const locationTargets = includeLocationInfo ? deriveLocationTargets(extractedTargets, marketTargets) : null;
   const marketSnapshot = includeMarket
     ? getMarketSnapshotFromCache(marketQueryMeta.query, {
         limit: 5,
@@ -209,7 +269,7 @@ async function buildContext({ message, meta, intent, openai }) {
   const includeHitSummary = /piracy|pirate|hit track|hittrack|hittracker|bounty|raid|ambush|cargo|haul/.test(lowerContent);
   const hitSummary = includeHitSummary ? getHitActivitySummary() : [];
 
-  const knowledgeSnippets = await fetchKnowledgeSnippets({ content, guildId: meta.guildId, channelId }) || [];
+  const knowledgeSnippets = await fetchKnowledgeSnippets({ content, guildId: meta.guildId, channelId, openai }) || [];
   const rawMemories = await fetchMemorySnippets({
     content,
     guildId: meta.guildId,
@@ -240,6 +300,7 @@ async function buildContext({ message, meta, intent, openai }) {
         guildId: meta.guildId,
         channelId,
         limit: MEMORY_KNOWLEDGE_LIMIT,
+        openai,
       }) || [])
     : [];
   const includeKnowledge = knowledgeSnippets.length > 0;
@@ -270,6 +331,7 @@ async function buildContext({ message, meta, intent, openai }) {
     knowledgeSnippets,
     longTermMemories: selectedMemories,
     memoryContext,
+    entityMatches,
     sections: {
       includeRecent: true,
       includeProfile: true,
@@ -281,6 +343,7 @@ async function buildContext({ message, meta, intent, openai }) {
       includeMarketCatalog: Boolean(marketCatalogSummary),
       includeLocation: Boolean(locationSnapshot),
       includeHitSummary: includeHitSummary && hitSummary.length > 0,
+      includeEntities: entityMatches.length > 0,
     },
     externalData: {
       userProfileLoaded: Boolean(userProfile),
@@ -292,6 +355,7 @@ async function buildContext({ message, meta, intent, openai }) {
       hitSummaryLoaded: hitSummary.length > 0,
       memoriesLoaded: selectedMemories.length > 0,
       memoryFallbackApplied: memoryContext.fallbackApplied,
+      entitiesLoaded: entityMatches.length > 0,
     },
   };
 }

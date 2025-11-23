@@ -26,6 +26,18 @@ npm run clear:commands -- path/to/.env.other   # optional alt env file
 
 Run it once after redeploying the GPT-free build, or anytime stray commands linger.
 
+### Deploying the new slash commands
+`/doc-ingest` uploads plain-text or markdown docs into `knowledge_docs` with automatic chunking and (optional) embeddings. Deploy it after updating the command definitions:
+
+```bash
+npm run deploy:commands               # registers guild commands using .env
+npm run deploy:commands -- path/to/.env.other
+```
+
+Grant upload access by setting `DOC_INGEST_ROLE_IDS` (and test equivalent) with the curator roles that should see and run the command.
+
+Uploaded chunks are now searchable in every ChatGPT response pass: the assistant queries both the legacy `/api/knowledge` table and the new `knowledge_docs` vector index for each message. Tune the retrieval knobs with `CHATGPT_KNOWLEDGE_DOC_LOOKUP`, `CHATGPT_KNOWLEDGE_DOC_LIMIT`, `CHATGPT_KNOWLEDGE_DOC_MIN_SCORE`, plus the fallback scanners `CHATGPT_KNOWLEDGE_DOC_SCAN_LIMIT` / `CHATGPT_KNOWLEDGE_DOC_SCAN_PAGE` to adjust how aggressively those snippets show up alongside market data, memories, and other caches.
+
 ### Architecture snapshot
 ```mermaid
 graph TD
