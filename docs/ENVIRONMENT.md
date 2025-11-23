@@ -56,6 +56,7 @@ This document enumerates all environment variables referenced in the codebase an
 - `CHATGPT_ENTITY_TOP_K` – Number of top entity catalog matches surfaced per request (drives prompt → intent → entity flow).
 - `CHATGPT_ENTITY_INDEX_REFRESH_MS` – Rebuild cadence for the entity catalog (defaults to 30 minutes).
 - `CHATGPT_ENTITY_DOC_LIMIT` – Knowledge documents sampled into the entity catalog (controls doc-topic entity breadth).
+- `CHATGPT_ENTITY_REBUILD_DEBOUNCE_MS` – Delay (ms) before auto-rebuilding the catalog after a UEX cache refresh; prevents thrash when multiple datasets update.
 - `USER_OPINION_USE_LLM` (default 'true') – Generates opinion responses via LLM.
 - `KNOWLEDGE_INGEST_ENABLE` – Master flag controlling ingestion pipelines (chat/hits/stats).
 - `CHAT_VECTOR_INGEST_ON_START` – Batch ingest historical chat logs at startup.

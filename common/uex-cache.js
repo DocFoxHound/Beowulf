@@ -1,6 +1,24 @@
 const UEX = require('../api/uexApi.js');
 
 const cacheStore = new Map();
+const cacheListeners = new Set();
+
+function addUexCacheListener(listener) {
+  if (typeof listener !== 'function') return () => {};
+  cacheListeners.add(listener);
+  return () => cacheListeners.delete(listener);
+}
+
+function notifyUexCacheListeners(payload) {
+  if (!cacheListeners.size) return;
+  for (const listener of cacheListeners) {
+    try {
+      listener(payload);
+    } catch (error) {
+      console.error('[UEXCache] cache listener failed:', error?.message || error);
+    }
+  }
+}
 const UEX_CACHE_DEBUG = (process.env.UEX_CACHE_DEBUG || 'true').toLowerCase() === 'true';
 const LOG_COMMODITIES_SNAPSHOT = (process.env.UEX_CACHE_COMMODITIES_SNAPSHOT || 'false').toLowerCase() === 'true';
 const SNAPSHOT_TO_DATASET = {
@@ -55,6 +73,7 @@ function refreshUexCache(label, payload, meta = {}) {
     info: meta.info,
   };
   cacheStore.set(label, entry);
+  notifyUexCacheListeners({ label, entry });
   if (UEX_CACHE_DEBUG) {
     console.log(`[UEXCache] Loaded ${label} (${entry.records.length} records) from ${entry.source}`);
     if (label === 'commodities' && LOG_COMMODITIES_SNAPSHOT) {
@@ -136,4 +155,5 @@ module.exports = {
   hydrateUexCachesFromDb,
   DATASET_LOADERS,
   primeUexCacheFromSnapshot,
+  addUexCacheListener,
 };

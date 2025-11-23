@@ -146,7 +146,7 @@ function deriveLocationTargets(rawTargets, marketTargets) {
   };
 }
 
-async function buildContext({ message, meta, intent, openai }) {
+async function buildContext({ message, meta, intent, openai, entityMatches: entityMatchesOverride }) {
   await ensureCachesReady();
   const channelId = meta.channelId;
   const userId = meta.authorId;
@@ -189,8 +189,9 @@ async function buildContext({ message, meta, intent, openai }) {
   });
   const extractedTargets = shouldExtractTargets ? extractMarketTargets(content) : null;
   const marketTargets = includeMarket ? (extractedTargets || createEmptyTargets()) : createEmptyTargets();
-  let entityMatches = [];
-  if (content) {
+  const hasEntityOverride = Array.isArray(entityMatchesOverride);
+  let entityMatches = hasEntityOverride ? entityMatchesOverride : [];
+  if (!hasEntityOverride && content) {
     try {
       entityMatches = await searchGameEntities({ query: content });
     } catch (error) {

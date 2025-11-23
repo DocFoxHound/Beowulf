@@ -316,7 +316,16 @@ function formatEntityMatches(matches = []) {
     const typeLabel = [entry.type, entry.subtype].filter(Boolean).join('/');
     const header = `• ${entry.name}${typeLabel ? ` (${typeLabel})` : ''} – confidence ${confidence}`;
     const summary = entry.summary ? `\n  ${entry.summary}` : '';
-    return `${header}${summary}`;
+    let details = '';
+    if (entry.details && typeof entry.details === 'object') {
+      const pairs = Object.entries(entry.details)
+        .filter(([, value]) => value != null && value !== '')
+        .map(([key, value]) => `${key}: ${value}`);
+      if (pairs.length) {
+        details = `\n  Details: ${pairs.join(', ')}`;
+      }
+    }
+    return `${header}${summary}${details}`;
   }).join('\n');
 }
 

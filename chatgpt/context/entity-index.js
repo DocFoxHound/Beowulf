@@ -1,9 +1,10 @@
-const { getUexCacheRecords } = require('../../common/uex-cache');
+const { getUexCacheRecords, addUexCacheListener } = require('../../common/uex-cache');
 const { KnowledgeDocsModel } = require('../../api/models/knowledge-docs');
 
 const ENTITY_REFRESH_MS = Number(process.env.CHATGPT_ENTITY_INDEX_REFRESH_MS || 30 * 60 * 1000);
 const ENTITY_DOC_LIMIT = Number(process.env.CHATGPT_ENTITY_DOC_LIMIT || 400);
 const ENTITY_TOP_K = Number(process.env.CHATGPT_ENTITY_TOP_K || 5);
+const ENTITY_REBUILD_DEBOUNCE_MS = Number(process.env.CHATGPT_ENTITY_REBUILD_DEBOUNCE_MS || 1000);
 
 const NAME_FIELDS = {
   commodities: ['commodity_name', 'name', 'label'],
@@ -24,6 +25,7 @@ const state = {
   builtAt: 0,
   building: null,
 };
+let rebuildTimeout = null;
 
 function normalize(str) {
   return String(str || '').trim().toLowerCase();
@@ -37,6 +39,163 @@ function tokenize(str) {
     .slice(0, 16);
 }
 
+function formatNumber(value) {
+  if (value == null) return null;
+  const num = Number(value);
+  if (!Number.isFinite(num)) return null;
+  return num.toLocaleString();
+}
+
+function summarizeCommodity(record) {
+  const parts = [];
+  const type = record.commodity_type || record.category || record.group || record.item_category;
+  if (type) parts.push(`type ${type}`);
+  const demand = record.demand || record.demand_level;
+  if (demand) parts.push(`demand ${demand}`);
+  const supply = record.supply || record.inventory_level;
+  if (supply) parts.push(`supply ${supply}`);
+  const buy = formatNumber(record.best_buy_price ?? record.buy_price ?? record.avg_buy_price);
+  if (buy) parts.push(`buy ${buy}`);
+  const sell = formatNumber(record.best_sell_price ?? record.sell_price ?? record.avg_sell_price);
+  if (sell) parts.push(`sell ${sell}`);
+  const volatility = record.volatility || record.risk_level;
+  if (volatility) parts.push(`volatility ${volatility}`);
+  return parts.join('; ');
+}
+
+function summarizeItem(record) {
+  const parts = [];
+  const subtype = record.item_type || record.sub_category || record.type;
+  if (subtype) parts.push(subtype);
+  const manufacturer = record.manufacturer || record.brand;
+  if (manufacturer) parts.push(`by ${manufacturer}`);
+  const size = record.size || record.class;
+  if (size) parts.push(`size ${size}`);
+  const role = record.role || record.function;
+  if (role) parts.push(role);
+  const rating = record.rating || record.grade;
+  if (rating) parts.push(`grade ${rating}`);
+  return parts.join('; ');
+}
+
+function summarizeTerminal(record) {
+  const parts = [];
+  const location = record.location_name || record.planet_name || record.system_name;
+  if (location) parts.push(location);
+  const services = Array.isArray(record.services) ? record.services.join(', ') : record.services_summary;
+  if (services) parts.push(`services: ${services}`);
+  const pads = record.pad_count || record.hangar_count;
+  if (pads) parts.push(`${pads} pads`);
+  const focus = record.terminal_type || record.specialty;
+  if (focus) parts.push(`focus: ${focus}`);
+  return parts.join('; ');
+}
+
+function summarizeLocation(record, dataset) {
+  const parts = [];
+  const type = record.type || record.location_type || dataset;
+  if (type) parts.push(type);
+  const region = record.region || record.system || record.star_system;
+  if (region) parts.push(`system ${region}`);
+  const parent = record.parent || record.planet || record.primary_body;
+  if (parent) parts.push(`parent ${parent}`);
+  const services = Array.isArray(record.services) ? record.services.join(', ') : record.services_summary;
+  if (services) parts.push(`services: ${services}`);
+  const population = formatNumber(record.population);
+  if (population) parts.push(`pop ${population}`);
+  return parts.join('; ');
+}
+
+function summarizeKnowledgeDoc(record) {
+  const parts = [];
+  if (record?.title) parts.push(record.title);
+  if (Array.isArray(record?.tags) && record.tags.length) {
+    parts.push(`tags: ${record.tags.slice(0, 4).join(', ')}`);
+  }
+  if (record?.created_at) parts.push(`created ${record.created_at}`);
+  return parts.join('; ');
+}
+
+function summarizeGeneric(record, maxPairs = 6) {
+  const entries = Object.entries(record)
+    .filter(([key, value]) => value !== undefined && value !== null && typeof value !== 'object' && key !== 'vector')
+    .slice(0, maxPairs);
+  if (!entries.length) return '';
+  return entries.map(([key, value]) => `${key}: ${value}`).join('; ');
+}
+
+function summarizeRecord(record, dataset, maxPairs = 6) {
+  if (!record || typeof record !== 'object') return '';
+  if (dataset === 'commodities') return summarizeCommodity(record);
+  if (dataset === 'items') return summarizeItem(record);
+  if (dataset === 'terminals') return summarizeTerminal(record);
+  if (LOCATION_DATASETS.has(dataset)) return summarizeLocation(record, dataset);
+  if (dataset === 'knowledge_docs') return summarizeKnowledgeDoc(record);
+  return summarizeGeneric(record, maxPairs);
+}
+
+function extractCommodityDetails(record) {
+  const details = {};
+  if (record?.commodity_type) details.type = record.commodity_type;
+  if (record?.category) details.category = record.category;
+  const buy = formatNumber(record?.best_buy_price ?? record?.buy_price);
+  if (buy) details.buy = buy;
+  const sell = formatNumber(record?.best_sell_price ?? record?.sell_price);
+  if (sell) details.sell = sell;
+  if (record?.demand) details.demand = record.demand;
+  if (record?.supply) details.supply = record.supply;
+  return Object.keys(details).length ? details : null;
+}
+
+function extractItemDetails(record) {
+  const details = {};
+  if (record?.item_type || record?.sub_category) details.type = record.item_type || record.sub_category;
+  if (record?.manufacturer) details.manufacturer = record.manufacturer;
+  if (record?.size) details.size = record.size;
+  if (record?.class) details.class = record.class;
+  if (record?.power_draw) details.power = record.power_draw;
+  if (record?.cooldown) details.cooldown = record.cooldown;
+  return Object.keys(details).length ? details : null;
+}
+
+function extractTerminalDetails(record) {
+  const details = {};
+  if (record?.location_name) details.location = record.location_name;
+  if (record?.terminal_type) details.type = record.terminal_type;
+  if (Array.isArray(record?.services) && record.services.length) details.services = record.services.join(', ');
+  if (record?.pad_count) details.pads = record.pad_count;
+  if (record?.inventory_count) details.inventory = record.inventory_count;
+  return Object.keys(details).length ? details : null;
+}
+
+function extractLocationDetails(record) {
+  const details = {};
+  if (record?.system || record?.star_system) details.system = record.system || record.star_system;
+  if (record?.planet) details.planet = record.planet;
+  if (record?.parent) details.parent = record.parent;
+  if (Array.isArray(record?.services) && record.services.length) details.services = record.services.join(', ');
+  if (record?.population) details.population = formatNumber(record.population);
+  return Object.keys(details).length ? details : null;
+}
+
+function extractDocDetails(record) {
+  const details = {};
+  if (Array.isArray(record?.tags) && record.tags.length) details.tags = record.tags;
+  if (record?.section) details.section = record.section;
+  if (record?.created_at) details.created_at = record.created_at;
+  return Object.keys(details).length ? details : null;
+}
+
+function extractDetails(record, dataset) {
+  if (!record || typeof record !== 'object') return null;
+  if (dataset === 'commodities') return extractCommodityDetails(record);
+  if (dataset === 'items') return extractItemDetails(record);
+  if (dataset === 'terminals') return extractTerminalDetails(record);
+  if (LOCATION_DATASETS.has(dataset)) return extractLocationDetails(record);
+  if (dataset === 'knowledge_docs') return extractDocDetails(record);
+  return null;
+}
+
 function pickName(record, dataset) {
   const fields = NAME_FIELDS[dataset] || ['name', 'label'];
   for (const key of fields) {
@@ -45,19 +204,12 @@ function pickName(record, dataset) {
   return null;
 }
 
-function summarizeRecord(record, maxPairs = 6) {
-  if (!record || typeof record !== 'object') return '';
-  const entries = Object.entries(record)
-    .filter(([key, value]) => value !== undefined && value !== null && typeof value !== 'object' && key !== 'vector')
-    .slice(0, maxPairs);
-  if (!entries.length) return '';
-  return entries.map(([key, value]) => `${key}: ${value}`).join('; ');
-}
-
 function buildEntry({ id, name, type, subtype, dataset, source, tags, record, aliases }) {
   const normalized = normalize(name);
   if (!normalized) return null;
   const aliasList = Array.isArray(aliases) ? aliases.map(normalize).filter(Boolean) : [];
+  const summary = summarizeRecord(record, dataset);
+  const details = extractDetails(record, dataset);
   return {
     id,
     name,
@@ -67,7 +219,8 @@ function buildEntry({ id, name, type, subtype, dataset, source, tags, record, al
     source,
     tags: Array.isArray(tags) ? tags.filter(Boolean) : [],
     record: record || null,
-    summary: summarizeRecord(record),
+    summary,
+    details,
     normalized,
     aliases: aliasList,
     tokens: tokenize(name)
@@ -156,6 +309,25 @@ async function rebuildEntityIndex() {
   state.builtAt = Date.now();
 }
 
+function scheduleEntityRebuild(reason) {
+  if (state.building) return;
+  if (rebuildTimeout) {
+    clearTimeout(rebuildTimeout);
+    rebuildTimeout = null;
+  }
+  rebuildTimeout = setTimeout(() => {
+    rebuildTimeout = null;
+    rebuildEntityIndex().catch((error) => {
+      console.error('[EntityIndex] scheduled rebuild failed:', error?.message || error, { reason });
+    });
+  }, ENTITY_REBUILD_DEBOUNCE_MS);
+}
+
+function invalidateEntityIndex(reason) {
+  state.builtAt = 0;
+  scheduleEntityRebuild(reason);
+}
+
 async function ensureEntityIndex() {
   const now = Date.now();
   if (state.entries.length && now - state.builtAt < ENTITY_REFRESH_MS) {
@@ -219,10 +391,16 @@ async function searchGameEntities({ query, limit = ENTITY_TOP_K } = {}) {
     tags: entry.tags,
     summary: entry.summary,
     record: entry.record,
+    details: entry.details,
     confidence: Math.min(1, score / 250),
   }));
 }
 
 module.exports = {
   searchGameEntities,
+  invalidateEntityIndex,
 };
+
+if (typeof addUexCacheListener === 'function') {
+  addUexCacheListener(({ label }) => invalidateEntityIndex(`uex:${label}`));
+}

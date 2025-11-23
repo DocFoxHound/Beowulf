@@ -2,6 +2,8 @@ const { classifyIntent } = require('../intent/classifier');
 const { buildContext } = require('../context/builder');
 const { generatePersonaResponse } = require('../persona/responder');
 const { writeMemories } = require('../memory/writer');
+const { ensureCachesReady } = require('../context/cache-readiness');
+const { searchGameEntities } = require('../context/entity-index');
 
 const STAGE_WARN_THRESHOLD_MS = Number(process.env.CHATGPT_STAGE_WARN_THRESHOLD_MS || 5000);
 const PERF_LOGGING_ENABLED = (process.env.CHATGPT_PERF_LOGGING || 'false').toLowerCase() === 'true';
@@ -45,7 +47,17 @@ async function handleChatGptInteraction({ message, client, openai }) {
     try { await message.channel.sendTyping(); } catch {}
 
     const intent = await runStage('intent', () => classifyIntent({ message, meta, openai }));
-    const context = await runStage('context', () => buildContext({ message, meta, intent, openai }));
+    const entityMatches = await runStage('entities', async () => {
+      if (!message?.content) return [];
+      try {
+        await ensureCachesReady();
+        return await searchGameEntities({ query: message.content });
+      } catch (error) {
+        console.error('[ChatGPT][Orchestrator] entity search failed', error?.message || error);
+        return [];
+      }
+    });
+    const context = await runStage('context', () => buildContext({ message, meta, intent, openai, entityMatches }));
     const personaResponse = await runStage('persona', () => generatePersonaResponse({ message, meta, intent, context, openai }));
 
     let sentReply = null;
