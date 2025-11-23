@@ -27,6 +27,7 @@ const { PlayerStatsModel } = require('./player-stats');
 const { MemoriesModel } = require('./memories');
 const { UserProfilesModel } = require('./user-profiles');
 const { ChatMessagesModel } = require('./chat-messages');
+const { GameEntitiesModel } = require('./game-entities');
 
 module.exports = {
   KnowledgeModel,
@@ -56,4 +57,5 @@ module.exports = {
   MemoriesModel,
   UserProfilesModel,
   ChatMessagesModel,
+  GameEntitiesModel,
 };

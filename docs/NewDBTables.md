@@ -201,6 +201,52 @@ CREATE INDEX IF NOT EXISTS idx_knowledge_docs_vector
 CREATE INDEX IF NOT EXISTS idx_knowledge_docs_title
     ON knowledge_docs (title);
 
+-- ============================================================
+--  Table: game_entities
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS game_entities (
+    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name              TEXT NOT NULL,
+    aliases           TEXT[] DEFAULT '{}',
+    type              TEXT NOT NULL,
+    subcategory       TEXT,
+    short_description TEXT,
+    tags              TEXT[] DEFAULT '{}',
+    source            TEXT DEFAULT 'manual',
+    dataset_hint      TEXT,
+    metadata          JSONB DEFAULT '{}'::jsonb,
+    vector            vector(1536),
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE OR REPLACE FUNCTION update_game_entities_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_update_game_entities_timestamp
+BEFORE UPDATE ON game_entities
+FOR EACH ROW
+EXECUTE FUNCTION update_game_entities_timestamp();
+
+CREATE INDEX IF NOT EXISTS idx_game_entities_name
+    ON game_entities USING GIN (to_tsvector('simple', name));
+
+CREATE INDEX IF NOT EXISTS idx_game_entities_tags
+    ON game_entities USING GIN (tags);
+
+CREATE INDEX IF NOT EXISTS idx_game_entities_aliases
+    ON game_entities USING GIN (aliases);
+
+CREATE INDEX IF NOT EXISTS idx_game_entities_vector
+    ON game_entities USING ivfflat (vector vector_l2_ops)
+    WITH (lists = 100);
+
 ---
 
 ## Runtime wiring
@@ -213,6 +259,7 @@ All four tables now have matching HTTP clients under `api/` and model abstractio
 | `user_profiles` | `api/userProfilesApi.js` | `api/models/user-profiles.js` | `API_USER_PROFILES_ROUTES` |
 | `chat_messages` | `api/chatMessagesApi.js` | `api/models/chat-messages.js` | `API_CHAT_MESSAGES_ROUTES` |
 | `knowledge_docs` | `api/knowledgeDocsApi.js` | `api/models/knowledge-docs.js` | `API_KNOWLEDGE_DOCS_ROUTES` |
+| `game_entities` | `api/gameEntitiesApi.js` | `api/models/game-entities.js` | `API_GAME_ENTITIES_ROUTES` |
 
 Each API module exposes the common CRUD helpers (`list*`, `get*`, `create*`, `update*`, `patch*`, `delete*`) plus specialty helpers where needed (for example vector/embedding operations on `memories` and `knowledge_docs`, or pruning helpers for `chat_messages`).
 

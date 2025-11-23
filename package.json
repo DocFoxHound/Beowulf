@@ -25,6 +25,7 @@
     "express": "^5.1.0",
     "lodash": "^4.17.21",
     "openai": "^4.78.1",
+    "papaparse": "^5.4.1",
     "pg": "^8.11.5",
     "pm2": "^6.0.5",
     "string-progressbar": "^1.0.4"
@@ -35,7 +36,8 @@
     "ingest:chat": "node vector-handling/chat-ingest.js",
     "deploy:commands": "node scripts/deploy-slash-commands.js",
     "clear:commands": "node scripts/clear-slash-commands.js",
-    "preload:memories": "node scripts/preload-memories.js"
+    "preload:memories": "node scripts/preload-memories.js",
+    "sync:entities": "node scripts/sync-game-entities.js"
   },
   "devDependencies": {
     "dependency-cruiser": "^16.10.4",

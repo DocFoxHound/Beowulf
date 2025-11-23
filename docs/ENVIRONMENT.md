@@ -57,6 +57,8 @@ This document enumerates all environment variables referenced in the codebase an
 - `CHATGPT_ENTITY_INDEX_REFRESH_MS` – Rebuild cadence for the entity catalog (defaults to 30 minutes).
 - `CHATGPT_ENTITY_DOC_LIMIT` – Knowledge documents sampled into the entity catalog (controls doc-topic entity breadth).
 - `CHATGPT_ENTITY_REBUILD_DEBOUNCE_MS` – Delay (ms) before auto-rebuilding the catalog after a UEX cache refresh; prevents thrash when multiple datasets update.
+- `CHATGPT_ENTITY_DB_LIMIT` – Max game-entity rows fetched per rebuild.
+- `CHATGPT_ENTITY_INCLUDE_CACHE_FALLBACK` (default 'true') – When true, append legacy UEX catalog entries if the DB is empty.
 - `USER_OPINION_USE_LLM` (default 'true') – Generates opinion responses via LLM.
 - `KNOWLEDGE_INGEST_ENABLE` – Master flag controlling ingestion pipelines (chat/hits/stats).
 - `CHAT_VECTOR_INGEST_ON_START` – Batch ingest historical chat logs at startup.
@@ -73,7 +75,16 @@ This document enumerates all environment variables referenced in the codebase an
 - `UEX_FRESH_LOAD_ON_START` – If 'true', forces full UEX data refresh on boot.
 - (Various API route vars used in `api/*` and deprecated modules):
   - `SERVER_URL`, `API_SCI_API_ROUTES`, `API_CLASS`, etc. – Base URLs and route segments for backend/UEX bridging.
+- `API_GAME_ENTITIES_ROUTES` – REST path (default `/api/game-entities`) used by the entity catalog model/API wrapper.
 - `DEBUG_MARKET_FALLBACK` – Logs fallback errors in market answerer.
+
+## Game Entities Catalog
+- `GAME_ENTITIES_EXISTING_LIMIT` (default 20000) – Cap when preloading current rows before upserts.
+- `GAME_ENTITIES_COMMODITY_LIMIT`, `GAME_ENTITIES_ITEM_LIMIT`, `GAME_ENTITIES_SHIP_LIMIT`, `GAME_ENTITIES_LOCATION_LIMIT` – Optional limits for `npm run sync:entities` dataset sizes.
+- `ENTITY_UPLOAD_MAX_FILE_BYTES` (default 2 MB) – Slash command upload guard.
+- `ENTITY_UPLOAD_MAX_ROWS` (default 500) – Max CSV rows processed per upload.
+- `ENTITY_UPLOAD_ROLE_IDS` / `TEST_ENTITY_UPLOAD_ROLE_IDS` – Override which roles can use `/entity-upload` (falls back to doc-ingest roles if unset).
+- `API_GAME_ENTITIES_ROUTES` – REST route for catalog CRUD (see above).
 
 ## Scheduling & Intervals (implicit via code comments)
 Intervals are hardcoded; toggles exist via feature flags above. Documented in SCHEDULES-JOBS.md.

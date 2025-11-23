@@ -1,6 +1,7 @@
 const docIngest = require('./doc-ingest');
+const entityUpload = require('./entity-upload');
 
-const slashCommands = [docIngest].filter(Boolean);
+const slashCommands = [docIngest, entityUpload].filter(Boolean);
 
 function getSlashCommandData() {
   return slashCommands

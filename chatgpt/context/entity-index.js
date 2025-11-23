@@ -1,10 +1,13 @@
 const { getUexCacheRecords, addUexCacheListener } = require('../../common/uex-cache');
 const { KnowledgeDocsModel } = require('../../api/models/knowledge-docs');
+const { GameEntitiesModel } = require('../../api/models/game-entities');
 
 const ENTITY_REFRESH_MS = Number(process.env.CHATGPT_ENTITY_INDEX_REFRESH_MS || 30 * 60 * 1000);
 const ENTITY_DOC_LIMIT = Number(process.env.CHATGPT_ENTITY_DOC_LIMIT || 400);
 const ENTITY_TOP_K = Number(process.env.CHATGPT_ENTITY_TOP_K || 5);
 const ENTITY_REBUILD_DEBOUNCE_MS = Number(process.env.CHATGPT_ENTITY_REBUILD_DEBOUNCE_MS || 1000);
+const ENTITY_DB_LIMIT = Number(process.env.CHATGPT_ENTITY_DB_LIMIT || 2000);
+const INCLUDE_CACHE_FALLBACK = (process.env.CHATGPT_ENTITY_INCLUDE_CACHE_FALLBACK || 'true').toLowerCase() === 'true';
 
 const NAME_FIELDS = {
   commodities: ['commodity_name', 'name', 'label'],
@@ -229,6 +232,38 @@ function buildEntry({ id, name, type, subtype, dataset, source, tags, record, al
   };
 }
 
+function buildEntryFromGameEntity(row) {
+  if (!row || !row.name) return null;
+  const normalized = normalize(row.name);
+  if (!normalized) return null;
+  const aliasList = Array.isArray(row.aliases)
+    ? row.aliases.map(normalize).filter(Boolean)
+    : [];
+  const tags = Array.isArray(row.tags) ? row.tags.filter(Boolean) : [];
+  const details = row.metadata && typeof row.metadata === 'object' ? row.metadata : null;
+  const extraTokens = [];
+  if (row.type) extraTokens.push(...tokenize(row.type));
+  if (row.subcategory) extraTokens.push(...tokenize(row.subcategory));
+  return {
+    id: row.id || row.slug || row.name,
+    name: row.name,
+    type: row.type || 'entity',
+    subtype: row.subcategory || row.dataset_hint || null,
+    datasetHint: row.dataset_hint || null,
+    source: row.source || 'game_entities',
+    tags,
+    record: details,
+    summary: row.short_description || (details?.description) || null,
+    details,
+    normalized,
+    aliases: aliasList,
+    tokens: tokenize(row.name)
+      .concat(aliasList.flatMap(tokenize))
+      .concat(tags.flatMap(tokenize))
+      .concat(extraTokens),
+  };
+}
+
 function collectUexEntities() {
   const datasets = ['commodities', 'items', 'terminals', 'cities', 'planets', 'moons', 'outposts', 'space_stations', 'star_systems'];
   const entries = [];
@@ -275,6 +310,17 @@ function collectUexEntities() {
   return entries;
 }
 
+async function collectGameEntitiesFromDb(limit = ENTITY_DB_LIMIT) {
+  try {
+    const rows = await GameEntitiesModel.list({ limit, order: 'updated_at.desc' });
+    if (!Array.isArray(rows) || !rows.length) return [];
+    return rows.map(buildEntryFromGameEntity).filter(Boolean);
+  } catch (error) {
+    console.error('[EntityIndex] game_entities fetch failed:', error?.message || error);
+    return [];
+  }
+}
+
 async function collectDocEntities(limit = ENTITY_DOC_LIMIT) {
   try {
     const docs = await KnowledgeDocsModel.list({ limit, order: 'created_at.desc' });
@@ -301,11 +347,37 @@ async function collectDocEntities(limit = ENTITY_DOC_LIMIT) {
   }
 }
 
+function dedupeEntries(entries = []) {
+  const seen = new Set();
+  const result = [];
+  for (const entry of entries) {
+    if (!entry) continue;
+    const key = entry.id || entry.normalized || entry.name;
+    if (!key) continue;
+    const normalizedKey = String(key).toLowerCase();
+    if (seen.has(normalizedKey)) continue;
+    seen.add(normalizedKey);
+    result.push(entry);
+  }
+  return result;
+}
+
 async function rebuildEntityIndex() {
-  const baseEntries = collectUexEntities();
-  const docEntries = await collectDocEntities();
-  const merged = [...baseEntries, ...docEntries];
-  state.entries = merged;
+  const [dbEntries, docEntries] = await Promise.all([
+    collectGameEntitiesFromDb(),
+    collectDocEntities(),
+  ]);
+  const combined = [];
+  if (Array.isArray(dbEntries) && dbEntries.length) {
+    combined.push(...dbEntries);
+  }
+  if (!dbEntries.length || INCLUDE_CACHE_FALLBACK) {
+    combined.push(...collectUexEntities());
+  }
+  if (Array.isArray(docEntries) && docEntries.length) {
+    combined.push(...docEntries);
+  }
+  state.entries = dedupeEntries(combined);
   state.builtAt = Date.now();
 }
 

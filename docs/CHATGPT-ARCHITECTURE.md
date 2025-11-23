@@ -20,14 +20,15 @@ This architecture is structured for incremental development and GPT-powered code
 
 # **System Summary**
 
-The Beowulf assistant consists of **six core subsystems**:
+The Beowulf assistant consists of **seven core subsystems**:
 
 1. **Orchestrator** – central AI interaction router  
 2. **Intent Classifier** – identifies user intent  
-3. **Context Builder** – assembles all data needed for GPT  
-4. **Tools System** – external data functions (market, stats, org info)  
-5. **Persona Responder** – GPT response generator with tool-calling  
-6. **Memory Writer** – stores new long-term memories with embeddings  
+3. **Entity Resolver** – canonical lookup across all Star Citizen entities  
+4. **Context Builder** – assembles all data needed for GPT  
+5. **Tools System** – external data functions (market, stats, org info)  
+6. **Persona Responder** – GPT response generator with tool-calling  
+7. **Memory Writer** – stores new long-term memories with embeddings  
 
 These subsystems work together to create a smart, personality-rich assistant.
 
@@ -91,7 +92,7 @@ The live Node.js implementation in this repository mirrors the architecture by e
 
 - `chatgpt/orchestrator` – wires message events from `index.js` into the pipeline.
 - `chatgpt/intent` – lightweight classifier that tags banter, price queries, stats lookups, etc.
-- `chatgpt/context` – hydrates context exclusively from the global caches outlined in `GLOBAL-CACHES.md`.
+- `chatgpt/context` – hydrates context exclusively from the global caches outlined in `GLOBAL-CACHES.md` and now expects entity resolution metadata.
 - `chatgpt/tools` – helper accessors that read `globalThis.userListCache`, `chatMessagesCache`, `uexCache`, `playerStatsCache`, `leaderboardCache`, and `hitCache`.
 - `chatgpt/persona` – persona prompt + OpenAI response handler (currently targeting GPT-5.1 compatible models).
 - `chatgpt/memory` – optional writer that reuses the vector-ingest utilities when `KNOWLEDGE_INGEST_ENABLE=true`.
@@ -100,7 +101,7 @@ The Discord entrypoint (`index.js`) now routes any mention or reply to Beowulf t
 
 ### **Implementation Notes**
 
-- The intent classifier first runs fast keyword heuristics, then confirms the result with a lightweight GPT model (`CHATGPT_INTENT_MODEL`, default `gpt-4o-mini`) that returns a JSON intent payload.
+- The intent classifier first runs fast keyword heuristics, then confirms the result with a lightweight GPT model (`CHATGPT_INTENT_MODEL`, default `gpt-4o-mini`) that returns a JSON intent payload. The only decision it makes now is "is this Star Citizen/game data, banter, admin, etc."—dataset routing is deferred to the Entity Resolver stage.
 - Orchestrator stage timing logs (`[ChatGPT][Perf] ...`) surface how long intent, context, persona, and memory stages take, helping debug any >5s latency.
 - Cache readiness helpers automatically hydrate leaderboard, market (UEX), player stats, and hit caches on-demand so context building rarely blocks on cold data.
 
@@ -193,13 +194,39 @@ Long-form documentation for RAG-style knowledge (guides, rules, trading hints).
 
 ---
 
+## **2.5 `game_entities`**
+
+Canonical index of every Star Citizen noun we care about.
+
+| Field | Type |
+|-------|------|
+| id | UUID PK |
+| name | TEXT |
+| aliases | TEXT[] |
+| type | TEXT (`ship`, `component`, `weapon`, `location`, `manufacturer`, etc.) |
+| subcategory | TEXT (optional specialization like `quantum_drive`, `cooler`, `fighter`) |
+| short_description | TEXT |
+| tags | TEXT[] |
+| metadata | JSONB (arbitrary glue to map into downstream datasets) |
+| vector | vector(1536) |
+| created_at | TIMESTAMPTZ |
+| updated_at | TIMESTAMPTZ |
+
+Populate this table via the automated UEX sync (`npm run sync:entities`) plus manual uploads. The sync script pulls commodities, items, ships, terminals, and all major location datasets (cities, outposts, moons, planets, stations, star systems) from the UEX endpoints and upserts them into `game_entities`, so each successive run simply updates changed rows instead of creating duplicates.
+
+At runtime the orchestrator reads the table through `GameEntitiesModel` (backed by `api/gameEntitiesApi.js`). Set `SERVER_URL` and `API_GAME_ENTITIES_ROUTES` so the bot can reach your REST gateway. If the table is still empty, the catalog automatically falls back to the legacy UEX-derived nouns while you finish seeding (`CHATGPT_ENTITY_INCLUDE_CACHE_FALLBACK=true`). Manual curation is available via the `/entity-upload` slash command (CSV or JSON) described in `docs/GAME-ENTITIES.md` alongside curl examples.
+
+---
+
 # **3. Orchestration Pipeline**
 
 ```
 Discord Message
-      ↓
+  ↓
 Intent Classifier
-      ↓
+  ↓
+Entity Resolver (catalog lookup)
+  ↓
 Context Builder
       ↓
 Persona Responder (GPT)
@@ -209,6 +236,10 @@ Final Response Sent to Discord
       ↓
 Memory Writer
 ```
+
+---
+
+**Entity Resolver Step:** After the classifier labels the global intent, the orchestrator always queries the canonical `game_entities` index with the user's raw text. This hybrid vector + fuzzy lookup returns best-match ships, components, locations, or other nouns, along with routing metadata. If no result clears the confidence threshold, the pipeline falls back to broad knowledge retrieval and allows the persona responder to explain the ambiguity rather than forcing the user down the wrong dataset lane.
 
 ---
 
@@ -234,6 +265,8 @@ Determines what category a message falls into.
 }
 ```
 
+The classifier no longer tries to guess the exact dataset (ship list vs. component manual). Its only job is to quickly determine whether a message is about Star Citizen game data at all, plus whether tools should be enabled. The downstream Entity Resolver consumes the raw text (and any classifier-provided hints) to run `search_game_entities` and decide which caches or docs to hydrate. This division keeps short prompts such as "What is a Pontes?" from being misrouted before a canonical lookup happens.
+
 ---
 
 # **5. Context Builder**
@@ -249,10 +282,15 @@ Assembles everything GPT needs to respond correctly.
 
 ### **Entity Catalog Layer**
 
-- `chatgpt/context/entity-index.js` builds a lightweight catalog from UEX caches (commodities, items, terminals, locations) plus tagged knowledge-doc topics.
-- `searchGameEntities()` runs between intent classification and cache lookups, ensuring every prompt flows through **prompt → intent → entity detection → dataset retrieval**.
+- `chatgpt/context/entity-index.js` now hydrates straight from the `game_entities` table (via `GameEntitiesModel`) plus tagged knowledge-doc topics, giving us one canonical source of truth. If the table is empty—or you explicitly allow it—`CHATGPT_ENTITY_INCLUDE_CACHE_FALLBACK` keeps the older UEX-derived nouns in play so nothing regresses while you seed.
+- The new `search_game_entities` tool exposes that catalog to GPT. It accepts `{ query: string, top_k?: number }`, performs hybrid vector + fuzzy search, and returns scored matches like `{ name, type, subcategory, id, score }`.
+- Orchestrator always runs this lookup after intent classification, so every prompt flows through **prompt → intent → entity detection → dataset retrieval**.
 - Entity matches feed back into `context.builder` for two reasons: (1) they teach the persona whether a noun is a ship, component, or location before touching market datasets, and (2) they seed `marketTargets`/`locationTargets` when the user never mentioned "price" but clearly referenced a tradable object.
-- Keep `CHATGPT_ENTITY_TOP_K`, `CHATGPT_ENTITY_INDEX_REFRESH_MS`, and `CHATGPT_ENTITY_DOC_LIMIT` tuned so the catalog stays fresh without hammering the DB.
+- Keep `CHATGPT_ENTITY_TOP_K`, `CHATGPT_ENTITY_DB_LIMIT`, `CHATGPT_ENTITY_INDEX_REFRESH_MS`, and `CHATGPT_ENTITY_DOC_LIMIT` tuned so the catalog stays fresh without hammering the DB. When no entity clears the configured confidence, the builder defaults to RAG across all knowledge docs and explicitly tells the persona responder which gaps remain so it can answer honestly.
+
+See `docs/GAME-ENTITIES.md` for the schema, environment variables, and instructions on adding more nouns (manual entries, curl examples, and syncing from UEX caches).
+
+**RAG Blending:** Once entities are resolved, the builder performs a second vector search across `knowledge_docs`, historical chat, and any entity-linked references (loadout guides, market blurbs, component manuals). Each snippet is tagged with `source`, `entity_type`, and `confidence` so GPT can pick the best evidence. Ambiguous lookups intentionally return multiple labeled chunks, allowing the responder to say, for example, "No ship named Pontes exists, but there is a Pontes quantum drive." This keeps answers accurate even when players use incomplete terminology.
 
 ### **Output Interface:**
 ```ts
@@ -260,7 +298,7 @@ interface BuiltContext {
   recentChat: ChatMessage[];
   longTermMemories: Memory[];
   knowledgeSnippets: KnowledgeDoc[];
-  externalData: any;
+  externalData: any; // includes entity resolution metadata, per-entity datasets, and fallback RAG hits
 }
 ```
 
@@ -271,10 +309,13 @@ interface BuiltContext {
 GPT calls tools for any external data that must be accurate.
 
 ### **Tools Provided**
+- `search_game_entities(query, top_k?)`
 - `get_item_price(item, region?)`
 - `get_user_stats(userId)`
 - `get_market_trends(item)`
 - `get_org_rank(userId)`
+
+`search_game_entities` is callable by both the orchestrator (pre-fetch) and GPT (self-serve). It always runs before any market/user tool to guarantee we know what noun the user referenced. The function returns up to `top_k` scored matches with type/subcategory metadata so orchestrator code can fetch the appropriate dataset (components, ships, docs) and pass a tight context bundle into the persona responder.
 
 ---
 
@@ -329,6 +370,10 @@ Used for market sync, user stats, API scraping, and cached data.
           │ Intent Classifier   │
           └───────┬────────────┘
                   │
+            ┌───────▼────────────┐
+            │ Entity Resolver     │
+            └───────┬────────────┘
+              │
           ┌───────▼────────────┐
           │  Context Builder    │
           └───────┬────────────┘

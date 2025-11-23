@@ -1,6 +1,7 @@
 const path = require('node:path');
 const axios = require('axios');
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const Papa = require('papaparse');
 const { KnowledgeDocsModel } = require('../api/models/knowledge-docs');
 const { getEmbedding } = require('../common/embeddings');
 
@@ -9,6 +10,8 @@ const MIN_CHUNK_SIZE = Number(process.env.DOC_INGEST_CHUNK_MIN || 600);
 const MAX_CHUNK_SIZE = Number(process.env.DOC_INGEST_CHUNK_MAX || 4000);
 const CHUNK_OVERLAP = Number(process.env.DOC_INGEST_CHUNK_OVERLAP || 200);
 const MAX_CHUNKS = Number(process.env.DOC_INGEST_MAX_CHUNKS || 25);
+const MAX_CSV_ROWS = Number(process.env.DOC_INGEST_MAX_CSV_ROWS || 250);
+const MAX_JSON_CHUNKS = Number(process.env.DOC_INGEST_MAX_JSON_CHUNKS || 200);
 const MAX_FILE_BYTES = Number(process.env.DOC_INGEST_MAX_FILE_BYTES || 4_000_000);
 const SUPPORTED_MIME = new Set(['text/plain', 'text/markdown', 'text/csv', 'application/json']);
 const SUPPORTED_EXTS = new Set(['.txt', '.md', '.markdown', '.csv', '.json']);
@@ -155,6 +158,119 @@ function chunkText(text, chunkSize, { preferRowBoundaries = false } = {}) {
   return chunkByChars(text, chunkSize);
 }
 
+function isJsonAttachment(attachment) {
+  const contentType = attachment?.contentType?.toLowerCase() || '';
+  const ext = attachment?.name ? path.extname(attachment.name).toLowerCase() : '';
+  return contentType.includes('json') || ext === '.json';
+}
+
+function parseCsvRows(text) {
+  try {
+    const parsed = Papa.parse(text, {
+      header: true,
+      skipEmptyLines: 'greedy',
+      dynamicTyping: false,
+    });
+    const headers = Array.isArray(parsed.meta?.fields)
+      ? parsed.meta.fields.map((field) => String(field || '').trim()).filter(Boolean)
+      : [];
+    if (!headers.length) return null;
+    const rows = Array.isArray(parsed.data)
+      ? parsed.data.filter((row) => {
+          if (!row || typeof row !== 'object') return false;
+          return headers.some((header) => String(row[header] ?? '').trim().length);
+        })
+      : [];
+    if (!rows.length) return null;
+    return { headers, rows };
+  } catch (err) {
+    console.error('[DocIngest] CSV parse failed:', err?.message || err);
+    return null;
+  }
+}
+
+function formatCsvRowText(headers, row) {
+  const lines = [];
+  for (const header of headers) {
+    const rawValue = row[header];
+    const value = rawValue === undefined || rawValue === null ? '' : String(rawValue).trim();
+    if (!value) continue;
+    lines.push(`${header}: ${value}`);
+  }
+  return lines.join('\n').trim();
+}
+
+function pickRowLabel(headers, row) {
+  for (const header of headers) {
+    const value = row[header];
+    if (value === undefined || value === null) continue;
+    const trimmed = String(value).trim();
+    if (trimmed) return trimmed;
+  }
+  return null;
+}
+
+function buildCsvRowChunks(text) {
+  const parsed = parseCsvRows(text);
+  if (!parsed) return null;
+  const { headers, rows } = parsed;
+  const csvChunks = [];
+  for (let idx = 0; idx < rows.length && csvChunks.length < MAX_CSV_ROWS; idx++) {
+    const textBlock = formatCsvRowText(headers, rows[idx]);
+    if (!textBlock) continue;
+    csvChunks.push({
+      text: textBlock,
+      rowNumber: idx + 1,
+      label: pickRowLabel(headers, rows[idx]),
+      headers,
+    });
+  }
+  return csvChunks.length ? csvChunks : null;
+}
+
+function pickJsonLabel(value, fallback) {
+  if (value && typeof value === 'object') {
+    if (value.name) return String(value.name);
+    if (value.id) return String(value.id);
+    if (value.slug) return String(value.slug);
+  }
+  return fallback;
+}
+
+function buildJsonChunks(text) {
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch (err) {
+    console.error('[DocIngest] JSON parse failed:', err?.message || err);
+    return null;
+  }
+  const chunks = [];
+  const pushChunk = (label, value) => {
+    if (chunks.length >= MAX_JSON_CHUNKS) return;
+    const pretty = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+    const textBlock = label ? `"${label}": ${pretty}` : pretty;
+    chunks.push({ text: textBlock, label });
+  };
+
+  if (Array.isArray(data)) {
+    data.forEach((value, idx) => {
+      if (chunks.length >= MAX_JSON_CHUNKS) return;
+      const label = pickJsonLabel(value, `Entry ${idx + 1}`);
+      pushChunk(label, value);
+    });
+  } else if (data && typeof data === 'object') {
+    for (const [key, value] of Object.entries(data)) {
+      if (chunks.length >= MAX_JSON_CHUNKS) break;
+      pushChunk(key, value);
+    }
+  } else {
+    pushChunk('Document', data);
+  }
+
+  return chunks.length ? chunks : null;
+}
+
 function buildChunksWithAutoScaling({ text, initialSize, preferRowBoundaries }) {
   let currentSize = normalizeChunkSize(initialSize || DEFAULT_CHUNK_SIZE);
   let chunks = chunkText(text, currentSize, { preferRowBoundaries });
@@ -295,18 +411,52 @@ async function execute(interaction, context = {}) {
 
   const requestedChunkSize = normalizeChunkSize(interaction.options.getInteger('chunk_size'));
   const preferRowBoundaries = isCsvAttachment(attachment);
-  const { chunks, chunkSize } = buildChunksWithAutoScaling({
-    text: textContent,
-    initialSize: requestedChunkSize,
-    preferRowBoundaries,
-  });
-  if (!chunks.length) {
+  const preferJsonChunks = !preferRowBoundaries && isJsonAttachment(attachment);
+  let chunkSize = null;
+  let chunkEntries = null;
+  let usingCsvRows = false;
+  let usingJsonChunks = false;
+  if (preferRowBoundaries) {
+    const csvChunks = buildCsvRowChunks(textContent);
+    if (csvChunks && csvChunks.length) {
+      chunkEntries = csvChunks;
+      usingCsvRows = true;
+    }
+  }
+  if (!chunkEntries && preferJsonChunks) {
+    const jsonChunks = buildJsonChunks(textContent);
+    if (jsonChunks && jsonChunks.length) {
+      chunkEntries = jsonChunks;
+      usingJsonChunks = true;
+    }
+  }
+  if (!chunkEntries) {
+    const built = buildChunksWithAutoScaling({
+      text: textContent,
+      initialSize: requestedChunkSize,
+      preferRowBoundaries,
+    });
+    chunkEntries = built.chunks.map((block) => ({ text: block }));
+    chunkSize = built.chunkSize;
+  }
+
+  if (!chunkEntries.length) {
     await interaction.editReply('No content chunks were generated. Provide a longer text file.');
     return;
   }
 
-  if (chunks.length > MAX_CHUNKS) {
-    await interaction.editReply(`Too many chunks (${chunks.length}). Reduce the file length or increase chunk size (currently ${chunkSize}).`);
+  if (usingCsvRows) {
+    if (chunkEntries.length > MAX_CSV_ROWS) {
+      await interaction.editReply(`Too many CSV rows (${chunkEntries.length}). Reduce the file length or split the sheet so each upload stays under ${MAX_CSV_ROWS} rows.`);
+      return;
+    }
+  } else if (usingJsonChunks) {
+    if (chunkEntries.length > MAX_JSON_CHUNKS) {
+      await interaction.editReply(`Too many JSON blocks (${chunkEntries.length}). Split the JSON file so each upload stays under ${MAX_JSON_CHUNKS} top-level entries.`);
+      return;
+    }
+  } else if (chunkEntries.length > MAX_CHUNKS) {
+    await interaction.editReply(`Too many chunks (${chunkEntries.length}). Reduce the file length or increase chunk size (currently ${chunkSize}).`);
     return;
   }
 
@@ -316,9 +466,19 @@ async function execute(interaction, context = {}) {
   const tags = buildTags({ baseTags, classification, interaction });
 
   const ingestResults = [];
-  for (let i = 0; i < chunks.length; i++) {
-    const chunk = chunks[i];
-    const chunkTitle = chunks.length > 1 ? `${baseTitle} (part ${i + 1}/${chunks.length})` : baseTitle;
+  for (let i = 0; i < chunkEntries.length; i++) {
+    const entry = chunkEntries[i];
+    const chunkTitle = (() => {
+      if (usingCsvRows && entry) {
+        if (entry.label) return `${baseTitle} – ${entry.label}`;
+        if (entry.rowNumber !== undefined) return `${baseTitle} (row ${entry.rowNumber})`;
+      }
+      if (usingJsonChunks && entry) {
+        if (entry.label) return `${baseTitle} – ${entry.label}`;
+      }
+      return chunkEntries.length > 1 ? `${baseTitle} (part ${i + 1}/${chunkEntries.length})` : baseTitle;
+    })();
+    const chunk = String(entry?.text || '');
     const payload = {
       title: chunkTitle.slice(0, KnowledgeDocsModel.limits.title),
       text: chunk.slice(0, KnowledgeDocsModel.limits.text),
