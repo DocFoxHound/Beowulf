@@ -3,8 +3,16 @@ const entityUpload = require('./entity-upload');
 const playerItemUpload = require('./player-item-upload');
 const componentItemUpload = require('./component-item-upload');
 const shipListUpload = require('./ship-list-upload');
+const rcoMiningUpload = require('./rco-mining-upload');
 
-const slashCommands = [knowledgeDocIngest, entityUpload, playerItemUpload, componentItemUpload, shipListUpload].filter(Boolean);
+const slashCommands = [
+  knowledgeDocIngest,
+  entityUpload,
+  playerItemUpload,
+  componentItemUpload,
+  shipListUpload,
+  rcoMiningUpload,
+].filter(Boolean);
 
 function getSlashCommandData() {
   return slashCommands

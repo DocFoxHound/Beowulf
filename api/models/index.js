@@ -31,6 +31,7 @@ const { GameEntitiesModel } = require('./game-entities');
 const { ItemsFpsModel } = require('./items-fps');
 const { ItemsComponentsModel } = require('./items-components');
 const { ShipListModel } = require('./ship-list');
+const { RcoMiningDataModel } = require('./rco-mining-data');
 
 module.exports = {
   KnowledgeModel,
@@ -64,4 +65,5 @@ module.exports = {
   ItemsFpsModel,
   ItemsComponentsModel,
   ShipListModel,
+  RcoMiningDataModel,
 };

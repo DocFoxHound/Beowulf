@@ -79,12 +79,14 @@ This document enumerates all environment variables referenced in the codebase an
 - `API_ITEMS_FPS_ROUTES` – REST path (default `/api/items-fps`) for the FPS items catalog CRUD endpoints.
 - `API_ITEMS_COMPONENTS_ROUTES` – REST path (default `/api/items-components`) for the ship component catalog CRUD endpoints.
 - `API_LIST_SHIPS_ROUTES` – REST path (default `/api/list-ships`) for the curated ship list CRUD endpoints.
+- `API_RCO_MINING_DATA_ROUTES` – REST path (default `/api/rco-mining-data`) powering the RCO mining data API/model wrapper.
 - `DEBUG_MARKET_FALLBACK` – Logs fallback errors in market answerer.
 
 ## Game Entities Catalog
 - `GAME_ENTITIES_EXISTING_LIMIT` (default 20000) – Cap when preloading current rows before upserts.
 - `GAME_ENTITIES_COMMODITY_LIMIT`, `GAME_ENTITIES_ITEM_LIMIT`, `GAME_ENTITIES_SHIP_LIMIT`, `GAME_ENTITIES_LOCATION_LIMIT` – Optional limits for `npm run sync:entities` dataset sizes.
 - `GAME_ENTITIES_FPS_LIMIT`, `GAME_ENTITIES_COMPONENT_LIMIT`, `GAME_ENTITIES_SHIP_LIST_LIMIT` – Caps for how many `items_fps`, `items_components`, and `ship_list` rows the sync ingests per run.
+- `GAME_ENTITIES_RCO_MINING_LIMIT` – Cap for how many `rco_mining_data` rows the entity sync inspects per run.
 - `ENTITY_UPLOAD_MAX_FILE_BYTES` (default 2 MB) – Slash command upload guard.
 - `ENTITY_UPLOAD_MAX_ROWS` (default 500) – Max CSV rows processed per upload.
 - `ENTITY_UPLOAD_ROLE_IDS` / `TEST_ENTITY_UPLOAD_ROLE_IDS` – Override which roles can use `/entity-upload` (falls back to knowledge-doc-ingest roles if unset).
@@ -107,6 +109,11 @@ This document enumerates all environment variables referenced in the codebase an
 - `SHIP_LIST_UPLOAD_MAX_FILE_BYTES` (default 2 MB) – File guard for the curated ship uploader.
 - `SHIP_LIST_UPLOAD_MAX_ROWS` (default 1000) – Row limit per upload batch.
 - `SHIP_LIST_UPLOAD_EXISTING_LIMIT` (default 20000) – Existing curated ship rows to load for name-based dedupe before each upload.
+
+## RCO Mining Data Uploads
+- `RCO_MINING_UPLOAD_ROLE_IDS` / `TEST_RCO_MINING_UPLOAD_ROLE_IDS` – Roles that can run `/rco-mining-upload` (falls back to other ingest roles when unset).
+- `RCO_MINING_UPLOAD_MAX_FILE_BYTES` (default 2 MB) – File guard for JSON attachments processed by the mining uploader.
+- `RCO_MINING_UPLOAD_MAX_ROWS` (default 1000) – Row limit per upload batch for mining JSON payloads.
 
 ## Scheduling & Intervals (implicit via code comments)
 Intervals are hardcoded; toggles exist via feature flags above. Documented in SCHEDULES-JOBS.md.

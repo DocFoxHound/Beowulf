@@ -6,7 +6,8 @@ const { upsertGameEntities } = require('../common/game-entities-sync');
 const { ItemsFpsModel } = require('../api/models/items-fps');
 const { ItemsComponentsModel } = require('../api/models/items-components');
 const { ShipListModel } = require('../api/models/ship-list');
-const { fpsItemToEntity, componentItemToEntity, shipItemToEntity } = require('../common/entities/items-to-entities');
+const { RcoMiningDataModel } = require('../api/models/rco-mining-data');
+const { fpsItemToEntity, componentItemToEntity, shipItemToEntity, miningDataRowToEntities } = require('../common/entities/items-to-entities');
 
 const LIMITERS = {
   commodities: Number(process.env.GAME_ENTITIES_COMMODITY_LIMIT || 5000),
@@ -16,6 +17,7 @@ const LIMITERS = {
   fpsItems: Number(process.env.GAME_ENTITIES_FPS_LIMIT || 5000),
   componentItems: Number(process.env.GAME_ENTITIES_COMPONENT_LIMIT || 5000),
   shipList: Number(process.env.GAME_ENTITIES_SHIP_LIST_LIMIT || 2000),
+  rcoMining: Number(process.env.GAME_ENTITIES_RCO_MINING_LIMIT || 5000),
 };
 
 function takeLimit(list, limit) {
@@ -214,10 +216,11 @@ function registerItemEntity(builderResult, target, dedupeSet) {
 async function gatherUploadedItemEntities() {
   const entities = [];
   const dedupe = new Set();
-  const [fpsRowsRaw, componentRowsRaw, shipListRaw] = await Promise.all([
+  const [fpsRowsRaw, componentRowsRaw, shipListRaw, miningRowsRaw] = await Promise.all([
     ItemsFpsModel.list({ limit: LIMITERS.fpsItems, order: 'updated_at.desc' }),
     ItemsComponentsModel.list({ limit: LIMITERS.componentItems, order: 'updated_at.desc' }),
     ShipListModel.list({ limit: LIMITERS.shipList, order: 'updated_at.desc' }),
+    RcoMiningDataModel.list({ limit: LIMITERS.rcoMining, order: 'updated_at.desc' }),
   ]);
 
   const fpsRows = takeLimit(fpsRowsRaw || [], LIMITERS.fpsItems);
@@ -233,6 +236,14 @@ async function gatherUploadedItemEntities() {
   const shipRows = takeLimit(shipListRaw || [], LIMITERS.shipList);
   for (const row of shipRows) {
     registerItemEntity(shipItemToEntity(row, { source: 'ship-list-table' }), entities, dedupe);
+  }
+
+  const miningRows = takeLimit(miningRowsRaw || [], LIMITERS.rcoMining);
+  for (const row of miningRows) {
+    const miningEntities = miningDataRowToEntities(row, { source: 'rco-mining-table' });
+    for (const entity of miningEntities) {
+      registerItemEntity(entity, entities, dedupe);
+    }
   }
 
   return entities;

@@ -46,6 +46,8 @@ Uploaded chunks are now searchable in every ChatGPT response pass: the assistant
 
 `/ship-list-upload` ingests curated ship specs into the `ship_list` table, capturing manufacturer/role/size metadata plus arbitrary stat columns while auto-generating IDs as needed. Just like the other uploaders, every row also mirrors into `game_entities`, so Beowulf immediately recognizes the new hull names. Lock it down with `SHIP_LIST_UPLOAD_ROLE_IDS` / `TEST_SHIP_LIST_UPLOAD_ROLE_IDS`, and adjust caps using `SHIP_LIST_UPLOAD_MAX_FILE_BYTES` + `SHIP_LIST_UPLOAD_MAX_ROWS`.
 
+`/rco-mining-upload` accepts JSON attachments (or inline JSON blocks) and pipes them directly into the `rco_mining_data` table. Each object can omit most columns — only `source_file` and `stat_grain` are mandatory for new rows — and updates are as simple as including an `id` plus the fields to patch. The uploader automatically recognizes the four schema variations produced by the RCO mining exporter (rock-type-by-location, ore-by-location, hand-mining finds, and rock-type-by-system) and flattens them into the canonical columns. When you provide raw row JSON instead, the optional `stat_grain` argument sets the default grain name so you don't have to repeat it per row. The uploader enforces JSON-specific file caps, surfaces row-level validation errors, and batches the individual create/update calls against the new `API_RCO_MINING_DATA_ROUTES` REST endpoint. Gate access with `RCO_MINING_UPLOAD_ROLE_IDS` / `TEST_RCO_MINING_UPLOAD_ROLE_IDS`, and tweak payload limits via `RCO_MINING_UPLOAD_MAX_FILE_BYTES` + `RCO_MINING_UPLOAD_MAX_ROWS`.
+
 ### Architecture snapshot
 ```mermaid
 graph TD

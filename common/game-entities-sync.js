@@ -7,11 +7,23 @@ function normalizeNameOnly(name) {
   return n || null;
 }
 
-function normalizeKey(name, type) {
-  const n = normalizeNameOnly(name);
-  const t = (type || '').trim().toLowerCase();
-  if (!n) return null;
-  return `${n}::${t || 'unknown'}`;
+function normalizeDatasetHint(value) {
+  const v = (value || '').trim().toLowerCase();
+  return v || null;
+}
+
+function normalizeDatasetKey(name, datasetHint, type) {
+  const baseName = normalizeNameOnly(name);
+  if (!baseName) return null;
+  const scope = normalizeDatasetHint(datasetHint) || (type || '').trim().toLowerCase() || 'unknown';
+  return `${baseName}::${scope}`;
+}
+
+function normalizeKey(name, type, datasetHint) {
+  const baseName = normalizeNameOnly(name);
+  if (!baseName) return null;
+  const scope = normalizeDatasetHint(datasetHint) || (type || '').trim().toLowerCase() || 'unknown';
+  return `${baseName}::${scope}`;
 }
 
 async function loadExistingEntities() {
@@ -19,13 +31,13 @@ async function loadExistingEntities() {
   const map = new Map();
   const nameMap = new Map();
   for (const row of existing) {
-    const key = normalizeKey(row?.name, row?.type);
-    const nameOnly = normalizeNameOnly(row?.name);
+    const key = normalizeKey(row?.name, row?.type, row?.dataset_hint);
+    const nameScope = normalizeDatasetKey(row?.name, row?.dataset_hint, row?.type);
     if (key && !map.has(key)) {
       map.set(key, row);
     }
-    if (nameOnly && !nameMap.has(nameOnly)) {
-      nameMap.set(nameOnly, row);
+    if (nameScope && !nameMap.has(nameScope)) {
+      nameMap.set(nameScope, row);
     }
   }
   return { existing, map, nameMap };
@@ -51,7 +63,9 @@ function sanitizeEntityInput(entity = {}, { defaultSource = 'manual-upload' } = 
       : typeof entity.tags === 'string'
         ? entity.tags.split(/[|,\n]/).map((tag) => tag.trim()).filter(Boolean)
         : undefined,
-    dataset_hint: entity.dataset_hint || entity.dataset || entity.datasetHint || null,
+    dataset_hint: typeof (entity.dataset_hint ?? entity.dataset ?? entity.datasetHint) === 'string'
+      ? (entity.dataset_hint ?? entity.dataset ?? entity.datasetHint).trim()
+      : entity.dataset_hint ?? entity.dataset ?? entity.datasetHint ?? null,
     source: entity.source || defaultSource,
     metadata: entity.metadata && typeof entity.metadata === 'object'
       ? entity.metadata
@@ -102,13 +116,13 @@ async function upsertGameEntities(entities = [], { defaultSource = 'manual-uploa
       skipped += 1;
       continue;
     }
-    const key = normalizeKey(payload.name, payload.type);
-    const nameOnly = normalizeNameOnly(payload.name);
-    if (!key || !nameOnly) {
+    const key = normalizeKey(payload.name, payload.type, payload.dataset_hint);
+    const datasetKey = normalizeDatasetKey(payload.name, payload.dataset_hint, payload.type);
+    if (!key) {
       skipped += 1;
       continue;
     }
-    const existing = map.get(key) || nameMap.get(nameOnly) || null;
+    const existing = map.get(key) || nameMap.get(datasetKey) || null;
     if (existing && existing.id) {
       if (!dryRun) {
         try {
@@ -121,7 +135,9 @@ async function upsertGameEntities(entities = [], { defaultSource = 'manual-uploa
       }
       updated += 1;
       map.set(key, { ...existing, ...payload, id: existing.id });
-      nameMap.set(nameOnly, { ...existing, ...payload, id: existing.id });
+      if (datasetKey) {
+        nameMap.set(datasetKey, { ...existing, ...payload, id: existing.id });
+      }
     } else {
       if (!dryRun) {
         try {
@@ -129,8 +145,8 @@ async function upsertGameEntities(entities = [], { defaultSource = 'manual-uploa
           if (result?.data?.id && !map.has(key)) {
             map.set(key, result.data);
           }
-          if (result?.data?.id) {
-            nameMap.set(nameOnly, result.data);
+          if (result?.data?.id && datasetKey) {
+            nameMap.set(datasetKey, result.data);
           }
         } catch (error) {
           console.error('[GameEntitiesSync] create failed:', payload.name, error?.message || error);

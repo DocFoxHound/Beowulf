@@ -69,6 +69,72 @@ function pickString(item = {}, keys = []) {
   return undefined;
 }
 
+const MINING_METADATA_FIELDS = [
+  'stat_grain',
+  'system_name',
+  'location_code',
+  'rock_type',
+  'ore_name',
+  'scans',
+  'clusters',
+  'finds',
+  'cluster_min',
+  'cluster_max',
+  'cluster_med',
+  'mass_min',
+  'mass_max',
+  'mass_med',
+  'inst_min',
+  'inst_max',
+  'inst_med',
+  'res_min',
+  'res_max',
+  'res_med',
+  'rocks_min',
+  'rocks_max',
+  'rocks_med',
+  'ore_prob',
+  'ore_pct_min',
+  'ore_pct_max',
+  'ore_pct_med',
+];
+
+function buildMiningEntity(name, type, row = {}, opts = {}) {
+  const resolvedName = ensureString(name);
+  if (!resolvedName) return null;
+  const metadata = gatherMetadataFields(row, MINING_METADATA_FIELDS);
+  const tags = [];
+  const grain = ensureString(row.stat_grain);
+  if (grain) tags.push(`grain:${grain}`);
+  const system = ensureString(row.system_name);
+  if (system) tags.push(`system:${system}`);
+  const location = ensureString(row.location_code);
+  if (location) tags.push(`location:${location}`);
+  const payload = sanitizeEntityInput(
+    {
+      name: resolvedName,
+      type,
+      dataset_hint: opts.datasetHint || 'rco_mining_data',
+      subcategory: grain || type,
+      tags,
+      metadata,
+    },
+    { defaultSource: opts.source || 'rco-mining-upload' }
+  );
+  if (!payload) return null;
+    const key = normalizeKey(payload.name, payload.type, payload.dataset_hint);
+  return key ? { payload, key } : null;
+}
+
+function miningDataRowToEntities(row = {}, opts = {}) {
+  const results = [];
+  const oreEntity = buildMiningEntity(row?.ore_name, 'mining_ore', row, opts);
+  if (oreEntity) results.push(oreEntity);
+  const rockEntity = buildMiningEntity(row?.rock_type, 'mining_rock', row, opts);
+  if (rockEntity) results.push(rockEntity);
+  return results;
+}
+
 function buildBaseItemEntity(
   item = {},
   {
@@ -107,7 +173,7 @@ function buildBaseItemEntity(
     { defaultSource: source }
   );
   if (!payload) return null;
-  const key = normalizeKey(payload.name, payload.type);
+    const key = normalizeKey(payload.name, payload.type, payload.dataset_hint);
   return key ? { payload, key } : null;
 }
 
@@ -158,4 +224,5 @@ module.exports = {
   componentItemToEntity,
   shipItemToEntity,
   buildBaseItemEntity,
+  miningDataRowToEntities,
 };
