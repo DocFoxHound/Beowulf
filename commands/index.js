@@ -1,7 +1,10 @@
-const docIngest = require('./doc-ingest');
+const knowledgeDocIngest = require('./knowledge-doc-ingest');
 const entityUpload = require('./entity-upload');
+const playerItemUpload = require('./player-item-upload');
+const componentItemUpload = require('./component-item-upload');
+const shipListUpload = require('./ship-list-upload');
 
-const slashCommands = [docIngest, entityUpload].filter(Boolean);
+const slashCommands = [knowledgeDocIngest, entityUpload, playerItemUpload, componentItemUpload, shipListUpload].filter(Boolean);
 
 function getSlashCommandData() {
   return slashCommands

@@ -28,6 +28,9 @@ const { MemoriesModel } = require('./memories');
 const { UserProfilesModel } = require('./user-profiles');
 const { ChatMessagesModel } = require('./chat-messages');
 const { GameEntitiesModel } = require('./game-entities');
+const { ItemsFpsModel } = require('./items-fps');
+const { ItemsComponentsModel } = require('./items-components');
+const { ShipListModel } = require('./ship-list');
 
 module.exports = {
   KnowledgeModel,
@@ -58,4 +61,7 @@ module.exports = {
   UserProfilesModel,
   ChatMessagesModel,
   GameEntitiesModel,
+  ItemsFpsModel,
+  ItemsComponentsModel,
+  ShipListModel,
 };

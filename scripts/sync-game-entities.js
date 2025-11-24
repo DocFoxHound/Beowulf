@@ -3,12 +3,19 @@ require('dotenv').config();
 
 const UEX = require('../api/uexApi');
 const { upsertGameEntities } = require('../common/game-entities-sync');
+const { ItemsFpsModel } = require('../api/models/items-fps');
+const { ItemsComponentsModel } = require('../api/models/items-components');
+const { ShipListModel } = require('../api/models/ship-list');
+const { fpsItemToEntity, componentItemToEntity, shipItemToEntity } = require('../common/entities/items-to-entities');
 
 const LIMITERS = {
   commodities: Number(process.env.GAME_ENTITIES_COMMODITY_LIMIT || 5000),
   items: Number(process.env.GAME_ENTITIES_ITEM_LIMIT || 5000),
   ships: Number(process.env.GAME_ENTITIES_SHIP_LIMIT || 2000),
   locations: Number(process.env.GAME_ENTITIES_LOCATION_LIMIT || 5000),
+  fpsItems: Number(process.env.GAME_ENTITIES_FPS_LIMIT || 5000),
+  componentItems: Number(process.env.GAME_ENTITIES_COMPONENT_LIMIT || 5000),
+  shipList: Number(process.env.GAME_ENTITIES_SHIP_LIST_LIMIT || 2000),
 };
 
 function takeLimit(list, limit) {
@@ -197,7 +204,41 @@ function buildTerminalEntity(record) {
   };
 }
 
-async function gatherEntities() {
+function registerItemEntity(builderResult, target, dedupeSet) {
+  if (!builderResult || !builderResult.payload || !builderResult.key) return;
+  if (dedupeSet.has(builderResult.key)) return;
+  dedupeSet.add(builderResult.key);
+  target.push(builderResult.payload);
+}
+
+async function gatherUploadedItemEntities() {
+  const entities = [];
+  const dedupe = new Set();
+  const [fpsRowsRaw, componentRowsRaw, shipListRaw] = await Promise.all([
+    ItemsFpsModel.list({ limit: LIMITERS.fpsItems, order: 'updated_at.desc' }),
+    ItemsComponentsModel.list({ limit: LIMITERS.componentItems, order: 'updated_at.desc' }),
+    ShipListModel.list({ limit: LIMITERS.shipList, order: 'updated_at.desc' }),
+  ]);
+
+  const fpsRows = takeLimit(fpsRowsRaw || [], LIMITERS.fpsItems);
+  for (const row of fpsRows) {
+    registerItemEntity(fpsItemToEntity(row, { source: 'items-fps-table' }), entities, dedupe);
+  }
+
+  const componentRows = takeLimit(componentRowsRaw || [], LIMITERS.componentItems);
+  for (const row of componentRows) {
+    registerItemEntity(componentItemToEntity(row, { source: 'items-components-table' }), entities, dedupe);
+  }
+
+  const shipRows = takeLimit(shipListRaw || [], LIMITERS.shipList);
+  for (const row of shipRows) {
+    registerItemEntity(shipItemToEntity(row, { source: 'ship-list-table' }), entities, dedupe);
+  }
+
+  return entities;
+}
+
+async function gatherUexEntities() {
   const entities = [];
   const [commodities, items, ships, terminals, cities, planets, moons, outposts, stations, starSystems] = await Promise.all([
     UEX.getAllCommodities(),
@@ -247,8 +288,12 @@ async function gatherEntities() {
 
 async function main() {
   console.log('[GameEntitiesSync] Fetching UEX datasets...');
-  const entities = await gatherEntities();
-  console.log(`[GameEntitiesSync] Prepared ${entities.length} entities. Upserting...`);
+  const [uexEntities, uploadedEntities] = await Promise.all([
+    gatherUexEntities(),
+    gatherUploadedItemEntities(),
+  ]);
+  const entities = uexEntities.concat(uploadedEntities);
+  console.log(`[GameEntitiesSync] Prepared ${entities.length} entities (UEX: ${uexEntities.length}, curated: ${uploadedEntities.length}). Upserting...`);
   const summary = await upsertGameEntities(entities, { defaultSource: 'uex-sync' });
   console.log('[GameEntitiesSync] Done:', summary);
 }

@@ -22,7 +22,7 @@ The `game_entities` table is the canonical noun index that powers `search_game_e
 ## Runtime data sources
 
 1. **Primary:** Beowulf now loads the catalog via `GameEntitiesModel.list()` on every rebuild. All entries in the table are cached in-memory for fast scoring.
-2. **Automated sync:** Run `npm run sync:entities` (see `scripts/sync-game-entities.js`) to pull commodities, items, ships, terminals, cities, outposts, moons, planets, stations, and star systems from the UEX APIs. The sync uses name+type keys to upsert, so repeated runs simply refresh metadata.
+2. **Automated sync:** Run `npm run sync:entities` (see `scripts/sync-game-entities.js`) to pull commodities, items, ships, terminals, cities, outposts, moons, planets, stations, and star systems from the UEX APIs **plus** the curated `items_fps`, `items_components`, and `ship_list` tables. The sync uses name+type keys to upsert, so repeated runs simply refresh metadata.
 3. **Fallback:** If the table is empty (or you set `CHATGPT_ENTITY_INCLUDE_CACHE_FALLBACK=true`), the old UEX-derived catalog is appended so you never lose coverage while seeding the table.
 4. **Docs:** Knowledge document titles/tags are still ingested as lightweight entities so GPT can match broader topics.
 
@@ -76,7 +76,9 @@ curl -X POST "$SERVER_URL/api/game-entities" \
 
 ### 4. Upload via Discord
 
-Use the `/entity-upload` slash command (same roles/permissions as `/doc-ingest`) with a CSV or JSON attachment. Required columns/fields are `name` and `type`. Optional fields include `subcategory`, `short_description`, `aliases`, `tags`, `dataset_hint`, `source`, and `metadata` (either JSON or additional columns). The command reports how many rows were created vs. updated, and it relies on the same name+type dedupe rules as the sync script.
+Use the `/entity-upload` slash command (same roles/permissions as `/knowledge-doc-ingest`) with a CSV or JSON attachment. Required columns/fields are `name` and `type`. Optional fields include `subcategory`, `short_description`, `aliases`, `tags`, `dataset_hint`, `source`, and `metadata` (either JSON or additional columns). The command reports how many rows were created vs. updated, and it relies on the same name+type dedupe rules as the sync script.
+
+`/player-item-upload`, `/component-item-upload`, and `/ship-list-upload` all mirror their respective tables (`items_fps`, `items_components`, `ship_list`) into `game_entities` automatically (dry runs skip writes). No extra action is needed after uploading CSVs — the entity index refreshes immediately while avoiding duplicate rows.
 
 ## Troubleshooting
 

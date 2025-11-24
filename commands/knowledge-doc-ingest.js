@@ -25,7 +25,7 @@ const CLASSIFICATION_CHOICES = [
   { name: 'Org Lore', value: 'lore' },
 ];
 
-const name = 'doc-ingest';
+const name = 'knowledge-doc-ingest';
 
 const data = new SlashCommandBuilder()
   .setName(name)
@@ -184,7 +184,7 @@ function parseCsvRows(text) {
     if (!rows.length) return null;
     return { headers, rows };
   } catch (err) {
-    console.error('[DocIngest] CSV parse failed:', err?.message || err);
+    console.error('[KnowledgeDocIngest] CSV parse failed:', err?.message || err);
     return null;
   }
 }
@@ -242,7 +242,7 @@ function buildJsonChunks(text) {
   try {
     data = JSON.parse(text);
   } catch (err) {
-    console.error('[DocIngest] JSON parse failed:', err?.message || err);
+    console.error('[KnowledgeDocIngest] JSON parse failed:', err?.message || err);
     return null;
   }
   const chunks = [];
@@ -295,7 +295,7 @@ function parseTagsInput(raw) {
 function buildTags({ baseTags = [], classification, interaction }) {
   const tags = [...baseTags];
   if (classification) tags.push(classification);
-  tags.push('source:doc_ingest');
+  tags.push('source:knowledge_doc_ingest');
   if (interaction?.guildId) tags.push(`guild:${interaction.guildId}`);
   if (interaction?.user?.id) tags.push(`uploader:${interaction.user.id}`);
   const seen = new Set();
@@ -346,14 +346,14 @@ async function maybeEmbed(text, openai) {
     const vector = await getEmbedding({ text: payload, openai });
     if (Array.isArray(vector) && vector.length === KnowledgeDocsModel.vectorDim) return vector;
   } catch (err) {
-    console.error('[DocIngest] embedding helper failed:', err?.message || err);
+    console.error('[KnowledgeDocIngest] embedding helper failed:', err?.message || err);
   }
   try {
     const resp = await openai.embeddings.create({ model: DOC_EMBED_MODEL, input: payload });
     const fallback = resp?.data?.[0]?.embedding;
     if (Array.isArray(fallback) && fallback.length === KnowledgeDocsModel.vectorDim) return fallback;
   } catch (err) {
-    console.error('[DocIngest] direct embedding failed:', err?.message || err);
+    console.error('[KnowledgeDocIngest] direct embedding failed:', err?.message || err);
   }
   return null;
 }
@@ -386,7 +386,7 @@ async function execute(interaction, context = {}) {
   try {
     buffer = await downloadAttachment(attachment.url);
   } catch (err) {
-    console.error('[DocIngest] download failed:', err?.message || err);
+    console.error('[KnowledgeDocIngest] download failed:', err?.message || err);
     await interaction.editReply('Failed to download the attachment from Discord.');
     return;
   }
@@ -495,7 +495,7 @@ async function execute(interaction, context = {}) {
         ingestResults.push({ ok: false, error: created?.errors?.join(', ') || 'validation failed' });
       }
     } catch (err) {
-      console.error('[DocIngest] create failed:', err?.message || err);
+      console.error('[KnowledgeDocIngest] create failed:', err?.message || err);
       ingestResults.push({ ok: false, error: err?.message || 'request failed' });
     }
   }

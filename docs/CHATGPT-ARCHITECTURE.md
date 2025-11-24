@@ -212,7 +212,7 @@ Canonical index of every Star Citizen noun we care about.
 | created_at | TIMESTAMPTZ |
 | updated_at | TIMESTAMPTZ |
 
-Populate this table via the automated UEX sync (`npm run sync:entities`) plus manual uploads. The sync script pulls commodities, items, ships, terminals, and all major location datasets (cities, outposts, moons, planets, stations, star systems) from the UEX endpoints and upserts them into `game_entities`, so each successive run simply updates changed rows instead of creating duplicates.
+Populate this table via the automated UEX sync (`npm run sync:entities`) plus manual uploads. The sync script pulls commodities, items, ships, terminals, cities, outposts, moons, planets, stations, star systems, and any curated rows sitting in `items_fps`, `items_components`, or `ship_list`, so each successive run simply updates changed rows instead of creating duplicates.
 
 At runtime the orchestrator reads the table through `GameEntitiesModel` (backed by `api/gameEntitiesApi.js`). Set `SERVER_URL` and `API_GAME_ENTITIES_ROUTES` so the bot can reach your REST gateway. If the table is still empty, the catalog automatically falls back to the legacy UEX-derived nouns while you finish seeding (`CHATGPT_ENTITY_INCLUDE_CACHE_FALLBACK=true`). Manual curation is available via the `/entity-upload` slash command (CSV or JSON) described in `docs/GAME-ENTITIES.md` alongside curl examples.
 

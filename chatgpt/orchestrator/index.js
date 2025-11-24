@@ -4,6 +4,7 @@ const { generatePersonaResponse } = require('../persona/responder');
 const { writeMemories } = require('../memory/writer');
 const { ensureCachesReady } = require('../context/cache-readiness');
 const { searchGameEntities } = require('../context/entity-index');
+const { processHitIntakeInteraction } = require('../workflows/hit-intake');
 
 const STAGE_WARN_THRESHOLD_MS = Number(process.env.CHATGPT_STAGE_WARN_THRESHOLD_MS || 5000);
 const PERF_LOGGING_ENABLED = (process.env.CHATGPT_PERF_LOGGING || 'false').toLowerCase() === 'true';
@@ -47,6 +48,30 @@ async function handleChatGptInteraction({ message, client, openai }) {
     try { await message.channel.sendTyping(); } catch {}
 
     const intent = await runStage('intent', () => classifyIntent({ message, meta, openai }));
+
+    const workflowResult = await processHitIntakeInteraction({ message, meta, intent, client, openai });
+    if (workflowResult?.handled) {
+      let sentReply = null;
+      if (workflowResult.reply) {
+        sentReply = await message.reply({ content: workflowResult.reply.slice(0, 2000) });
+      }
+      await runStage('memory', () => writeMemories({
+        message,
+        meta,
+        intent: workflowResult.intent || intent,
+        context: null,
+        personaResponse: { text: workflowResult.reply || '' },
+        client,
+        openai,
+        replyMessage: sentReply,
+      }));
+      if (INTERACTION_LOGGING_ENABLED) {
+        const elapsed = Date.now() - timerStart;
+        console.log(`[ChatGPT] Workflow handled in ${elapsed}ms (intent=${workflowResult.intent?.intent || intent.intent}, channel=${meta.channelName})`);
+      }
+      return { intent: workflowResult.intent || intent, workflowResult, sentReply };
+    }
+
     const entityMatches = await runStage('entities', async () => {
       if (!message?.content) return [];
       try {

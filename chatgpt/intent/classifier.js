@@ -12,10 +12,11 @@ const KEYWORD_RULES = [
   { intent: 'help', needsTool: false, keywords: ['help', 'how do', 'explain', 'what is', 'can you remind'], minConfidence: 0.5 },
   { intent: 'admin', needsTool: false, keywords: ['promote', 'verify', 'approve', 'ban', 'flag'], minConfidence: 0.45 },
   { intent: 'serious_info', needsTool: false, keywords: ['policy', 'rule', 'schedule', 'operation', 'ops', 'mission'], minConfidence: 0.5 },
+  { intent: 'hit_create', needsTool: true, keywords: ['add a hit', 'log a hit', 'record a hit', 'new hit', 'submit hit', 'post hit', 'hit tracker', 'pirate hit'], minConfidence: 0.45 },
 ];
 
-const ALLOWED_INTENTS = ['banter', 'price_query', 'location_info', 'user_stats', 'serious_info', 'help', 'admin', 'other'];
-const TOOL_DEFAULTS = new Set(['price_query', 'location_info', 'user_stats', 'admin']);
+const ALLOWED_INTENTS = ['banter', 'price_query', 'location_info', 'user_stats', 'serious_info', 'help', 'admin', 'hit_create', 'other'];
+const TOOL_DEFAULTS = new Set(['price_query', 'location_info', 'user_stats', 'admin', 'hit_create']);
 const INTENT_MODEL = process.env.CHATGPT_INTENT_MODEL || 'gpt-3.5-turbo';
 const USE_MODEL = (process.env.CHATGPT_INTENT_USE_MODEL || 'true').toLowerCase() === 'true';
 
