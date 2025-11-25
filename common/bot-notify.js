@@ -1,4 +1,6 @@
 const { sendMessageNotifySubject } = require("../threads/send-response")
+const WELCOME_EMBED_MODEL = process.env.CHATGPT_WELCOME_MODEL || process.env.CHATGPT_RESPONSE_MODEL || 'gpt-4o-mini';
+const WELCOME_EMBED_USE_MODEL = (process.env.CHATGPT_WELCOME_USE_MODEL || 'true').toLowerCase() === 'true';
 
 function getDisplayName(userData) {
     return userData?.nickname || userData?.username || 'member';
@@ -84,9 +86,31 @@ async function notifyJoinGuestWelcome(userData, _openai, client) {
 }
 
 //this doesn't ping a channel but returns a statement to use in an embed.
-async function notifyWelcomeForEmbed(userData, _openai, _client, messageToSend){
-    const message = messageToSend || `Welcome ${getDisplayName(userData)}! Glad to have you aboard.`;
-    return message;
+async function notifyWelcomeForEmbed(userData, openai, _client, messageToSend){
+    const fallback = messageToSend || `Welcome ${getDisplayName(userData)}! Glad to have you aboard.`;
+    if (!WELCOME_EMBED_USE_MODEL || !openai) {
+        return fallback;
+    }
+    const displayName = getDisplayName(userData);
+    const prompt = [
+        { role: 'system', content: 'You write short, hype welcomes for new IronPoint Discord members. Keep it under 3 energetic sentences, stay PG-13, avoid emojis unless provided, and keep Markdown to simple bold text only when it helps emphasis.' },
+        { role: 'user', content: `Base message: ${fallback}\nMember: ${displayName}` }
+    ];
+    try {
+        const completion = await openai.chat.completions.create({
+            model: WELCOME_EMBED_MODEL,
+            temperature: 0.65,
+            max_tokens: 180,
+            messages: prompt,
+        });
+        const aiMessage = completion?.choices?.[0]?.message?.content?.trim();
+        if (aiMessage) {
+            return aiMessage;
+        }
+    } catch (error) {
+        console.error('[BotNotify] Welcome embed prompt failed:', error?.response?.data || error?.message || error);
+    }
+    return fallback;
 }
 
 module.exports = {
