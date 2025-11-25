@@ -220,11 +220,12 @@ async function handleSimpleJoin(interaction, client, openai){
 
     // Create welcome message
     const welcomeMessage = `Welcome ${dbUser.username} to IronPoint, the best Pirate crew in Star Citizen. Skill and creativity keep us on top, so show both and let's dominate together.`;
-    let returnedMessage = "";
+    const defaultReturnMessage = "Welcome to IronPoint, feel free to join the crew whenever you see us online. If you're interested in joining, please let us know! We open recruitment periodically and it's great to see interest.";
+    let returnedMessage = defaultReturnMessage;
     try{
         returnedMessage = await notifyWelcomeForEmbed(dbUser, openai, client, welcomeMessage);
     }catch(error){
-        returnedMessage = "Welcome to IronPoint! Please take a moment to read the rules and let us know if you're here as a Guest or here as a potential Join!";
+        returnedMessage = defaultReturnMessage;
         console.error("Error notifying welcome for embed:", error);
     }
     // Create embed with avatar, title, and welcome message
@@ -338,7 +339,6 @@ async function handleSimpleWelcomeGuest(interaction, client, openai){
         .addFields(
             { name: 'Apply to IronPoint', value: '[💀Join IronPoint💀](https://discord.com/channels/692428312840110090/1434066387529240646)', inline: false },
             { name: 'Website', value: '[ironpoint.org](https://www.ironpoint.org/)', inline: false },
-            { name: 'Kill Tracker', value: '[BeowulfHunter](https://github.com/DocFoxHound/BeowulfHunterPy/releases/latest)', inline: false },
             { name: 'Dogfighting 101 Videos', value: `[Kozuka's Raptor 101](https://www.youtube.com/playlist?list=PL3P2dFMRGUtYJa4NauDruO76hSdNCDBOQ)`, inline: false },
         );
     // Send embed to channel
