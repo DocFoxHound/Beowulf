@@ -5,6 +5,20 @@ const { ChannelType } = require("discord.js");
 const { checkRecentGatherings } = require("./recent-gatherings.js");
 const { checkRecentGangs } = require("./recent-fleets.js")
 
+function normalizeSession(rawSession = {}, fallbackGuildId) {
+    const normalized = {
+        id: String(rawSession.id ?? rawSession.session_id ?? ""),
+        user_id: rawSession.user_id || rawSession.userId || rawSession.user || null,
+        channel_id: rawSession.channel_id || rawSession.channelId || null,
+        channel_name: rawSession.channel_name || rawSession.channelName || null,
+        joined_at: rawSession.joined_at || rawSession.joinedAt || null,
+        left_at: rawSession.left_at || rawSession.leftAt || null,
+        minutes: Number(rawSession.minutes || 0),
+        guild_id: rawSession.guild_id || rawSession.guildId || fallbackGuildId,
+    };
+    return normalized;
+}
+
 
 async function voiceChannelSessions(client, openai) {
     const guildId = process.env.LIVE_ENVIRONMENT === "true" ? process.env.GUILD_ID : process.env.TEST_GUILD_ID;
@@ -32,7 +46,10 @@ async function voiceChannelSessions(client, openai) {
         });
 
         // Get all active sessions from API
-        const activeSessions = await getAllActiveVoiceSessions() || [];
+        const activeSessionsRaw = await getAllActiveVoiceSessions() || [];
+        const activeSessions = activeSessionsRaw
+            .map(session => normalizeSession(session, guildId))
+            .filter(session => session?.user_id);
         const now = new Date();
 
         // Track users currently in voice
