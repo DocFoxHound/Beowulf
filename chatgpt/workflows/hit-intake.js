@@ -28,6 +28,8 @@ const COMMAND_WORDS = {
   done: ['done', 'finish', 'post', 'ship it'],
   status: ['status', 'summary', 'progress'],
 };
+const HIT_ACTION_PATTERN = /\b(add|log|record|submit|post|create|file|report|register|start|launch|new)\b/i;
+const HIT_INTAKE_HINT_PATTERN = /\b(intake|form|entry|ticket)\b/i;
 const PIRACY_VERB_PATTERN = /\b(stole|steal|stolen|robbed|pirated|jacked|heisted|nabbed|lifted|raided|yoinked|took)\b/i;
 const CARGO_UNIT_HINT_PATTERN = /\b(scu|unit|units|box|boxes|crate|crates|haul|load|cargo|loot)\b/i;
 const AUTO_ASSIST_LIMIT = Number(process.env.HIT_INTAKE_AUTO_ASSIST_LIMIT || 6);
@@ -130,9 +132,18 @@ function shouldStartSession(intent, content) {
   if (intent?.intent === 'hit_create') return true;
   if (!content) return false;
   const lower = content.toLowerCase();
-  if (lower.includes('hit tracker')) return true;
-  if (lower.includes('pirate hit')) return true;
-  if (/\b(add|log|record|submit|post|create|new|file)\b/.test(lower) && /\bhit\b/.test(lower)) {
+  const actionHint = HIT_ACTION_PATTERN.test(lower);
+  const mentionsHitWord = /\bhit\b/.test(lower);
+  const mentionsHitTracker = lower.includes('hit tracker');
+  const mentionsPirateHit = lower.includes('pirate hit');
+  const mentionsIntake = HIT_INTAKE_HINT_PATTERN.test(lower) || lower.includes('hit intake');
+  if ((mentionsHitTracker || mentionsPirateHit || mentionsIntake || mentionsHitWord) && actionHint) {
+    return true;
+  }
+  if (mentionsHitTracker && (lower.includes('start') || lower.includes('open') || lower.includes('use'))) {
+    return true;
+  }
+  if (mentionsIntake && mentionsHitWord) {
     return true;
   }
   const hasPiracyVerb = PIRACY_VERB_PATTERN.test(lower);
