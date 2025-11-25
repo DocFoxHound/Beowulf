@@ -17,6 +17,7 @@ const RECENT_CHAT_LIMIT = Number(process.env.CHATGPT_RECENT_CHAT_LIMIT || 8);
 const MEMORY_PRIMARY_IMPORTANCE = Number(process.env.CHATGPT_MEMORY_PRIMARY_IMPORTANCE || 3);
 const MEMORY_PRIMARY_SCORE = Number(process.env.CHATGPT_MEMORY_PRIMARY_SCORE || 0.28);
 const MEMORY_KNOWLEDGE_LIMIT = Number(process.env.CHATGPT_MEMORY_KNOWLEDGE_LIMIT || 2);
+const CONTEXT_DEBUG = (process.env.CHATGPT_CONTEXT_DEBUG || 'false').toLowerCase() === 'true';
 const MARKET_DEBUG = (process.env.CHATGPT_MARKET_DEBUG || 'false').toLowerCase() === 'true';
 const MARKET_FILLER_WORDS = new Set(['what', 'is', 'the', 'current', 'price', 'for', 'of', 'a', 'an', 'anyone', 'know']);
 const GENERIC_MARKET_WORDS = new Set(['highest', 'value', 'values', 'trade', 'trades', 'route', 'routes', 'profit', 'profits', 'haul', 'hauls', 'cargo', 'run', 'runs', 'best', 'top', 'great', 'good', 'money', 'credits', 'right', 'now', 'today', 'tonight', 'currently', 'biggest', 'largest', 'most', 'high', 'higher', 'low', 'lower']);
@@ -90,6 +91,22 @@ function buildBanterFallbackProfile(message, meta) {
   };
 }
 
+function parseStatsObject(stats) {
+  if (!stats) return null;
+  if (typeof stats === 'object' && !Array.isArray(stats)) return stats;
+  if (typeof stats === 'string') {
+    try {
+      const parsed = JSON.parse(stats);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+    } catch (error) {
+      if (CONTEXT_DEBUG) {
+        console.warn('[ChatGPT][Context] Failed to parse stats_json:', error?.message || error);
+      }
+    }
+  }
+  return null;
+}
+
 function sanitizeContent(content) {
   return (content || '').trim();
 }
@@ -157,9 +174,13 @@ async function buildContext({ message, meta, intent, openai, entityMatches: enti
 
   const recentChat = getRecentChatForChannel(channelId, RECENT_CHAT_LIMIT);
   let userProfile = getUserProfileFromCache(userId);
-  if (!userProfile && intentIsBanter) {
+  if (!userProfile) {
     userProfile = buildBanterFallbackProfile(message, meta) || null;
   }
+  const profileStats = userProfile ? parseStatsObject(userProfile.stats_json) : null;
+  const profileLikeable = profileStats && profileStats.likeable != null
+    ? Number(profileStats.likeable)
+    : null;
   const playerStats = getPlayerStatsSnapshot(userId);
 
   const includeLeaderboard = intent.intent === 'user_stats' || /leaderboard|rank|score|promotion|prestige/.test(lowerContent);
@@ -321,6 +342,8 @@ async function buildContext({ message, meta, intent, openai, entityMatches: enti
     intent,
     recentChat,
     userProfile,
+    profileStats,
+    profileLikeable,
     leaderboard,
     playerStats,
     hitSummary,

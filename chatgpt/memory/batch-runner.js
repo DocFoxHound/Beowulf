@@ -87,31 +87,26 @@ async function flushChannel(channelId, reason = 'interval') {
     return null;
   }
 
-  if (pending.length < MIN_BATCH_COUNT) {
+  const shouldProcessPartial = reason === 'interval';
+  if (!shouldProcessPartial && pending.length < MIN_BATCH_COUNT) {
     state.accumulated = pending.length;
     state.lastFlushAt = Date.now();
     return null;
   }
 
-  const batch = pending.slice(0, MIN_BATCH_COUNT);
+  const batch = pending;
 
   state.isProcessing = true;
   debugLog(`Flushing channel ${channelId} reason=${reason} count=${batch.length}`);
   try {
     await batchHandler({ channelId, reason, messages: batch });
     state.lastProcessedIso = batch[batch.length - 1]?.timestamp || state.lastProcessedIso;
-    state.accumulated = Math.max(0, state.accumulated - batch.length);
+    state.accumulated = 0;
   } catch (error) {
     console.error(`[MemoryBatcher] Failed to process batch for channel ${channelId}:`, error?.message || error);
   } finally {
     state.isProcessing = false;
     state.lastFlushAt = Date.now();
-  }
-
-  const remainder = pending.length - batch.length;
-  state.accumulated = remainder;
-  if (remainder >= MIN_BATCH_COUNT) {
-    queueFlush(channelId, 'backlog');
   }
 
   return batch;

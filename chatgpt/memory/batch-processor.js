@@ -10,7 +10,7 @@ const { isBotUser } = require('../../common/bot-identity');
 const MEMORY_MODEL = process.env.CHATGPT_MEMORY_MODEL || process.env.CHATGPT_PERSONA_MODEL || 'gpt-4o-mini';
 const MEMORY_IMPORTANCE_THRESHOLD = Math.max(1, Number(process.env.MEMORY_IMPORTANCE_THRESHOLD || 3));
 const MAX_MEMORIES_PER_BATCH = Math.max(1, Number(process.env.MEMORY_BATCH_MAX_MEMORIES || 3));
-const MEMORY_BATCH_DEBUG = 0
+const MEMORY_BATCH_DEBUG = 0;
 const MAX_SERIALIZED_MESSAGES = Math.max(5, Number(process.env.MEMORY_BATCH_MAX_MESSAGES || 20));
 const MESSAGE_CHAR_LIMIT = Math.max(80, Number(process.env.MEMORY_BATCH_MESSAGE_CHAR_LIMIT || 400));
 const PROMPT_CHAR_LIMIT = Math.max(2000, Number(process.env.MEMORY_BATCH_PROMPT_CHAR_LIMIT || 9000));
@@ -19,6 +19,21 @@ const PERSONA_STRING_FIELDS = ['profession', 'demeanor', 'relationship_notes', '
 const PERSONA_ARRAY_FIELDS = ['known_for', 'notable_quotes', 'favorite_topics', 'achievements', 'notable_traits', 'warnings'];
 const PERSONA_TRAIT_FIELDS = ['openness', 'conscientiousness', 'extraversion', 'agreeableness', 'neuroticism', 'confidence', 'courage', 'integrity', 'resilience', 'humor'];
 const ALLOWED_MEMORY_TYPES = new Set(['episodic', 'inside_joke', 'profile', 'lore', 'dogfighting_advice', 'piracy_advice']);
+const MAX_PROFILE_NICKNAME = 120;
+const DEFAULT_LIKEABLE_SCORE = (() => {
+  const raw = Number(process.env.USER_PROFILE_DEFAULT_LIKEABLE || 55);
+  if (Number.isFinite(raw)) {
+    return Math.max(0, Math.min(100, raw));
+  }
+  return 55;
+})();
+const STAT_FIELD_RULES = {
+  likeable: {
+    min: 0,
+    max: 100,
+    default: DEFAULT_LIKEABLE_SCORE,
+  },
+};
 
 function logMemoryError(context, error, meta = {}) {
   const safeMeta = (() => {
@@ -74,6 +89,42 @@ function mergeArraysUnique(base = [], incoming = []) {
     if (text) set.add(text);
   }
   return Array.from(set);
+}
+
+function sanitizeNickname(value) {
+  if (value === undefined || value === null) return null;
+  const text = String(value).trim();
+  if (!text) return null;
+  return text.length > MAX_PROFILE_NICKNAME ? text.slice(0, MAX_PROFILE_NICKNAME) : text;
+}
+
+function getUserIdentitySnapshot(userId) {
+  if (!userId) return null;
+  try {
+    const cache = globalThis?.userListCache;
+    if (cache && typeof cache.getById === 'function') {
+      return cache.getById(userId) || null;
+    }
+  } catch (error) {
+    if (MEMORY_BATCH_DEBUG) {
+      console.warn('[MemoryBatcher] Failed to read userListCache for nickname:', error?.message || error);
+    }
+  }
+  return null;
+}
+
+function derivePreferredNickname({ providedNickname, existingNickname, fallbackUser }) {
+  const candidates = [
+    providedNickname,
+    fallbackUser?.nickname,
+    fallbackUser?.username,
+    existingNickname,
+  ];
+  for (const candidate of candidates) {
+    const normalized = sanitizeNickname(candidate);
+    if (normalized) return normalized;
+  }
+  return null;
 }
 
 function normalizeTraits(traitsSource = {}) {
@@ -156,18 +207,111 @@ function mergePersonaDetails(existing = {}, incoming = {}) {
   return Object.keys(merged).length ? merged : null;
 }
 
-function mergeStatsJson(existingValue, incomingPersona) {
-  const base = parseStatsJsonValue(existingValue);
-  if (!incomingPersona) return Object.keys(base).length ? base : null;
-  const existingPersona = typeof base.persona_details === 'object' && base.persona_details !== null
-    ? base.persona_details
-    : {};
-  const mergedPersona = mergePersonaDetails(existingPersona, incomingPersona);
-  if (mergedPersona) {
-    base.persona_details = mergedPersona;
-    base.last_persona_update = new Date().toISOString();
+function normalizeStatNumber(value) {
+  if (value === undefined || value === null || value === '') return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
+function clampStatField(name, value) {
+  const num = normalizeStatNumber(value);
+  if (num === null) return null;
+  const rule = STAT_FIELD_RULES[name];
+  if (!rule) return Number(num.toFixed(2));
+  const clamped = Math.max(rule.min, Math.min(rule.max, num));
+  return Number(clamped.toFixed(2));
+}
+
+function blendStatValue(name, currentValue, incomingValue) {
+  const incoming = clampStatField(name, incomingValue);
+  if (incoming === null) return clampStatField(name, currentValue);
+  const current = clampStatField(name, currentValue);
+  if (current === null) return incoming;
+  const blended = (current + incoming) / 2;
+  return clampStatField(name, blended);
+}
+
+function applyStatDeltas(target, deltas = {}) {
+  if (!target || typeof target !== 'object') return target;
+  for (const [key, rawDelta] of Object.entries(deltas)) {
+    const delta = normalizeStatNumber(rawDelta);
+    if (delta === null || delta === 0) continue;
+    const rule = STAT_FIELD_RULES[key];
+    const current = clampStatField(key, target[key] ?? rule?.default);
+    if (current === null) continue;
+    const next = clampStatField(key, current + delta);
+    if (next !== null) {
+      target[key] = next;
+    }
   }
-  return Object.keys(base).length ? base : null;
+  return target;
+}
+
+function mergeStatFields(base = {}, patch = {}) {
+  const target = { ...base };
+  const absolute = patch.absolute || patch.fields || null;
+  if (absolute && typeof absolute === 'object') {
+    for (const [key, value] of Object.entries(absolute)) {
+      if (value !== null && typeof value === 'object') continue;
+      const blended = blendStatValue(key, target[key], value);
+      if (blended !== null) {
+        target[key] = blended;
+      }
+    }
+  }
+  if (patch.deltas && typeof patch.deltas === 'object') {
+    applyStatDeltas(target, patch.deltas);
+  }
+  return target;
+}
+
+function ensureStatsDefaults(stats = {}) {
+  const target = { ...stats };
+  for (const [key, rule] of Object.entries(STAT_FIELD_RULES)) {
+    if (target[key] == null && rule?.default != null) {
+      const normalized = clampStatField(key, rule.default);
+      if (normalized != null) target[key] = normalized;
+    }
+  }
+  return target;
+}
+
+function mergeStatsJson(existingValue, incomingUpdate) {
+  const base = parseStatsJsonValue(existingValue);
+  if (!incomingUpdate) {
+    const normalizedBase = ensureStatsDefaults(base);
+    return Object.keys(normalizedBase).length ? normalizedBase : null;
+  }
+
+  const payload = typeof incomingUpdate === 'object' && incomingUpdate !== null
+    ? incomingUpdate
+    : { personaDetails: incomingUpdate };
+
+  const personaSource = payload.personaDetails
+    || payload.persona_details
+    || (!payload.statsPatch && !payload.stats_patch && !payload.stats && !payload.absolute && !payload.deltas
+      ? payload
+      : null);
+  const normalizedPersona = normalizePersonaDetails(personaSource);
+  if (normalizedPersona) {
+    const existingPersona = typeof base.persona_details === 'object' && base.persona_details !== null
+      ? base.persona_details
+      : {};
+    const mergedPersona = mergePersonaDetails(existingPersona, normalizedPersona);
+    if (mergedPersona) {
+      base.persona_details = mergedPersona;
+      base.last_persona_update = new Date().toISOString();
+    }
+  }
+
+  const statsPatch = payload.statsPatch || payload.stats_patch || payload.stats || null;
+  if (statsPatch) {
+    const mergedFields = mergeStatFields(base, statsPatch);
+    Object.assign(base, mergedFields);
+  }
+
+  const normalizedBase = ensureStatsDefaults(base);
+  return Object.keys(normalizedBase).length ? normalizedBase : null;
 }
 
 function clamp(value, min, max) {
@@ -267,7 +411,8 @@ function buildPersonaGuidance(profilesMap) {
       ? `Known for: ${personaDetails.known_for.join(', ')}`
       : null;
     const traitLine = personaDetails?.traits ? formatTraitBaseline(personaDetails.traits) : null;
-    const pieces = [profession, knownFor, traitLine ? `Traits: ${traitLine}` : null].filter(Boolean);
+    const likeableScore = typeof stats?.likeable === 'number' ? `Likeable: ${Math.round(stats.likeable)}` : null;
+    const pieces = [profession, knownFor, likeableScore, traitLine ? `Traits: ${traitLine}` : null].filter(Boolean);
     lines.push(`- ${name} (${userId})${pieces.length ? ` -> ${pieces.join(' | ')}` : ''}`);
   }
   if (!lines.length) {
@@ -287,8 +432,9 @@ function buildPrompts({ channelId, channelName, guildId, reason, serializedMessa
     'Messages JSON follows:',
     JSON.stringify(serializedMessages, null, 2),
     'Desired JSON schema:',
-    '{"memories":[{"summary":"string","details":"include concrete facts, stats, or quotes","importance":1-5,"type":"episodic|inside_joke|profile|lore|dogfighting_advice|piracy_advice|fact","related_users":["discordId"],"tags":["string"],"should_store":true|false}],"profile_adjustments":[{"user_id":"string","nickname":"string?","tease_level":0-100,"tease_level_delta":-10-10,"style_preferences":{"tone_preference":"short text"},"persona_details":{"profession":"string?","known_for":["string"],"notable_quotes":["string"],"favorite_topics":["string"],"achievements":["string"],"personality_summary":"string?","relationship_notes":"string?","catchphrase":"string?","traits":{"openness":0-10,"conscientiousness":0-10,"extraversion":0-10,"agreeableness":0-10,"neuroticism":0-10,"confidence":0-10,"courage":0-10,"integrity":0-10,"resilience":0-10,"humor":0-10}},"notes":"short guidance"}]}',
-    `Limit memories to ${MAX_MEMORIES_PER_BATCH} items. Reject mundane updates unless they include a concrete plan, metric, or character insight. Classify fighter tactics, formation calls, joust angles, missile baiting, or EVA boarding plans as dogfighting_advice. Classify profitable commodity intel, piracy routes, snare traps, loot valuations, or fence strategies as piracy_advice. If someone states a strong opinion, shares a recurring joke, or teases another member in a way that defines their relationship, capture it as an inside_joke (with the direct quote in details). If you keep a memory, ensure the summary explains why it matters AND populate the details field with supporting numbers, names, timestamps, or direct quotes. Set should_store=false for filler banter. Only populate persona_details when the chat gives reliable signals (profession, what they are known for, quotes, quirks, etc.). When updating trait sliders, reference the baseline above and adjust gradually (no jumps bigger than 1 point).`
+    '{"memories":[{"summary":"string","details":"include concrete facts, stats, or quotes","importance":1-5,"type":"episodic|inside_joke|profile|lore|dogfighting_advice|piracy_advice|fact","related_users":["discordId"],"tags":["string"],"should_store":true|false}],"profile_adjustments":[{"user_id":"string","nickname":"string?","tease_level":0-100,"tease_level_delta":-10-10,"style_preferences":{"tone_preference":"short text"},"persona_details":{"profession":"string?","known_for":["string"],"notable_quotes":["string"],"favorite_topics":["string"],"achievements":["string"],"personality_summary":"string?","relationship_notes":"string?","catchphrase":"string?","traits":{"openness":0-10,"conscientiousness":0-10,"extraversion":0-10,"agreeableness":0-10,"neuroticism":0-10,"confidence":0-10,"courage":0-10,"integrity":0-10,"resilience":0-10,"humor":0-10}},"stats_adjustments":{"likeable":0-100,"likeable_delta":-15-15,"other_numeric_stat":0-100},"notes":"short guidance"}]}',
+    `Limit memories to ${MAX_MEMORIES_PER_BATCH} items. Reject mundane updates unless they include a concrete plan, metric, or character insight. Classify fighter tactics, formation calls, joust angles, missile baiting, or EVA boarding plans as dogfighting_advice. Classify profitable commodity intel, piracy routes, snare traps, loot valuations, or fence strategies as piracy_advice. If someone states a strong opinion, shares a recurring joke, or teases another member in a way that defines their relationship, capture it as an inside_joke (with the direct quote in details). If you keep a memory, ensure the summary explains why it matters AND populate the details field with supporting numbers, names, timestamps, or direct quotes. Set should_store=false for filler banter. Only populate persona_details when the chat gives reliable signals (profession, what they are known for, quotes, quirks, etc.). When updating trait sliders, reference the baseline above and adjust gradually (no jumps bigger than 1 point).`,
+    `Track how much Beowulf likes each speaker using stats_adjustments.likeable (0-100, default ${STAT_FIELD_RULES.likeable.default || 55}). Increase it when they are helpful/respectful, decrease it when they are rude or demanding. Keep likeable_delta between -15 and +15 per batch, and only emit stats_adjustments when you have strong sentiment evidence.`
   ].join('\n');
   return { systemPrompt, userPrompt: instructions };
 }
@@ -381,6 +527,54 @@ function mergeStylePreferences(existingPrefs, incomingPrefs, notes) {
   return Object.keys(merged).length ? merged : null;
 }
 
+function normalizeStatsPatch(entry = {}) {
+  if (!entry || typeof entry !== 'object') return null;
+  const absolute = {};
+  const deltas = {};
+  const rawSources = [];
+  if (entry.stats_adjustments && typeof entry.stats_adjustments === 'object') rawSources.push(entry.stats_adjustments);
+  if (entry.statsPatch && typeof entry.statsPatch === 'object') rawSources.push(entry.statsPatch);
+  if (entry.stats_patch && typeof entry.stats_patch === 'object') rawSources.push(entry.stats_patch);
+  if (entry.stats_json) rawSources.push(parseStatsJsonValue(entry.stats_json));
+  if (entry.stats) rawSources.push(parseStatsJsonValue(entry.stats));
+
+  const ingest = (obj) => {
+    if (!obj || typeof obj !== 'object') return;
+    for (const [key, value] of Object.entries(obj)) {
+      if (value === undefined || value === null || value === '') continue;
+      if (key === 'persona_details' || key === 'personaDetails') continue;
+      if (typeof value === 'object') continue;
+      if (key.toLowerCase().endsWith('_delta')) {
+        const baseKey = key.replace(/_delta$/i, '');
+        const deltaValue = normalizeStatNumber(value);
+        if (deltaValue !== null) deltas[baseKey] = deltaValue;
+      } else {
+        absolute[key] = value;
+      }
+    }
+  };
+
+  rawSources.forEach(ingest);
+
+  const likeableValueCandidates = [entry.likeable, entry.likeable_score, entry.stats_likeable];
+  for (const candidate of likeableValueCandidates) {
+    if (candidate === undefined || candidate === null || candidate === '') continue;
+    absolute.likeable = candidate;
+    break;
+  }
+
+  const likeableDeltaCandidates = [entry.likeable_delta, entry.stats_likeable_delta];
+  for (const candidate of likeableDeltaCandidates) {
+    const deltaValue = normalizeStatNumber(candidate);
+    if (deltaValue === null) continue;
+    deltas.likeable = deltaValue;
+    break;
+  }
+
+  if (!Object.keys(absolute).length && !Object.keys(deltas).length) return null;
+  return { absolute, deltas };
+}
+
 function normalizeProfileAdjustment(entry = {}) {
   const userId = entry.user_id || entry.userId;
   if (!userId) return null;
@@ -392,8 +586,9 @@ function normalizeProfileAdjustment(entry = {}) {
     stylePreferences: typeof entry.style_preferences === 'object' && entry.style_preferences !== null ? entry.style_preferences : null,
     notes: typeof entry.notes === 'string' ? entry.notes.trim() : null,
     personaDetails: normalizePersonaDetails(entry.persona_details || entry.personaDetails || entry.persona),
+    statsPatch: normalizeStatsPatch(entry),
   };
-  if (!adjustment.nickname && adjustment.teaseLevel === null && adjustment.teaseDelta === null && !adjustment.stylePreferences && !adjustment.notes && !adjustment.personaDetails) {
+  if (!adjustment.nickname && adjustment.teaseLevel === null && adjustment.teaseDelta === null && !adjustment.stylePreferences && !adjustment.notes && !adjustment.personaDetails && !adjustment.statsPatch) {
     return null;
   }
   return adjustment;
@@ -446,10 +641,16 @@ async function applyProfileAdjustment(adjustment) {
   if (!adjustment) return null;
   const userId = adjustment.userId;
   const existing = typeof getUserProfileFromCache === 'function' ? getUserProfileFromCache(userId) : null;
+  const fallbackUser = getUserIdentitySnapshot(userId);
   const patch = { user_id: userId };
 
-  if (adjustment.nickname) {
-    patch.nickname = adjustment.nickname;
+  const preferredNickname = derivePreferredNickname({
+    providedNickname: adjustment.nickname,
+    existingNickname: existing?.nickname,
+    fallbackUser,
+  });
+  if (preferredNickname) {
+    patch.nickname = preferredNickname;
   }
 
   if (adjustment.teaseLevel !== null && adjustment.teaseLevel !== undefined) {
@@ -464,27 +665,16 @@ async function applyProfileAdjustment(adjustment) {
     patch.style_preferences = mergedPrefs;
   }
 
-  const mergedStats = mergeStatsJson(existing?.stats_json, adjustment.personaDetails);
+  const mergedStats = mergeStatsJson(existing?.stats_json, {
+    personaDetails: adjustment.personaDetails,
+    statsPatch: adjustment.statsPatch,
+  });
   if (mergedStats) {
     patch.stats_json = mergedStats;
   }
 
   if (!patch.nickname && patch.tease_level == null && !patch.style_preferences && !patch.stats_json) {
     return null;
-  }
-
-  if (!existing && !patch.nickname) {
-    try {
-      const fallbackUser = globalThis?.userListCache?.getById ? globalThis.userListCache.getById(userId) : null;
-      const fallbackName = fallbackUser?.nickname || fallbackUser?.username || null;
-      if (fallbackName) {
-        patch.nickname = String(fallbackName).trim().slice(0, 120);
-      }
-    } catch (e) {
-      if (MEMORY_BATCH_DEBUG) {
-        console.warn('[MemoryBatcher] Failed to derive fallback nickname:', e?.message || e);
-      }
-    }
   }
 
   try {

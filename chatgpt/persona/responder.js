@@ -111,6 +111,7 @@ function formatUserProfile(profile) {
       ? `Prestige: Raptor ${profile.raptor_level ?? '-'} / Raider ${profile.raider_level ?? '-'}`
       : null,
     profile.tease_level != null ? `Tease level: ${profile.tease_level}` : null,
+    stats?.likeable != null ? `Likeable: ${Number(stats.likeable).toFixed(0)} / 100` : null,
   ].filter(Boolean);
   if (personaDetails) {
     fields.push(...formatPersonaDetails(personaDetails));

@@ -5,10 +5,13 @@ const { writeMemories } = require('../memory/writer');
 const { ensureCachesReady } = require('../context/cache-readiness');
 const { searchGameEntities } = require('../context/entity-index');
 const { processHitIntakeInteraction } = require('../workflows/hit-intake');
+const { processHitEditInteraction } = require('../workflows/hit-edit');
 
 const STAGE_WARN_THRESHOLD_MS = Number(process.env.CHATGPT_STAGE_WARN_THRESHOLD_MS || 5000);
 const PERF_LOGGING_ENABLED = (process.env.CHATGPT_PERF_LOGGING || 'false').toLowerCase() === 'true';
 const INTERACTION_LOGGING_ENABLED = (process.env.CHATGPT_INTERACTION_LOGGING || 'false').toLowerCase() === 'true';
+const LIKEABLE_REFUSAL_THRESHOLD = Number(process.env.CHATGPT_LIKEABLE_REFUSAL_THRESHOLD || 5);
+const TOOL_USAGE_FLAGS = ['marketLoaded', 'marketCatalogLoaded', 'locationLoaded', 'leaderboardLoaded', 'statsLoaded', 'hitSummaryLoaded'];
 
 async function runStage(stageName, operation) {
   const start = Date.now();
@@ -40,6 +43,25 @@ function getRequestMeta(message, client) {
   };
 }
 
+function contextUsedProtectedTools(context) {
+  if (!context || !context.externalData) return false;
+  return TOOL_USAGE_FLAGS.some((flag) => context.externalData[flag]);
+}
+
+function shouldRefuseForLikeable(context) {
+  if (!context) return null;
+  const likeable = Number(context.profileLikeable ?? (context.profileStats?.likeable ?? NaN));
+  if (!Number.isFinite(likeable)) return null;
+  if (likeable >= LIKEABLE_REFUSAL_THRESHOLD) return null;
+  if (!contextUsedProtectedTools(context)) return null;
+  return { likeable };
+}
+
+function buildLikeableRefusalMessage(likeable) {
+  const score = Number.isFinite(likeable) ? `${Math.round(likeable)} / 100` : 'too low';
+  return `Nope. Your charm score is ${score}, so I'm not fetching intel for you. Be nice and maybe I'll open the toolbox again.`;
+}
+
 async function handleChatGptInteraction({ message, client, openai }) {
   const meta = getRequestMeta(message, client);
   const timerStart = Date.now();
@@ -48,6 +70,29 @@ async function handleChatGptInteraction({ message, client, openai }) {
     try { await message.channel.sendTyping(); } catch {}
 
     const intent = await runStage('intent', () => classifyIntent({ message, meta, openai }));
+
+    const editWorkflowResult = await processHitEditInteraction({ message, meta, intent, client });
+    if (editWorkflowResult?.handled) {
+      let sentReply = null;
+      if (editWorkflowResult.reply) {
+        sentReply = await message.reply({ content: editWorkflowResult.reply.slice(0, 2000) });
+      }
+      await runStage('memory', () => writeMemories({
+        message,
+        meta,
+        intent: editWorkflowResult.intent || intent,
+        context: null,
+        personaResponse: { text: editWorkflowResult.reply || '' },
+        client,
+        openai,
+        replyMessage: sentReply,
+      }));
+      if (INTERACTION_LOGGING_ENABLED) {
+        const elapsed = Date.now() - timerStart;
+        console.log(`[ChatGPT] Workflow handled in ${elapsed}ms (intent=${editWorkflowResult.intent?.intent || intent.intent}, channel=${meta.channelName})`);
+      }
+      return { intent: editWorkflowResult.intent || intent, workflowResult: editWorkflowResult, sentReply };
+    }
 
     const workflowResult = await processHitIntakeInteraction({ message, meta, intent, client, openai });
     if (workflowResult?.handled) {
@@ -83,6 +128,28 @@ async function handleChatGptInteraction({ message, client, openai }) {
       }
     });
     const context = await runStage('context', () => buildContext({ message, meta, intent, openai, entityMatches }));
+
+    const refusalMeta = shouldRefuseForLikeable(context);
+    if (refusalMeta) {
+      const refusalText = buildLikeableRefusalMessage(refusalMeta.likeable);
+      const sentReply = await message.reply({ content: refusalText.slice(0, 2000) });
+      await runStage('memory', () => writeMemories({
+        message,
+        meta,
+        intent,
+        context,
+        personaResponse: { text: refusalText, model: 'likeable-guard' },
+        client,
+        openai,
+        replyMessage: sentReply,
+      }));
+      if (INTERACTION_LOGGING_ENABLED) {
+        const elapsed = Date.now() - timerStart;
+        console.log(`[ChatGPT] Refused tool reply (likeable=${Math.round(refusalMeta.likeable || 0)}), elapsed=${elapsed}ms, channel=${meta.channelName}`);
+      }
+      return { intent, context, personaResponse: { text: refusalText, model: 'likeable-guard' }, sentReply };
+    }
+
     const personaResponse = await runStage('persona', () => generatePersonaResponse({ message, meta, intent, context, openai }));
 
     let sentReply = null;

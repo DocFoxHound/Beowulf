@@ -1,6 +1,8 @@
 const { HitTrackerModel } = require('../../api/models/hit-tracker');
 const { ensureUexCacheReady } = require('../context/cache-readiness');
 const { handleHitPost } = require('../../functions/post-new-hit');
+const { getUserFromCacheByName } = require('../../common/userlist-cache');
+const { extractHitIntentFields } = require('../tools/hit-extraction');
 
 const SESSION_TTL_MS = Number(process.env.HIT_INTAKE_SESSION_TTL_MS || 15 * 60 * 1000);
 const MAX_MEDIA_LINKS = Number(process.env.HIT_INTAKE_MAX_MEDIA_LINKS || 4);
@@ -26,6 +28,30 @@ const COMMAND_WORDS = {
   done: ['done', 'finish', 'post', 'ship it'],
   status: ['status', 'summary', 'progress'],
 };
+const PIRACY_VERB_PATTERN = /\b(stole|steal|stolen|robbed|pirated|jacked|heisted|nabbed|lifted|raided|yoinked|took)\b/i;
+const CARGO_UNIT_HINT_PATTERN = /\b(scu|unit|units|box|boxes|crate|crates|haul|load|cargo|loot)\b/i;
+const AUTO_ASSIST_LIMIT = Number(process.env.HIT_INTAKE_AUTO_ASSIST_LIMIT || 6);
+const AUTO_EXTRACTION_MIN_CONFIDENCE = Number(process.env.HIT_AUTO_EXTRACTION_MIN_CONFIDENCE || 0.6);
+const AUTO_EXTRACTION_MAX_CARGO = Number(process.env.HIT_AUTO_EXTRACTION_MAX_CARGO || 8);
+const OPTIONAL_DETAILS_PROMPT = 'Optional: add `title/summary/video/victims` using `title=`, `story=`, `video=URL`, `victims=Name1,Name2` or say `skip`. Attach media if you have receipts.';
+const CONFIRMATION_INSTRUCTIONS = 'Say `done` to post this hit, provide adjustments like `title=New Title` to tweak fields, or say `cancel` to abort.';
+const HIT_ID_RANDOM_SUFFIX_MAX = (() => {
+  const raw = Number(process.env.HIT_ID_RANDOM_SUFFIX_MAX);
+  if (Number.isFinite(raw) && raw >= 10) return Math.floor(raw);
+  return 1000;
+})();
+const ASSIST_CAPTURE_PATTERNS = [
+  /\bassists?\s*(?:were|was|=|:)?\s*(?<names>[^.;\n]+)/gi,
+  /\bassisted\s+by\s+(?<names>[^.;\n]+)/gi,
+  /\bwith\s+(?<names>[^.;\n]+)/gi,
+  /\brolling\s+with\s+(?<names>[^.;\n]+)/gi,
+  /\brolled\s+with\s+(?<names>[^.;\n]+)/gi,
+  /\bteamed\s+(?:up\s+)?with\s+(?<names>[^.;\n]+)/gi,
+  /\bplus\s+(?<names>[^.;\n]+)/gi,
+  /\bcrew\s*(?:was|were|=|:)?\s*(?<names>[^.;\n]+)/gi,
+];
+const ASSIST_NAME_SPLIT_REGEX = /\s*(?:,|&|\band\b|\+|\/|\|)\s*/i;
+const ASSIST_NAME_STOPWORDS = /\b(?:scu|unit|units|crate|crates|box|boxes|cargo|loot|value|profit|haul|solo|alone|nobody|none|myself|my|crew|self|ran|running|flying|watching|covering|holding|supporting)\b/i;
 
 const ITEM_NAME_FIELDS = ['item_name', 'item', 'commodity_name', 'commodity', 'commodityName', 'name', 'label'];
 const SELL_PRICE_FIELDS = ['sell_price', 'best_sell', 'median_price', 'price_sell', 'price_sell_max', 'price_sell_avg', 'price_sell_min'];
@@ -34,6 +60,15 @@ const MIN_COMMODITY_MATCH_SCORE = Number(process.env.HIT_INTAKE_MIN_COMMODITY_SC
 
 const numberFormatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 const decimalFormatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 });
+
+function generateHitEntryId() {
+  const base = Date.now();
+  const suffix = Math.floor(Math.random() * HIT_ID_RANDOM_SUFFIX_MAX);
+  const padded = suffix.toString().padStart(String(HIT_ID_RANDOM_SUFFIX_MAX - 1).length, '0');
+  const composite = `${base}${padded}`;
+  const asNumber = Number(composite);
+  return Number.isFinite(asNumber) ? asNumber : base;
+}
 
 function getSessionKey(meta) {
   return `${meta.channelId}:${meta.authorId}`;
@@ -60,6 +95,7 @@ function startSession(meta, message) {
     key,
     userId: meta.authorId,
     channelId: meta.channelId,
+    botUserId: meta.botUserId || null,
     startedAt: new Date().toISOString(),
     expiresAt: Date.now() + SESSION_TTL_MS,
     status: 'collecting',
@@ -99,6 +135,13 @@ function shouldStartSession(intent, content) {
   if (/\b(add|log|record|submit|post|create|new|file)\b/.test(lower) && /\bhit\b/.test(lower)) {
     return true;
   }
+  const hasPiracyVerb = PIRACY_VERB_PATTERN.test(lower);
+  if (hasPiracyVerb && (CARGO_UNIT_HINT_PATTERN.test(lower) || /\b\d+(?:\.\d+)?\b/.test(lower))) {
+    return true;
+  }
+  if ((hasPiracyVerb || /\bhit\b/.test(lower)) && extractFreeformCargo(content).length) {
+    return true;
+  }
   return false;
 }
 
@@ -123,6 +166,10 @@ function wantsSkip(content) {
 
 function wantsStatus(content) {
   return matchesCommand(content, COMMAND_WORDS.status);
+}
+
+function wantsDone(content) {
+  return matchesCommand(content, COMMAND_WORDS.done);
 }
 
 function formatCurrency(value) {
@@ -293,10 +340,25 @@ function parseCargoInput(text) {
     const name = (match.groups.name || '').replace(/\s+/g, ' ').trim();
     const qty = Number(match.groups.qty);
     if (!name || !Number.isFinite(qty) || qty <= 0) continue;
+    if (!isLikelyCommodityName(name)) {
+      continue;
+    }
     items.push({ commodity_name: name, scuAmount: qty });
   }
   if (items.length) return items;
   return extractFreeformCargo(trimmed);
+}
+
+function isLikelyCommodityName(name) {
+  if (!name) return false;
+  const value = name.trim();
+  if (!value) return false;
+  const lower = value.toLowerCase();
+  if (/^(?:i|me|my|mine|we|us|they|them|you|ya|yo)\b/.test(lower)) return false;
+  if (/(?:\bstole\b|\bsteal\b|\bstolen\b|\bhit\b|\bwith\b|\bassists?\b|\bwas\b|\bwere\b|\bsolo\b)/.test(lower)) return false;
+  if (lower.includes('scu')) return false;
+  if (value.length > 48) return false;
+  return true;
 }
 
 function sanitizeCommodityLabel(raw) {
@@ -353,33 +415,177 @@ async function enrichCargoPricing(items) {
   return { priced, totalValue, totalScu };
 }
 
-function parseAssistsFromMessage(message) {
+function parseAssistsFromMessage(message, { excludeIds = [] } = {}) {
   const content = (message.content || '').trim();
   if (!content && !message.mentions?.users?.size) {
     return { handled: false, assists: [], guests: [] };
   }
   if (matchesCommand(content, COMMAND_WORDS.skip)) {
-    return { handled: true, assists: [], guests: [] };
+    return { handled: true, assists: [], guests: [], skipped: true };
   }
   const assists = new Set();
+  const excluded = new Set((excludeIds || []).filter(Boolean).map((id) => String(id)));
   if (message.mentions?.users?.size) {
     for (const user of message.mentions.users.values()) {
-      assists.add(user.id);
+      if (excluded.has(String(user.id))) continue;
+      assists.add(String(user.id));
     }
   }
   const manualMatches = content.match(/<@!?(\d+)>/g);
   if (manualMatches) {
     for (const raw of manualMatches) {
       const id = raw.replace(/\D/g, '');
-      if (id) assists.add(id);
+      if (id && !excluded.has(id)) assists.add(id);
     }
   }
   const guestMatch = content.match(/guests?\s*[:=]\s*(.+)$/i);
-  const guests = guestMatch ? splitList(guestMatch[1]) : [];
+  let guests = guestMatch ? splitList(guestMatch[1]) : [];
+  if (assists.size === 0 && guests.length === 0) {
+    const { resolvedIds, unresolvedNames } = extractAssistHintsFromContent(content);
+    for (const id of resolvedIds) {
+      assists.add(id);
+    }
+    if (unresolvedNames.length) {
+      guests = dedupeStrings(unresolvedNames.slice(0, AUTO_ASSIST_LIMIT));
+    }
+  }
   if (assists.size === 0 && guests.length === 0) {
     return { handled: false, assists: [], guests: [] };
   }
-  return { handled: true, assists: Array.from(assists), guests };
+  return { handled: true, assists: Array.from(assists), guests, skipped: false };
+}
+
+function cleanAssistName(raw) {
+  if (!raw) return null;
+  let value = raw.replace(/<@!?(\d+)>/g, '').replace(/[@#]/g, '').trim();
+  value = value.replace(/\b(?:for|on|during|while|watching|covering|holding|running|flying|guarding|supporting|helping|against|near|in|at)\b.*$/i, '').trim();
+  value = value.replace(/[^a-z0-9\s'._-]/gi, ' ').replace(/\s+/g, ' ').trim();
+  if (!value || value.length < 2) return null;
+  if (/^\d+$/.test(value)) return null;
+  if (!/[a-z]/i.test(value)) return null;
+  if (ASSIST_NAME_STOPWORDS.test(value.toLowerCase())) return null;
+  return value;
+}
+
+function extractAssistHintsFromContent(content) {
+  if (!content) return { resolvedIds: [], unresolvedNames: [] };
+  const candidates = [];
+  for (const pattern of ASSIST_CAPTURE_PATTERNS) {
+    pattern.lastIndex = 0;
+    let match;
+    while ((match = pattern.exec(content)) !== null) {
+      const segment = (match.groups?.names || '').trim();
+      if (!segment) continue;
+      const pieces = segment.split(ASSIST_NAME_SPLIT_REGEX).map((part) => cleanAssistName(part)).filter(Boolean);
+      candidates.push(...pieces);
+    }
+  }
+  if (!candidates.length) return { resolvedIds: [], unresolvedNames: [] };
+  const uniqueNames = dedupeStrings(candidates).slice(0, AUTO_ASSIST_LIMIT * 2);
+  const resolvedIds = [];
+  const unresolvedNames = [];
+  for (const name of uniqueNames) {
+    const user = getUserFromCacheByName?.(name);
+    if (user?.id) {
+      resolvedIds.push(user.id);
+    } else {
+      unresolvedNames.push(name);
+    }
+    if (resolvedIds.length >= AUTO_ASSIST_LIMIT) break;
+  }
+  return { resolvedIds, unresolvedNames };
+}
+
+function resolveAssistNamesFromExtraction(names = []) {
+  if (!Array.isArray(names) || !names.length) {
+    return { assists: [], guests: [] };
+  }
+  const assists = new Set();
+  const guests = [];
+  for (const raw of names) {
+    const mentionMatch = typeof raw === 'string' ? raw.match(/<@!?(\d+)>/) : null;
+    if (mentionMatch) {
+      assists.add(mentionMatch[1]);
+      continue;
+    }
+    const cleaned = cleanAssistName(raw);
+    if (!cleaned) continue;
+    const user = getUserFromCacheByName?.(cleaned);
+    if (user?.id) {
+      assists.add(String(user.id));
+    } else {
+      guests.push(cleaned);
+    }
+    if (assists.size >= AUTO_ASSIST_LIMIT) break;
+  }
+  return {
+    assists: Array.from(assists),
+    guests: dedupeStrings(guests).slice(0, AUTO_ASSIST_LIMIT),
+  };
+}
+
+function extractionIndicatesSolo(names = []) {
+  if (!Array.isArray(names) || !names.length) return false;
+  return names.some((value) => typeof value === 'string' && /\b(none|solo|alone|no assists?)\b/i.test(value));
+}
+
+function mapExtractionCargoToItems(entries = []) {
+  return entries
+    .slice(0, AUTO_EXTRACTION_MAX_CARGO)
+    .map((entry) => {
+      const commodityName = entry?.name ? String(entry.name).trim() : null;
+      const amount = Number(entry?.quantity ?? entry?.amount ?? entry?.scuAmount);
+      if (!commodityName || !Number.isFinite(amount) || amount <= 0) return null;
+      return { commodity_name: commodityName, scuAmount: amount };
+    })
+    .filter(Boolean);
+}
+
+function coerceTimestampIso(value) {
+  if (!value) return null;
+  try {
+    const date = new Date(value);
+    if (Number.isNaN(date.valueOf())) return null;
+    return date.toISOString();
+  } catch {
+    return null;
+  }
+}
+
+function normalizeAirOrGroundValue(value) {
+  const str = (value == null ? '' : String(value)).trim().toLowerCase();
+  if (!str) return null;
+  if (str.startsWith('g')) return 'ground';
+  return 'air';
+}
+
+function setSessionPiracyType(session, value) {
+  if (!session) return;
+  const target = session.fields || session;
+  if (!target) return;
+  const normalized = normalizeAirOrGroundValue(value);
+  if (!normalized) return;
+  target.air_or_ground = normalized;
+  target.type_of_piracy = normalized;
+}
+
+function applyExtractionOptionalDetails(session, extraction) {
+  if (!extraction) return;
+  if (extraction.title && !session.fields.title) session.fields.title = extraction.title;
+  if (extraction.story && !session.fields.story) session.fields.story = extraction.story;
+  if (extraction.type_of_piracy) {
+    setSessionPiracyType(session, extraction.type_of_piracy);
+  }
+  if (extraction.timestamp) {
+    const normalized = coerceTimestampIso(extraction.timestamp);
+    if (normalized) session.fields.timestamp = normalized;
+  }
+  if (Array.isArray(extraction.victims) && extraction.victims.length) {
+    session.fields.victims = dedupeStrings((session.fields.victims || []).concat(extraction.victims));
+  }
+  if (Array.isArray(extraction.guests) && extraction.guests.length) {
+    session.fields.guests = dedupeStrings((session.fields.guests || []).concat(extraction.guests));
+  }
 }
 
 function normalizeUrlCandidates(values = []) {
@@ -478,8 +684,8 @@ function mergeOptionalDetails(target, updates) {
   if (Array.isArray(updates.guests) && updates.guests.length) {
     target.guests = dedupeStrings((target.guests || []).concat(updates.guests));
   }
-  if (updates.type_of_piracy) target.type_of_piracy = updates.type_of_piracy;
-  if (updates.air_or_ground) target.air_or_ground = updates.air_or_ground;
+  if (updates.type_of_piracy) setSessionPiracyType(target, updates.type_of_piracy);
+  if (updates.air_or_ground) setSessionPiracyType(target, updates.air_or_ground);
   if (updates.timestamp) target.timestamp = updates.timestamp;
   if (updates.patch) target.patch = updates.patch;
 }
@@ -509,6 +715,17 @@ function buildAssistsSummary(session) {
   return `Assists: ${mentions}`;
 }
 
+function buildGuestsSummary(session) {
+  if (!session.fields.guests || !session.fields.guests.length) return null;
+  return `Guests: ${session.fields.guests.join(', ')}`;
+}
+
+function buildAssistAndOptionalSummary(session) {
+  const guestLine = buildGuestsSummary(session);
+  const assistBlock = [buildAssistsSummary(session), guestLine].filter(Boolean).join('\n');
+  return `${assistBlock}\n\n${OPTIONAL_DETAILS_PROMPT}`;
+}
+
 function buildStatusSummary(session) {
   const sections = [];
   sections.push(`Cargo: ${session.fields.cargo.length ? `${session.fields.cargo.length} items` : 'pending'}`);
@@ -516,6 +733,53 @@ function buildStatusSummary(session) {
   sections.push(`Extras: ${session.fields.story || session.fields.title || session.fields.video_link || session.fields.victims.length || session.fields.additional_media_links.length ? 'captured' : 'optional'}`);
   sections.push(`Total Value: ${session.pricing.totalValue ? `${formatCurrency(session.pricing.totalValue)} aUEC` : 'tbd'}`);
   return sections.join(' | ');
+}
+
+function formatTimestampForSummary(value) {
+  if (!value) return null;
+  try {
+    const date = new Date(value);
+    if (Number.isNaN(date.valueOf())) return value;
+    return date.toISOString();
+  } catch {
+    return value;
+  }
+}
+
+function buildOptionalDetailsSummary(session) {
+  const fields = session.fields || {};
+  const lines = [];
+  if (fields.title) lines.push(`Title: ${fields.title}`);
+  if (fields.story) lines.push(`Story: ${fields.story}`);
+  if (fields.video_link) lines.push(`Video: ${fields.video_link}`);
+  if (fields.victims?.length) lines.push(`Victims: ${fields.victims.join(', ')}`);
+  if (fields.additional_media_links?.length) {
+    lines.push(`Media links: ${fields.additional_media_links.length}`);
+  }
+  if (fields.type_of_piracy) lines.push(`Type: ${fields.type_of_piracy}`);
+  if (fields.timestamp) {
+    const formatted = formatTimestampForSummary(fields.timestamp);
+    if (formatted) lines.push(`Timestamp: ${formatted}`);
+  }
+  if (fields.patch) lines.push(`Patch: ${fields.patch}`);
+  return lines.join('\n');
+}
+
+function buildConfirmationSummary(session) {
+  const sections = [buildCargoSummary(session), '', buildAssistsSummary(session)];
+  const guestsLine = buildGuestsSummary(session);
+  if (guestsLine) sections.push(guestsLine);
+  const optional = buildOptionalDetailsSummary(session);
+  if (optional) {
+    sections.push('', optional);
+  }
+  return sections.filter(Boolean).join('\n');
+}
+
+function buildConfirmationPrompt(session, { prefix } = {}) {
+  const header = prefix || 'Review the hit before I post it:';
+  const summary = buildConfirmationSummary(session);
+  return `${header}\n\n${summary}\n\n${CONFIRMATION_INSTRUCTIONS}`;
 }
 
 function buildSuccessMessage(session, createdHit) {
@@ -538,12 +802,19 @@ function buildSuccessMessage(session, createdHit) {
 
 function buildHitPayload(session) {
   const fields = session.fields;
+  const rawId = Number(fields.id);
+  const entryId = Number.isFinite(rawId) ? rawId : generateHitEntryId();
+  const piracyType = normalizeAirOrGroundValue(fields.air_or_ground || fields.type_of_piracy) || 'air';
+  const valueLabel = formatCurrency(Math.round(session.pricing.totalValue || 0));
+  const baseTitle = fields.title
+    || `${fields.username || fields.nickname || 'Unknown'} hit — ${valueLabel} aUEC`;
   return {
+    id: entryId,
     user_id: fields.user_id,
     username: fields.username,
     nickname: fields.nickname,
-    title: fields.title || `${fields.nickname || fields.username || 'Unknown'} hit`,
-    story: fields.story,
+    title: baseTitle,
+    story: fields.story || undefined,
     cargo: fields.cargo.map((entry) => ({
       commodity_name: entry.commodity_name,
       scuAmount: entry.scuAmount,
@@ -554,12 +825,13 @@ function buildHitPayload(session) {
     assists: fields.assists,
     guests: fields.guests,
     victims: fields.victims,
-    video_link: fields.video_link,
+    video_link: fields.video_link || undefined,
     additional_media_links: fields.additional_media_links,
-    type_of_piracy: fields.type_of_piracy,
-    air_or_ground: fields.air_or_ground,
+    type_of_piracy: piracyType || undefined,
+    air_or_ground: piracyType || undefined,
     timestamp: fields.timestamp || new Date().toISOString(),
-    patch: fields.patch,
+    patch: fields.patch || undefined,
+    fleet_activity: false,
   };
 }
 
@@ -603,7 +875,7 @@ async function processCargoStep(session, message) {
 }
 
 async function processAssistsStep(session, message) {
-  const parsed = parseAssistsFromMessage(message);
+  const parsed = parseAssistsFromMessage(message, { excludeIds: [session.botUserId] });
   if (!parsed.handled) {
     return 'Need the assists. Mention them or type `none` if you ran it solo.';
   }
@@ -612,21 +884,21 @@ async function processAssistsStep(session, message) {
     session.fields.guests = dedupeStrings((session.fields.guests || []).concat(parsed.guests));
   }
   ensureStep(session, 'details');
-  return `${buildAssistsSummary(session)}\n\nOptional: add \`title/summary/video/victims\` using \`title=\`, \`story=\`, \`video=URL\`, \`victims=Name1,Name2\` or say \`skip\`. Attach media if you have receipts.`;
+  return buildAssistAndOptionalSummary(session);
 }
 
 function processDetailsStep(session, message) {
   if (wantsSkip(message.content || '')) {
-    ensureStep(session, 'ready');
-    return 'Skipping extras. I will push the hit with what we have.';
+    ensureStep(session, 'confirm');
+    return buildConfirmationPrompt(session, { prefix: 'Skipping extras. Review everything before I post it:' });
   }
   const details = parseOptionalDetails(message);
   if (!Object.keys(details).length) {
     return 'Did not catch any details. Use `title=`, `story=`, `video=` or say `skip`.';
   }
   mergeOptionalDetails(session.fields, details);
-  ensureStep(session, 'ready');
-  return 'Extras locked. Posting the hit now.';
+  ensureStep(session, 'confirm');
+  return buildConfirmationPrompt(session, { prefix: 'Extras locked. Review everything before I post it:' });
 }
 
 function ensureSession(meta, message) {
@@ -636,6 +908,64 @@ function ensureSession(meta, message) {
     session = startSession(meta, message);
   }
   return session;
+}
+
+async function tryAutoBootstrapHitFromModel({ session, message, meta, openai }) {
+  if (!session || !message?.content) return null;
+  try {
+    const extraction = await extractHitIntentFields({ message, meta, openai });
+    if (!extraction || extraction.action !== 'hit_create') return null;
+    if ((extraction.confidence || 0) < AUTO_EXTRACTION_MIN_CONFIDENCE) return null;
+    const cargoItems = mapExtractionCargoToItems(extraction.cargo);
+    if (!cargoItems.length) return null;
+    const { priced, totalValue, totalScu } = await enrichCargoPricing(cargoItems);
+    if (!priced.length) return null;
+    session.fields.cargo = priced;
+    session.pricing.totalValue = totalValue;
+    session.pricing.totalScu = totalScu;
+
+    const resolvedAssists = resolveAssistNamesFromExtraction(extraction.assists);
+    if (resolvedAssists.assists.length) {
+      session.fields.assists = resolvedAssists.assists;
+    }
+    if (resolvedAssists.guests.length) {
+      session.fields.guests = dedupeStrings((session.fields.guests || []).concat(resolvedAssists.guests));
+    }
+    if (Array.isArray(extraction.guests) && extraction.guests.length) {
+      session.fields.guests = dedupeStrings((session.fields.guests || []).concat(extraction.guests));
+    }
+    applyExtractionOptionalDetails(session, extraction);
+
+    const mentionAssistParse = parseAssistsFromMessage(message, { excludeIds: [meta?.botUserId] });
+    if (mentionAssistParse?.handled) {
+      if (mentionAssistParse.assists.length) {
+        session.fields.assists = dedupeStrings((session.fields.assists || []).concat(mentionAssistParse.assists));
+      }
+      if (mentionAssistParse.guests.length) {
+        session.fields.guests = dedupeStrings((session.fields.guests || []).concat(mentionAssistParse.guests));
+      }
+    }
+
+    const soloAcknowledged = extractionIndicatesSolo(extraction.assists);
+    if (session.fields.assists.length || session.fields.guests.length || soloAcknowledged) {
+      ensureStep(session, 'details');
+      const reply = [
+        buildCargoSummary(session),
+        '',
+        buildAssistAndOptionalSummary(session),
+      ].join('\n');
+      return { handled: true, reply };
+    }
+
+    ensureStep(session, 'assists');
+    return {
+      handled: true,
+      reply: `${buildCargoSummary(session)}\n\nTag every assist or say \`none\`.`,
+    };
+  } catch (error) {
+    console.error('[HitIntake] auto extraction bootstrap failed:', error?.message || error);
+    return null;
+  }
 }
 
 async function processHitIntakeInteraction({ message, meta, intent, client, openai }) {
@@ -664,9 +994,31 @@ async function processHitIntakeInteraction({ message, meta, intent, client, open
     };
   }
 
+  if (!existingSession) {
+    const autoBootstrap = await tryAutoBootstrapHitFromModel({ session, message, meta, openai });
+    if (autoBootstrap?.handled) {
+      return { handled: true, intent: SESSION_INTENT, reply: autoBootstrap.reply };
+    }
+  }
+
   let reply;
   if (session.step === 'cargo') {
     reply = await processCargoStep(session, message);
+    if (session.step === 'assists') {
+      const autoAssists = parseAssistsFromMessage(message, { excludeIds: [session.botUserId] });
+      if (autoAssists.handled) {
+        session.fields.assists = autoAssists.assists;
+        if (autoAssists.guests.length) {
+          session.fields.guests = dedupeStrings((session.fields.guests || []).concat(autoAssists.guests));
+        }
+        if (autoAssists.skipped || session.fields.assists.length || session.fields.guests.length) {
+          ensureStep(session, 'details');
+          const cargoBlock = buildCargoSummary(session);
+          reply = `${cargoBlock}\n\n${buildAssistAndOptionalSummary(session)}`;
+          return { handled: true, intent: SESSION_INTENT, reply };
+        }
+      }
+    }
     return { handled: true, intent: SESSION_INTENT, reply };
   }
   if (session.step === 'assists') {
@@ -675,20 +1027,41 @@ async function processHitIntakeInteraction({ message, meta, intent, client, open
   }
   if (session.step === 'details') {
     reply = processDetailsStep(session, message);
-    if (session.step !== 'ready') {
+    return { handled: true, intent: SESSION_INTENT, reply };
+  }
+  if (session.step === 'confirm') {
+    if (wantsDone(content)) {
+      try {
+        const created = await submitHit(session, { client, openai });
+        reply = buildSuccessMessage(session, created);
+      } catch (error) {
+        console.error('[HitIntake] Failed to submit hit:', error?.message || error);
+        sessions.delete(session.key);
+        reply = `I borked the submission (${error?.message || 'unknown error'}). Try again in a bit or ping an officer.`;
+      }
       return { handled: true, intent: SESSION_INTENT, reply };
     }
-  }
-  if (session.step === 'ready') {
-    try {
-      const created = await submitHit(session, { client, openai });
-      reply = buildSuccessMessage(session, created);
-    } catch (error) {
-      console.error('[HitIntake] Failed to submit hit:', error?.message || error);
-      sessions.delete(session.key);
-      reply = `I borked the submission (${error?.message || 'unknown error'}). Try again in a bit or ping an officer.`;
+
+    if (wantsSkip(content)) {
+      return {
+        handled: true,
+        intent: SESSION_INTENT,
+        reply: 'If everything above looks right, say `done` to log it or keep adjusting fields.',
+      };
     }
-    return { handled: true, intent: SESSION_INTENT, reply };
+
+    const detailUpdates = parseOptionalDetails(message);
+    if (Object.keys(detailUpdates).length) {
+      mergeOptionalDetails(session.fields, detailUpdates);
+      reply = buildConfirmationPrompt(session, { prefix: 'Updated the details. Review before I post it:' });
+      return { handled: true, intent: SESSION_INTENT, reply };
+    }
+
+    return {
+      handled: true,
+      intent: SESSION_INTENT,
+      reply: 'Need either more field updates (e.g., `title=New Title`) or say `done` to post the hit.',
+    };
   }
   return { handled: true, intent: SESSION_INTENT, reply: 'Still working on it. Keep feeding me the details.' };
 }
@@ -696,4 +1069,14 @@ async function processHitIntakeInteraction({ message, meta, intent, client, open
 module.exports = {
   processHitIntakeInteraction,
   getActiveHitIntakeSessions: () => ({ size: sessions.size }),
+};
+
+module.exports.__internals = {
+  parseCargoInput,
+  enrichCargoPricing,
+  buildCargoSummary,
+  dedupeStrings,
+  splitList,
+  formatCurrency,
+  formatScu,
 };
