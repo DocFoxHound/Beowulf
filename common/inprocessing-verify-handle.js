@@ -219,7 +219,7 @@ async function handleSimpleJoin(interaction, client, openai){
     }
 
     // Create welcome message
-    const welcomeMessage = `Welcome ${dbUser.username} to IronPoint, the best Pirate crew in Star Citizen. Skill and creativity keep us on top, so show both and let's dominate together.`;
+    const welcomeMessage = `Welcome ${dbUser.username} to IronPoint, let them know they can feel free to join the crew whenever you see us online. If they're interested in joining, please let us know! We open recruitment periodically and it's great to see interest.`;
     const defaultReturnMessage = "Welcome to IronPoint, feel free to join the crew whenever you see us online. If you're interested in joining, please let us know! We open recruitment periodically and it's great to see interest.";
     let returnedMessage = defaultReturnMessage;
     try{
