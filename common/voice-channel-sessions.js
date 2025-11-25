@@ -59,7 +59,8 @@ async function voiceChannelSessions(client, openai) {
                 const updatedSession = {
                     ...session,
                     left_at: leftAt,
-                    minutes: diffMinutes
+                    minutes: diffMinutes,
+                    guild_id: session.guild_id || guildId
                 };
                 await updateVoiceSession(session.id, updatedSession);
                 continue;
@@ -69,7 +70,8 @@ async function voiceChannelSessions(client, openai) {
                 // User is still in the same voice channel, increment minutes
                 const updatedSession = {
                     ...session,
-                    minutes: (parseInt(session.minutes) || 0) + 1
+                    minutes: (parseInt(session.minutes) || 0) + 1,
+                    guild_id: session.guild_id || guildId
                 };
                 await updateVoiceSession(session.id, updatedSession);
             } else if (currentChannelId !== null && currentChannelId !== session.channel_id) {
@@ -81,7 +83,8 @@ async function voiceChannelSessions(client, openai) {
                 const updatedSession = {
                     ...session,
                     left_at: leftAt,
-                    minutes: diffMinutes
+                    minutes: diffMinutes,
+                    guild_id: session.guild_id || guildId
                 };
                 await updateVoiceSession(session.id, updatedSession);
 
@@ -100,7 +103,8 @@ async function voiceChannelSessions(client, openai) {
                     channel_name: channel ? channel.name : "Unknown",
                     joined_at: now.toISOString(),
                     left_at: null,
-                    minutes: 0
+                    minutes: 0,
+                    guild_id: guildId
                 };
                 await createVoiceSession(newSession);
             } else {
@@ -112,7 +116,8 @@ async function voiceChannelSessions(client, openai) {
                 const updatedSession = {
                     ...session,
                     left_at: leftAt,
-                    minutes: diffMinutes
+                    minutes: diffMinutes,
+                    guild_id: session.guild_id || guildId
                 };
                 await updateVoiceSession(session.id, updatedSession);
             }
@@ -140,7 +145,8 @@ async function voiceChannelSessions(client, openai) {
                         channel_name: channel ? channel.name : "Unknown",
                         joined_at: now.toISOString(),
                         left_at: null,
-                        minutes: 0
+                        minutes: 0,
+                        guild_id: guildId
                     };
                     await createVoiceSession(newSession);
                 }
