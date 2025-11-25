@@ -90,14 +90,7 @@ async function voiceChannelSessions(client, openai) {
 
                 // Create new session for the new channel
                 const channel = guild.channels.cache.get(currentChannelId);
-                // Generate a unique bigint ID (timestamp in ms + last 6 digits of userId + last 6 digits of channelId)
-                const ts = Date.now();
-                const userPart = session.user_id.slice(-6);
-                const channelPart = currentChannelId.slice(-6);
-                const newId = `${Date.now()}_${userPart}_${channelPart}`;
-
                 const newSession = {
-                    id: newId,
                     user_id: session.user_id,
                     channel_id: currentChannelId,
                     channel_name: channel ? channel.name : "Unknown",
@@ -132,14 +125,7 @@ async function voiceChannelSessions(client, openai) {
                 if (!activeUserIds.has(userId)) {
                     // New user joined, create session
                     const channel = guild.channels.cache.get(channelId);
-                    // Generate a unique bigint ID (timestamp in ms + last 6 digits of userId + last 6 digits of channelId)
-                    const ts = Date.now();
-                    const userPart = userId.slice(-6);
-                    const channelPart = channelId.slice(-6);
-                    const newId = `${Date.now()}_${userPart}_${channelPart}`;
-                    // const newId = BigInt(`${ts}${userPart}${channelPart}`);
                     const newSession = {
-                        id: newId,
                         user_id: userId,
                         channel_id: channelId,
                         channel_name: channel ? channel.name : "Unknown",
