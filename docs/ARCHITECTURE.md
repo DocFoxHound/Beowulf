@@ -3,78 +3,67 @@
 This document provides a high-level view of the Beowulf Discord bot system: major subsystems, data flows, and integration points.
 
 ## High-Level Goals
-- Provide intelligent, context-aware Discord interactions (commands, conversational replies).
-- Maintain in-game/org data (hits, fleets, schedules, leaderboards, awards) with automated processing.
-- Ingest conversational and operational data into vector knowledge for retrieval-augmented responses.
+- Automate Discord notifications and data sync for org operations (hits, fleets, schedules, leaderboards, awards).
+- Maintain in-game/org data pipelines with deterministic processing and scheduled refreshes.
+- Capture conversational and operational data for analytics (vector storage still maintained even without live GPT responses).
 - Offer HTTP endpoints for external services to push events (hit creation, fleet updates, awards).
 - Operate reliably across live/test environments with isolated configuration.
 
 ## Subsystems
-1. Discord Client Core: Initialization, event listeners, command loader.
-2. Command Framework: Dynamic discovery of slash command modules from `commands/`.
-3. Conversation Handling: Mention/reply detection routing into `chatgpt/handler.js` and legacy thread-based responders.
-4. Market & Location Data: Periodic UEX ingestion + in-memory caching for trade/route advice, found under `common/process-uex-data.js` and `chatgpt/market-answerer.js`.
-5. Vector Knowledge & Embeddings: Chat, hit logs, player stats ingestion using OpenAI embeddings and vector store operations in `vector-handling/`.
-6. Scheduling & Events: Creation/update of events with RSVP buttons, periodic management (
-`functions/create-new-schedule.js`, `functions/update-schedule.js`, `common/event-management.js`).
-7. Leaderboards & Awards: Processing logs and stats for automated awards (`functions/process-leaderboards.js`, `common/automated-awards.js`).
-8. User Verification & Role Sync: Mapping Discord roles to rank/prestige tiers (`userlist-functions/userlist-controller.js` + verification flows).
-9. Express HTTP API: Endpoints for external triggers integrated into the Discord channel ecosystem.
-10. Persistence & Caching: PostgreSQL (via `pg` & `db/pool.js`), in-memory Maps, temporary lock files, file-based chat logs.
-11. Environment & Configuration: Extensive `process.env` usage grouped in `ENVIRONMENT.md`.
+1. Discord Client Core: Initialization, event listeners, and scheduled job orchestration.
+2. Automation Jobs: Timed tasks for UEX refresh, awards, leaderboards, cache refresh, and knowledge ingestion.
+3. Vector Knowledge & Embeddings: Chat, hit logs, player stats ingestion using OpenAI embeddings (retained for analytics/search even though no conversational handler consumes it live).
+4. Scheduling & Events: Creation/update of events with RSVP buttons, periodic management (`functions/create-new-schedule.js`, `functions/update-schedule.js`, `common/event-management.js`).
+5. Leaderboards & Awards: Processing logs and stats for automated awards (`functions/process-leaderboards.js`, `common/automated-awards.js`).
+6. User Verification & Role Sync: Mapping Discord roles to rank/prestige tiers (`userlist-functions/userlist-controller.js` + verification flows).
+7. Express HTTP API: Endpoints for external triggers integrated into the Discord channel ecosystem.
+8. Persistence & Caching: PostgreSQL (via `pg` & `db/pool.js`), in-memory Maps, temporary lock files, file-based chat logs.
+9. Environment & Configuration: Extensive `process.env` usage grouped in `ENVIRONMENT.md`.
 
 ## Mermaid: System Context Diagram
 ```mermaid
 graph TD
   subgraph Discord
     C[Channels & Threads]
-    U[Users]
     B[Bot Client]
   end
   subgraph External Services
-    EXT_API[Org Backend / Game Data]
+    EXT_API[Org Backend]
     UEX[UEX Data Source]
   end
   subgraph Data Layer
     DB[(PostgreSQL)]
     Vector[OpenAI Vector Store]
-    Files[(Chatlogs / JSON Cache)]
+    Logs[(Chatlogs / JSON Cache)]
   end
   EXT_API -->|HTTP Push| API[Express Endpoints]
-  UEX -->|Periodic Fetch| IngestUEX[UEX Refresh Sequence]
   API -->|Invoke| Handlers[Domain Handlers]
-  B -->|Events| Handlers
   Handlers -->|Read/Write| DB
-  Handlers -->|Embeddings| Vector
-  Handlers -->|Cache Prime| Files
-  B -->|Replies / Commands| C
-  C -->|User Messages| B
-  DB -->|Preload| B
-  Vector -->|Retrieval| HandlerLLM[LLM Response Logic]
-  HandlerLLM -->|Responses| B
+  Handlers -->|Notify| B
+  B -->|Embeds / Threads| C
+  C -->|Operational Messages| Logs
+  Logs -->|Batch Ingest| Vector
+  Vector -->|Analytics / Future Use| Handlers
+  UEX -->|Fetch| IngestUEX[UEX Refresh]
+  IngestUEX --> DB
 ```
 
 ## Data Flow Summary
 1. Startup:
-   - Load environment, acquire single-instance lock.
-   - Prime channels, preload DB tables, refresh userlist, optionally run UEX refresh.
-   - Warm caches (systems, stations, planets, outposts, terminals, market data).
-   - Optionally batch-ingest historical chat to vector store.
+  - Load environment, acquire single-instance lock.
+  - Prime channels, preload DB tables, refresh userlist, optionally run UEX refresh.
+  - Skip legacy chatgpt cache warmup (removed) but continue batch ingestion flags if enabled.
 2. Runtime:
-   - Discord events trigger command handlers or conversation routing.
-   - Message ingestion (live) pushes to vector embeddings if enabled.
-   - Scheduled intervals recalculate leaderboards, awards, user stats, and market data.
-   - External systems POST new hits, fleets, schedules; bot posts formatted embeds/threads.
-   - Retrieval pipeline uses vector + fallback heuristics to enrich LLM responses.
+  - Discord events handle membership changes, button interactions, and ingestion-only message logging (no conversational replies).
+  - Message ingestion (live) still pushes to vector embeddings if enabled for downstream analytics.
+  - Scheduled intervals recalculate leaderboards, awards, user stats, and market data.
+  - External systems POST new hits, fleets, schedules; bot posts formatted embeds/threads.
 
 ## Key Modules & Responsibilities
 | Module | Responsibility |
 |--------|----------------|
 | `index.js` | Orchestrates startup, intervals, Discord event binding, Express API. |
-| `chatgpt/handler.js` | Core message interpretation, routing, retrieval, AI generation. |
-| `commands/*` | Slash command definitions (`data` + `execute`). |
 | `common/process-uex-data.js` | Refreshes market DB tables from UEX. |
-| `chatgpt/market-answerer.js` | Deterministic trade/location advice functions. |
 | `vector-handling/*` | Chat/hits/player stats ingestion & vector store management. |
 | `userlist-functions/userlist-controller.js` | Role-to-rank + prestige level calculations. |
 | `functions/*` | Domain-specific event & state mutation handlers (hits, fleets, schedules). |
@@ -105,27 +94,23 @@ graph TD
 
 ## Extensibility Guidelines
 - Add new scheduled tasks: implement function and register setInterval in a dedicated scheduler module (future). Document in SCHEDULES-JOBS.md.
-- Add new command: place in `commands/<group>/<name>.js` exporting `data` (SlashCommandBuilder) and `execute`.
 - Add new ingestion source: create ingest function in `vector-handling/` and integrate with flags.
 - Introduce new data domain: define API in `api/`, caching in `common/`, handlers in `functions/`.
 
-## Mermaid: Command Lifecycle
+## Mermaid: Event & API Lifecycle
 ```mermaid
 sequenceDiagram
-  participant User
-  participant Discord
-  participant Bot
+  participant Service as Ext Service
+  participant API as Express API
   participant Handler
-  User->>Discord: Slash Command / Message
-  Discord->>Bot: Event (InteractionCreate / MessageCreate)
-  Bot->>Handler: Dispatch (command.execute / handleBotConversation)
-  Handler->>DB: Read contextual data
-  Handler->>Vector: Retrieval (if enabled)
-  Handler->>OpenAI: LLM / Embedding calls
-  OpenAI-->>Handler: Response / Embeddings
-  Handler-->>Bot: Formatted reply (embed/content)
-  Bot-->>Discord: Respond to interaction / post message
-  Discord-->>User: Visible result
+  participant Bot
+  participant Discord
+  Service->>API: POST payload (hit/fleet/schedule)
+  API->>Handler: Validate & transform
+  Handler->>DB: Persist state
+  Handler->>Bot: Send embed/thread update
+  Bot->>Discord: Publish message
+  Discord-->>Users: Visible notification
 ```
 
 ## Pending / Legacy Components

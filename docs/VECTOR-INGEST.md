@@ -1,6 +1,6 @@
 # Vector Ingestion & Retrieval
 
-This document explains how conversational, operational, and statistical data become embeddings in the OpenAI vector store and how they are used during response generation.
+This document explains how conversational, operational, and statistical data become embeddings in the OpenAI vector store and how they are retained for analytics or future retrieval features (live GPT responses have been removed).
 
 ## Goals
 - Persist salient org knowledge (chat summaries, hits, player stats) for retrieval-augmented assistance.
@@ -38,8 +38,6 @@ graph TD
   StatsIngest --> Queue
   Queue --> EmbedCalls[OpenAI Embeddings]
   EmbedCalls --> VectorStore[Vector Store]
-  VectorStore --> Retrieval[Retrieval Layer]
-  Retrieval --> Handler[chatgpt/handler]
 ```
 
 ## Embedding Workflow (Pseudo)
@@ -52,13 +50,10 @@ for (const item of items) {
 }
 ```
 
-## Retrieval Strategy
-1. Bot receives a mention or reply.
-2. Handler constructs query context (last messages, inferred intent).
-3. If `KNOWLEDGE_RETRIEVAL` enabled, perform vector similarity search:
-   - Prefer vector store when `KNOWLEDGE_PREFER_VECTOR === 'true'`.
-   - Combine top-k results into augmented prompt sections.
-4. Fallback: Use deterministic modules (market answerers, cached stats) when vector disabled or insufficient.
+## Current Usage
+- Embeddings are still generated and pruned so downstream analytics or future retrieval consumers can reuse the data without re-ingesting history.
+- No live Discord replies read from the vector store; `handleBotConversation` and related GPT features were removed.
+- If you add a new consumer (e.g., reporting dashboards), read directly from the vector store using the metadata filters established during ingestion (source, channel, timestamp).
 
 ## Ranking & Filtering
 - Similarity (cosine) handled by OpenAI vector store.
@@ -89,28 +84,16 @@ for (const item of items) {
 ## Suggested Improvements
 1. Introduce local vector cache (e.g., disk-based FAISS) for resilience on OpenAI outages.
 2. Add semantic categorization: tag embeddings by domain (market, fleet, social) to allow scoped retrieval.
-3. Implement query-time re-ranking using MMR (Maximal Marginal Relevance) to reduce redundancy.
-4. Provide an admin command to list ingestion stats (counts per source, last run times).
-5. Export minimal retrieval trace in replies when `DEBUG_RETRIEVAL === 'true'` (already partially implemented).
+3. Implement query-time re-ranking using MMR (Maximal Marginal Relevance) if/when a retrieval consumer returns.
+4. Provide an admin command or HTTP endpoint to list ingestion stats (counts per source, last run times).
+5. Export minimal retrieval trace via logs to help future consumers debug similarity searches.
 
 ## Admin & Debugging
-- Enable `DEBUG_RETRIEVAL` to log retrieval diagnostics.
-- Use role-gated slash commands (planned) to trigger manual re-ingest cycles.
+- Enable `DEBUG_RETRIEVAL` to log ingestion diagnostics (retained for parity even though live retrieval is disabled).
+- Manual re-ingest cycles can be triggered by invoking the relevant functions directly (see `vector-handling/extra-ingest.js`).
 
 ## Mermaid: Retrieval Decision
-```mermaid
-flowchart LR
-  Start[Incoming Mention] --> CheckFlags{Retrieval Enabled?}
-  CheckFlags -->|No| Fallback[Deterministic Only]
-  CheckFlags -->|Yes| VectorQuery[Vector Search]
-  VectorQuery --> Enough{Results >= k?}
-  Enough -->|No| Fallback
-  Enough -->|Yes| Merge[Merge Context]
-  Merge --> Prompt[Compose LLM Prompt]
-  Fallback --> Prompt
-  Prompt --> LLM[OpenAI Completion]
-  LLM --> Reply[Discord Reply]
-```
+The previous real-time retrieval decision tree has been removed along with the chatgpt handler. Reintroduce it only if you build another consumer that queries the vector store before responding in Discord.
 
 ## Glossary
 - Embedding: Numeric vector representation of text for similarity search.

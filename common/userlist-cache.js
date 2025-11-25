@@ -83,10 +83,15 @@ function getUserListMeta() {
   return { loadedAt: state.loadedAt, count: state.users.length };
 }
 
+function getUserListCacheState() {
+  return state;
+}
+
 module.exports = {
   refreshUserListCache,
   getUserListCache,
   getUserListMeta,
   getUserFromCacheById,
   getUserFromCacheByName,
+  getUserListCacheState,
 };

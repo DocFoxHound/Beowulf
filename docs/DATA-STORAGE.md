@@ -20,7 +20,7 @@ This document details the persistence and caching mechanisms used by the bot.
 ## In-Memory Data Structures
 - `channelIds`, `channelIdAndName` – Channel access control and mapping.
 - `userCache` (Map) – Cached user role/rank info refreshed every 12 hours.
-- Market cache: Complex nested arrays/maps in `chatgpt/data-cache.js` (see `market-data.md`).
+- Market cache: legacy `chatgpt/data-cache.js` structures were removed; consumers now query the DB directly.
 - Preloaded DB tables: `preloadedDbTables` for contextual message handling.
 
 ## Vector Store

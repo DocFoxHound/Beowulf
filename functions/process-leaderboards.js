@@ -3,6 +3,7 @@ const { createPlayerLeaderboardEntriesBulk, deleteAllPlayerLeaderboardEntries, c
 const { getAllGameVersions } = require('../api/gameVersionApi');
 const crypto = require('crypto'); // Add this at the top
 const { processLeaderboardLogs } = require('./process-leaderboard-logs');
+const { setPlayerLeaderboardCache, setOrgLeaderboardCache } = require('../common/leaderboard-cache.js');
 
 // Helper function to pause execution for ms milliseconds
 function sleep(ms) {
@@ -122,6 +123,11 @@ async function processPlayerLeaderboards(client, openai) {
     // Call process-leaderboard-logs with allPlayers (unaggregated)
     await processLeaderboardLogs(client, openai);
     await processOrgLeaderboards(client, openai, allPlayers);
+    try {
+        setPlayerLeaderboardCache(allPlayers, { source: 'processPlayerLeaderboards', createdAt: createdAtSeries });
+    } catch (cacheErr) {
+        console.error('[LeaderboardCache] Failed to update player cache:', cacheErr?.message || cacheErr);
+    }
     console.log("Completed processing Player Leaderboards.");
 }
 
@@ -226,6 +232,11 @@ async function processOrgLeaderboards(client, openai) {
         } catch (error) {
             console.error(`Error processing map ${mapTitle}:`, error.response ? error.response.data : error.message);
         }
+    }
+    try {
+        setOrgLeaderboardCache(allOrgs, { source: 'processOrgLeaderboards', createdAt: createdAtSeries });
+    } catch (cacheErr) {
+        console.error('[LeaderboardCache] Failed to update org cache:', cacheErr?.message || cacheErr);
     }
     console.log("Completed processing.");
 }

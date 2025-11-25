@@ -49,6 +49,16 @@ This document enumerates all environment variables referenced in the codebase an
 - `BANTER_USE_LLM` (default 'true') – Enables LLM for banter messages.
 - `KNOWLEDGE_RETRIEVAL` (default 'true') – Enables retrieval augmentation.
 - `KNOWLEDGE_PREFER_VECTOR` (default 'true') – Prefers vector store over other sources.
+- `CHATGPT_KNOWLEDGE_LOOKUP` / `CHATGPT_KNOWLEDGE_LIMIT` – Legacy `/api/knowledge` search toggle + per-query row cap.
+- `CHATGPT_KNOWLEDGE_DOC_LOOKUP` / `CHATGPT_KNOWLEDGE_DOC_LIMIT` – Enables `knowledge_docs` (knowledge-doc-ingest) retrieval and caps surfaced chunks per request.
+- `CHATGPT_KNOWLEDGE_DOC_MIN_SCORE` – Semantic similarity cutoff (0–1) for doc vector hits.
+- `CHATGPT_KNOWLEDGE_DOC_SCAN_LIMIT` / `CHATGPT_KNOWLEDGE_DOC_SCAN_PAGE` – Keyword fallback scanner caps (set scan limit to 0 to disable lexical fallback when vectors are missing).
+- `CHATGPT_ENTITY_TOP_K` – Number of top entity catalog matches surfaced per request (drives prompt → intent → entity flow).
+- `CHATGPT_ENTITY_INDEX_REFRESH_MS` – Rebuild cadence for the entity catalog (defaults to 30 minutes).
+- `CHATGPT_ENTITY_DOC_LIMIT` – Knowledge documents sampled into the entity catalog (controls doc-topic entity breadth).
+- `CHATGPT_ENTITY_REBUILD_DEBOUNCE_MS` – Delay (ms) before auto-rebuilding the catalog after a UEX cache refresh; prevents thrash when multiple datasets update.
+- `CHATGPT_ENTITY_DB_LIMIT` – Max game-entity rows fetched per rebuild.
+- `CHATGPT_ENTITY_INCLUDE_CACHE_FALLBACK` (default 'true') – When true, append legacy UEX catalog entries if the DB is empty.
 - `USER_OPINION_USE_LLM` (default 'true') – Generates opinion responses via LLM.
 - `KNOWLEDGE_INGEST_ENABLE` – Master flag controlling ingestion pipelines (chat/hits/stats).
 - `CHAT_VECTOR_INGEST_ON_START` – Batch ingest historical chat logs at startup.
@@ -65,7 +75,45 @@ This document enumerates all environment variables referenced in the codebase an
 - `UEX_FRESH_LOAD_ON_START` – If 'true', forces full UEX data refresh on boot.
 - (Various API route vars used in `api/*` and deprecated modules):
   - `SERVER_URL`, `API_SCI_API_ROUTES`, `API_CLASS`, etc. – Base URLs and route segments for backend/UEX bridging.
+- `API_GAME_ENTITIES_ROUTES` – REST path (default `/api/game-entities`) used by the entity catalog model/API wrapper.
+- `API_ITEMS_FPS_ROUTES` – REST path (default `/api/items-fps`) for the FPS items catalog CRUD endpoints.
+- `API_ITEMS_COMPONENTS_ROUTES` – REST path (default `/api/items-components`) for the ship component catalog CRUD endpoints.
+- `API_LIST_SHIPS_ROUTES` – REST path (default `/api/list-ships`) for the curated ship list CRUD endpoints.
+- `API_RCO_MINING_DATA_ROUTES` – REST path (default `/api/rco-mining-data`) powering the RCO mining data API/model wrapper.
 - `DEBUG_MARKET_FALLBACK` – Logs fallback errors in market answerer.
+
+## Game Entities Catalog
+- `GAME_ENTITIES_EXISTING_LIMIT` (default 20000) – Cap when preloading current rows before upserts.
+- `GAME_ENTITIES_COMMODITY_LIMIT`, `GAME_ENTITIES_ITEM_LIMIT`, `GAME_ENTITIES_SHIP_LIMIT`, `GAME_ENTITIES_LOCATION_LIMIT` – Optional limits for `npm run sync:entities` dataset sizes.
+- `GAME_ENTITIES_FPS_LIMIT`, `GAME_ENTITIES_COMPONENT_LIMIT`, `GAME_ENTITIES_SHIP_LIST_LIMIT` – Caps for how many `items_fps`, `items_components`, and `ship_list` rows the sync ingests per run.
+- `GAME_ENTITIES_RCO_MINING_LIMIT` – Cap for how many `rco_mining_data` rows the entity sync inspects per run.
+- `ENTITY_UPLOAD_MAX_FILE_BYTES` (default 2 MB) – Slash command upload guard.
+- `ENTITY_UPLOAD_MAX_ROWS` (default 500) – Max CSV rows processed per upload.
+- `ENTITY_UPLOAD_ROLE_IDS` / `TEST_ENTITY_UPLOAD_ROLE_IDS` – Override which roles can use `/entity-upload` (falls back to knowledge-doc-ingest roles if unset).
+- `API_GAME_ENTITIES_ROUTES` – REST route for catalog CRUD (see above).
+
+## Player FPS Items Catalog
+- `PLAYER_ITEM_UPLOAD_ROLE_IDS` / `TEST_PLAYER_ITEM_UPLOAD_ROLE_IDS` – Roles permitted to run `/player-item-upload` (falls back to entity/knowledge ingestor roles when unset).
+- `PLAYER_ITEM_UPLOAD_MAX_FILE_BYTES` (default 2 MB) – File-size cap for the player item uploader.
+- `PLAYER_ITEM_UPLOAD_MAX_ROWS` (default 1000) – Row limit per upload (applies to both CSV and JSON payloads).
+- `PLAYER_ITEM_UPLOAD_EXISTING_LIMIT` (default 20000) – How many existing FPS items to preload for name-based dedupe before each upload.
+
+## Ship Component Items Catalog
+- `COMPONENT_ITEM_UPLOAD_ROLE_IDS` / `TEST_COMPONENT_ITEM_UPLOAD_ROLE_IDS` – Roles allowed to run `/component-item-upload` (falls back to player/entity/knowledge roles when unset).
+- `COMPONENT_ITEM_UPLOAD_MAX_FILE_BYTES` (default 2 MB) – Attachment guard for the component uploader.
+- `COMPONENT_ITEM_UPLOAD_MAX_ROWS` (default 1000) – Row limit per upload batch.
+- `COMPONENT_ITEM_UPLOAD_EXISTING_LIMIT` (default 20000) – Number of existing component rows to pull when deduplicating by name.
+
+## Ship List Catalog
+- `SHIP_LIST_UPLOAD_ROLE_IDS` / `TEST_SHIP_LIST_UPLOAD_ROLE_IDS` – Roles allowed to run `/ship-list-upload` (falls back to other ingest roles when unset).
+- `SHIP_LIST_UPLOAD_MAX_FILE_BYTES` (default 2 MB) – File guard for the curated ship uploader.
+- `SHIP_LIST_UPLOAD_MAX_ROWS` (default 1000) – Row limit per upload batch.
+- `SHIP_LIST_UPLOAD_EXISTING_LIMIT` (default 20000) – Existing curated ship rows to load for name-based dedupe before each upload.
+
+## RCO Mining Data Uploads
+- `RCO_MINING_UPLOAD_ROLE_IDS` / `TEST_RCO_MINING_UPLOAD_ROLE_IDS` – Roles that can run `/rco-mining-upload` (falls back to other ingest roles when unset).
+- `RCO_MINING_UPLOAD_MAX_FILE_BYTES` (default 2 MB) – File guard for JSON attachments processed by the mining uploader.
+- `RCO_MINING_UPLOAD_MAX_ROWS` (default 1000) – Row limit per upload batch for mining JSON payloads.
 
 ## Scheduling & Intervals (implicit via code comments)
 Intervals are hardcoded; toggles exist via feature flags above. Documented in SCHEDULES-JOBS.md.

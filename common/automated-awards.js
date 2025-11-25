@@ -2,10 +2,8 @@
 const { refreshPlayerStatsView, getAllPlayerStats } = require('../api/playerStatsApi.js');
 const { getActiveBadgeReusables } = require('../api/badgeReusableApi.js');
 const { getAllBadges, createBadge } = require('../api/badgeApi.js');
-const { notifyForAward } = require('./bot-notify.js');
-const { getUserById } = require('../api/userlistApi.js');
 
-async function automatedAwards(client, openai) {
+async function automatedAwards() {
     console.log('Running automated awards...');
     // Refresh the materialized view
     await refreshPlayerStatsView();
@@ -90,21 +88,6 @@ async function automatedAwards(client, openai) {
                     badge_icon: badgeReusable.emoji_name || '',
                     badge_url: badgeReusable.image_url || '',
                 });
-                // Fetch user and notify for award
-                try {
-                    const user = await getUserById(player.user_id);
-                    const displayName = user && (user.nickname || user.username || player.user_id);
-                    // await notifyForAward(
-                    //     badgeReusable.badge_name,
-                    //     badgeReusable.badge_description || '',
-                    //     displayName,
-                    //     player.user_id,
-                    //     openai,
-                    //     client
-                    // );
-                } catch (err) {
-                    console.error('Error notifying for award:', err);
-                }
             }
         }
     }
@@ -178,4 +161,4 @@ function qualifiesForBadgeReusable(player, badgeReusable) {
     }
 }
 
-module.exports = { automatedAwards, qualifiesForBadgeReusable };
+module.exports = { automatedAwards };

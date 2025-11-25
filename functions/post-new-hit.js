@@ -1,6 +1,7 @@
 const { ChannelType, EmbedBuilder } = require("discord.js");
 const { getFleetById } = require("../api/userFleetApi"); // <-- Add this import
 const { editHitLog } = require("../api/hitTrackerApi"); // <-- Add this import
+const { upsertHitInCache, removeHitFromCache } = require("../common/hit-cache.js");
 
 // Simple in-memory de-duplication to prevent double posting the same hit
 const _postedHitCache = new Map(); // key -> timestamp
@@ -61,6 +62,42 @@ function toEmbedValue(value, fallback = "N/A", limit = 1024) {
     }
 }
 
+function buildHitEmbed(hitTrack) {
+    const assistList = Array.isArray(hitTrack.assists) && hitTrack.assists.length > 0
+        ? hitTrack.assists.map(id => `<@${id}>`)
+        : [];
+    const guestList = Array.isArray(hitTrack.guests) && hitTrack.guests.length > 0
+        ? hitTrack.guests
+        : [];
+    let assistMentions = "None";
+    if (assistList.length > 0 || guestList.length > 0) {
+        assistMentions = assistList.join(", ");
+        if (guestList.length > 0) {
+            if (assistMentions.length > 0) assistMentions += ", ";
+            assistMentions += guestList.join(", ");
+        }
+    }
+
+    return new EmbedBuilder()
+        .setTitle(`${hitTrack.nickname || hitTrack.username}: ${hitTrack.title}`)
+        .setDescription(toEmbedValue(hitTrack.story, ""))
+        .addFields(
+            { name: "User", value: toEmbedValue(hitTrack.nickname || hitTrack.username), inline: true },
+            { name: "Hit ID", value: toEmbedValue(hitTrack.id), inline: true },
+            { name: "Type of Piracy", value: toEmbedValue(hitTrack.type_of_piracy), inline: true },
+            { name: "Total SCU", value: toEmbedValue(hitTrack.total_scu), inline: true },
+            { name: "Total Value", value: toEmbedValue(hitTrack.total_value), inline: true },
+            { name: "Total Cut Value", value: toEmbedValue(hitTrack.total_cut_value), inline: true },
+            { name: "Assists", value: toEmbedValue(assistMentions, "None"), inline: true },
+            { name: "Victims", value: toEmbedValue((hitTrack.victims || []).join(", "), "None"), inline: true },
+            { name: "Video Link", value: toEmbedValue(hitTrack.video_link, "N/A", 1024), inline: true },
+            { name: "Additional Media", value: toEmbedValue((hitTrack.additional_media_links || []).join(", "), "None"), inline: false },
+            { name: "Timestamp", value: toEmbedValue(hitTrack.timestamp), inline: true },
+            { name: "Cargo JSON", value: toEmbedValue(hitTrack.cargo), inline: false }
+        )
+        .setColor(0x0099ff);
+}
+
 async function handleHitPost(client, openai, hitTrack) {
     try {
         // De-dup guard: skip if we've already posted this hit recently or it already has a thread
@@ -74,22 +111,6 @@ async function handleHitPost(client, openai, hitTrack) {
         const channel = await client.channels.fetch(channelId);
         if (!channel || channel.type !== ChannelType.GuildForum) {
             throw new Error("Channel not found or is not a forum channel.");
-        }
-
-        // Build assist mentions and guests
-        let assistMentions = "None";
-        const assistList = Array.isArray(hitTrack.assists) && hitTrack.assists.length > 0
-            ? hitTrack.assists.map(id => `<@${id}>`)
-            : [];
-        const guestList = Array.isArray(hitTrack.guests) && hitTrack.guests.length > 0
-            ? hitTrack.guests
-            : [];
-        if (assistList.length > 0 || guestList.length > 0) {
-            assistMentions = assistList.join(", ");
-            if (guestList.length > 0) {
-                if (assistMentions.length > 0) assistMentions += ", ";
-                assistMentions += guestList.join(", ");
-            }
         }
 
         // Fetch fleet names from fleet_ids
@@ -111,24 +132,7 @@ async function handleHitPost(client, openai, hitTrack) {
         }
 
         // Create the embed
-        const embed = new EmbedBuilder()
-            .setTitle(`${hitTrack.nickname || hitTrack.username}: ${hitTrack.title}`)
-            .setDescription(toEmbedValue(hitTrack.story, ""))
-            .addFields(
-                { name: "User", value: toEmbedValue(hitTrack.nickname || hitTrack.username), inline: true },
-                { name: "Hit ID", value: toEmbedValue(hitTrack.id), inline: true },
-                { name: "Type of Piracy", value: toEmbedValue(hitTrack.type_of_piracy), inline: true },
-                { name: "Total SCU", value: toEmbedValue(hitTrack.total_scu), inline: true },
-                { name: "Total Value", value: toEmbedValue(hitTrack.total_value), inline: true },
-                { name: "Total Cut Value", value: toEmbedValue(hitTrack.total_cut_value), inline: true },
-                { name: "Assists", value: toEmbedValue(assistMentions, "None"), inline: true },
-                { name: "Victims", value: toEmbedValue((hitTrack.victims || []).join(", "), "None"), inline: true },
-                { name: "Video Link", value: toEmbedValue(hitTrack.video_link, "N/A", 1024), inline: true },
-                { name: "Additional Media", value: toEmbedValue((hitTrack.additional_media_links || []).join(", "), "None"), inline: false },
-                { name: "Timestamp", value: toEmbedValue(hitTrack.timestamp), inline: true },
-                { name: "Cargo JSON", value: toEmbedValue(hitTrack.cargo), inline: false }
-            )
-            .setColor(0x0099ff);
+        const embed = buildHitEmbed(hitTrack);
 
         // Create a new post (thread) in the forum channel with the embed
         const thread = await channel.threads.create({
@@ -163,6 +167,9 @@ async function handleHitPost(client, openai, hitTrack) {
         hitTrack.thread_id = thread.id;
         try {
             await editHitLog(hitTrack.id, hitTrack);
+            try { upsertHitInCache(hitTrack, { source: 'handleHitPost' }); } catch (cacheErr) {
+                console.error('[HitCache] Failed to upsert after post:', cacheErr?.message || cacheErr);
+            }
         } catch (err) {
             console.error(err);
         }
@@ -200,7 +207,7 @@ async function handleHitPostUpdate(client, hitBefore, hitAfter) {
         const addChange = (label, fromVal, toVal, opts = {}) => {
             const f = toEmbedValue(fromVal, '—', opts.limit || 512);
             const t = toEmbedValue(toVal, '—', opts.limit || 512);
-            if (f !== t) changed.push({ name: label, value: `Before: ${f}\nAfter: ${t}`, inline: false });
+            if (f !== t) changed.push({ name: label, before: f, after: t });
         };
 
         addChange('Title', hitBefore?.title, hitAfter?.title, { limit: 256 });
@@ -218,13 +225,15 @@ async function handleHitPostUpdate(client, hitBefore, hitAfter) {
             changed.push({ name: 'Story', value: 'Story was updated.', inline: false });
         }
 
-        const header = new EmbedBuilder()
-            .setTitle(`Hit updated by ${hitAfter?.nickname || hitAfter?.username || 'Unknown'}`)
-            .setDescription(toEmbedValue(hitAfter?.title || '', ''))
-            .setColor(0x00cc99)
-            .addFields(changed.length ? changed : [{ name: 'No visible changes', value: 'No fields changed.', inline: false }]);
+        const changeLines = changed.length
+            ? changed.map((entry) => `• ${entry.name}: ${entry.before} → ${entry.after}`)
+            : ['No visible field changes detected.'];
+        const summaryText = [`Hit updated by ${hitAfter?.nickname || hitAfter?.username || 'Unknown'}`, ...changeLines].join('\n');
 
-        await channel.send({ embeds: [header] });
+        await channel.send({ content: summaryText.slice(0, 1900), embeds: [buildHitEmbed(hitAfter)] });
+        try { upsertHitInCache(hitAfter, { source: 'handleHitPostUpdate' }); } catch (cacheErr) {
+            console.error('[HitCache] Failed to upsert after update:', cacheErr?.message || cacheErr);
+        }
     } catch (e) {
         console.error('handleHitPostUpdate error:', e?.message || e);
     }
@@ -263,6 +272,9 @@ async function handleHitPostDelete(client, hit) {
             .setColor(0xcc0000);
 
         await channel.send({ embeds: [embed] });
+        try { removeHitFromCache(hit?.id, { source: 'handleHitPostDelete' }); } catch (cacheErr) {
+            console.error('[HitCache] Failed to remove after delete:', cacheErr?.message || cacheErr);
+        }
     } catch (e) {
         console.error('handleHitPostDelete error:', e?.message || e);
     }
