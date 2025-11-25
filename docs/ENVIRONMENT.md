@@ -123,6 +123,8 @@ Intervals are hardcoded; toggles exist via feature flags above. Documented in SC
 - `HITTRACK_CHANNEL_ID` / `TEST_HITTRACK_CHANNEL_ID` – Hit tracker forum inclusion.
 - `FLEETLOG_CHANNEL_ID` / `TEST_FLEETLOG_CHANNEL_ID` – Fleet log posting.
 - `FLEET_COMMANDERS_CHANNEL` / `TEST_FLEET_COMMANDERS_CHANNEL` – Commander change notifications.
+- `PIRATE_CHAT_CHANNEL_ID` / `TEST_PIRATE_CHAT_CHANNEL_ID` – Pirate-team discussion feed surfaced in pirate-advice replies.
+- `DOGFIGHT_CHAT_CHANNEL_ID` / `TEST_DOGFIGHT_CHAT_CHANNEL_ID` – Dogfight coaching channel surfaced in dogfight-advice replies.
 - `EVENTS_PUBLIC_CHANNEL`, `EVENTS_PROSPECT_CHANNEL`, `EVENTS_CREW_CHANNEL`, `EVENTS_MARAUDER_CHANNEL` and TEST_ variants – Event RSVP embeds.
 - `AUDIT_CHANNEL` / `TEST_AUDIT_CHANNEL` – Moderator audit logs.
 - `SHIP_LOG_CHANNEL` / `TEST_SHIP_LOG_CHANNEL` (deprecated fleet-log-add.js).
@@ -150,6 +152,8 @@ Command / Permissions Sets:
 ## Fleet / Hit Tracking
 - `HITTRACK_CHANNEL_ID` / `TEST_HITTRACK_CHANNEL_ID` – Forum for hit threads.
 - `DEBUG_HIT_LOGS` – Verbose logging for hit lifecycle (value '1').
+- `CHATGPT_DOMAIN_DIGEST_LIMIT` (default 8) – How many cached channel messages are surfaced per domain digest.
+- `CHATGPT_DOGFIGHT_HIGHLIGHT_LIMIT` (default 5) – Max Squadron Battle pilots listed for dogfight guidance.
 
 ## Leaderboards & External APIs
 - `API_CIG_LEADERBOARD_SB` – Base URL for CIG leaderboard (used twice in process-leaderboards.js).

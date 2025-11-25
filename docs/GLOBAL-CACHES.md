@@ -174,17 +174,12 @@ This project maintains several in-memory caches that are exposed through `global
   - Other modules may call `upsertHitInCache` if they mutate hit records
 
   ## userProfilesCache
-  - **Accessor:** `globalThis.userProfilesCache`
-  - **Source:** `common/user-profiles-cache.js` (wraps `UserProfilesModel` / `/api/userprofiles`)
-  - **Structure:**
     - `getById(userId)` returns the saved persona row `{ user_id, nickname, tease_level, style_preferences, stats_json, created_at, updated_at }`
     - `getState()` exposes `{ count, lastUpdated, meta }`
     - `refresh()` re-pulls all rows from the API; `upsertLocal(profile)` lets the memory processor update the cache immediately after a write
     - `stats_json.persona_details` holds bio fields like profession, known_for, favorite_topics, notable_quotes, achievements, relationship_notes, etc.
-  - **Hydration:**
     - Startup: `refreshUserProfilesCache()` runs inside `index.js`
     - Interval: refresh repeats every `USER_PROFILES_REFRESH_INTERVAL_MS` (default 30 minutes)
-  - **Usage:**
     - `chatgpt/context/builder.js` prefers this cache for persona prompts
     - `chatgpt/memory/batch-processor.js` writes adjustments (nickname, tease level, style prefs) and feeds them back into the cache via `upsertLocal`
 

@@ -14,9 +14,11 @@ const KEYWORD_RULES = [
   { intent: 'serious_info', needsTool: false, keywords: ['policy', 'rule', 'schedule', 'operation', 'ops', 'mission'], minConfidence: 0.5 },
   { intent: 'hit_create', needsTool: true, keywords: ['add a hit', 'log a hit', 'record a hit', 'new hit', 'submit hit', 'post hit', 'hit tracker', 'pirate hit'], minConfidence: 0.45 },
   { intent: 'hit_edit', needsTool: true, keywords: ['edit hit', 'update hit', 'modify hit', 'change hit', 'fix hit', 'amend hit'], minConfidence: 0.45 },
+  { intent: 'pirate_advice', needsTool: false, keywords: ['pirate', 'piracy', 'snare', 'ambush', 'hit log', 'hit tracker', 'haul', 'cargo run', 'interdict', 'boarding', 'net', 'raiding'], minConfidence: 0.45 },
+  { intent: 'dogfight_advice', needsTool: false, keywords: ['dogfight', 'light fighter', 'lf', 'fighter meta', 'best pilot', 'best ship', 'squadron battle', 'sb', 'duel', 'coaching', 'sparring'], minConfidence: 0.45 },
 ];
 
-const ALLOWED_INTENTS = ['banter', 'price_query', 'location_info', 'user_stats', 'serious_info', 'help', 'admin', 'hit_create', 'hit_edit', 'other'];
+const ALLOWED_INTENTS = ['banter', 'price_query', 'location_info', 'user_stats', 'serious_info', 'help', 'admin', 'hit_create', 'hit_edit', 'pirate_advice', 'dogfight_advice', 'other'];
 const TOOL_DEFAULTS = new Set(['price_query', 'location_info', 'user_stats', 'admin', 'hit_create', 'hit_edit']);
 const INTENT_MODEL = process.env.CHATGPT_INTENT_MODEL || 'gpt-3.5-turbo';
 const USE_MODEL = (process.env.CHATGPT_INTENT_USE_MODEL || 'true').toLowerCase() === 'true';

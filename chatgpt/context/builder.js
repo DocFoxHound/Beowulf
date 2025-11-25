@@ -3,6 +3,9 @@ const {
   getUserProfileFromCache,
   getLeaderboardSnapshot,
   getPlayerStatsSnapshot,
+  getPirateInsights,
+  getLeaderboardTopPilots,
+  getChannelDigest,
   getMarketSnapshotFromCache,
   getLocationSnapshotFromCache,
   getHitActivitySummary,
@@ -40,6 +43,10 @@ const ENTITY_LOCATION_TYPES = new Set([
   'star_systems',
 ]);
 const ENTITY_ITEM_TYPES = new Set(['component', 'components', 'commodity', 'commodities', 'item', 'items']);
+const PIRATE_CHAT_CHANNEL_ID = process.env.PIRATE_CHAT_CHANNEL_ID || null;
+const DOGFIGHT_CHAT_CHANNEL_ID = process.env.DOGFIGHT_CHAT_CHANNEL_ID || null;
+const DOMAIN_DIGEST_LIMIT = Number(process.env.CHATGPT_DOMAIN_DIGEST_LIMIT || 8);
+const DOGFIGHT_LEADERBOARD_LIMIT = Number(process.env.CHATGPT_DOGFIGHT_HIGHLIGHT_LIMIT || 5);
 
 function classifyMemoryImportance(memory) {
   if (!memory) return 'circumstantial';
@@ -171,6 +178,8 @@ async function buildContext({ message, meta, intent, openai, entityMatches: enti
   const lowerContent = (content || '').toLowerCase();
   const intentLabel = intent?.intent || 'banter';
   const intentIsBanter = intentLabel === 'banter';
+  const intentIsPirateAdvice = intentLabel === 'pirate_advice';
+  const intentIsDogfightAdvice = intentLabel === 'dogfight_advice';
 
   const recentChat = getRecentChatForChannel(channelId, RECENT_CHAT_LIMIT);
   let userProfile = getUserProfileFromCache(userId);
@@ -288,8 +297,16 @@ async function buildContext({ message, meta, intent, openai, entityMatches: enti
     : null;
   const locationQuery = includeLocationInfo ? locationTargets : null;
 
-  const includeHitSummary = /piracy|pirate|hit track|hittrack|hittracker|bounty|raid|ambush|cargo|haul/.test(lowerContent);
+  const includeHitSummary = intentIsPirateAdvice || /piracy|pirate|hit track|hittrack|hittracker|bounty|raid|ambush|cargo|haul/.test(lowerContent);
   const hitSummary = includeHitSummary ? getHitActivitySummary() : [];
+  const pirateInsights = intentIsPirateAdvice ? getPirateInsights() : null;
+  const pirateChatDigest = intentIsPirateAdvice && PIRATE_CHAT_CHANNEL_ID
+    ? getChannelDigest(PIRATE_CHAT_CHANNEL_ID, DOMAIN_DIGEST_LIMIT)
+    : [];
+  const dogfightHighlights = intentIsDogfightAdvice ? getLeaderboardTopPilots(DOGFIGHT_LEADERBOARD_LIMIT) : [];
+  const dogfightChatDigest = intentIsDogfightAdvice && DOGFIGHT_CHAT_CHANNEL_ID
+    ? getChannelDigest(DOGFIGHT_CHAT_CHANNEL_ID, DOMAIN_DIGEST_LIMIT)
+    : [];
 
   const knowledgeSnippets = await fetchKnowledgeSnippets({ content, guildId: meta.guildId, channelId, openai }) || [];
   const rawMemories = await fetchMemorySnippets({
@@ -307,6 +324,8 @@ async function buildContext({ message, meta, intent, openai, entityMatches: enti
     || playerStats
     || (hitSummary?.length || 0) > 0
     || locationSnapshot
+    || (pirateInsights && (pirateInsights.latest || (pirateInsights.topHits || []).length || (pirateInsights.topRoutes || []).length))
+    || dogfightHighlights.length > 0
   );
   const allowCircumstantialMemories = intentIsBanter || !hasRichData;
   const selectedMemories = allowCircumstantialMemories
@@ -347,6 +366,10 @@ async function buildContext({ message, meta, intent, openai, entityMatches: enti
     leaderboard,
     playerStats,
     hitSummary,
+    pirateInsights,
+    pirateChatDigest,
+    dogfightHighlights,
+    dogfightChatDigest,
     marketSnapshot,
     marketQuery,
     marketCatalogSummary,
@@ -368,6 +391,10 @@ async function buildContext({ message, meta, intent, openai, entityMatches: enti
       includeLocation: Boolean(locationSnapshot),
       includeHitSummary: includeHitSummary && hitSummary.length > 0,
       includeEntities: entityMatches.length > 0,
+      includePirateInsights: intentIsPirateAdvice && Boolean(pirateInsights && (pirateInsights.latest || (pirateInsights.topHits || []).length || (pirateInsights.topRoutes || []).length)),
+      includePirateChat: intentIsPirateAdvice && pirateChatDigest.length > 0,
+      includeDogfightInsights: intentIsDogfightAdvice && dogfightHighlights.length > 0,
+      includeDogfightChat: intentIsDogfightAdvice && dogfightChatDigest.length > 0,
     },
     externalData: {
       userProfileLoaded: Boolean(userProfile),
@@ -377,6 +404,10 @@ async function buildContext({ message, meta, intent, openai, entityMatches: enti
       marketCatalogLoaded: Boolean(marketCatalogSummary),
       locationLoaded: Boolean(locationSnapshot),
       hitSummaryLoaded: hitSummary.length > 0,
+      pirateInsightsLoaded: Boolean(pirateInsights && (pirateInsights.latest || (pirateInsights.topHits || []).length || (pirateInsights.topRoutes || []).length)),
+      pirateChatLoaded: pirateChatDigest.length > 0,
+      dogfightHighlightsLoaded: dogfightHighlights.length > 0,
+      dogfightChatLoaded: dogfightChatDigest.length > 0,
       memoriesLoaded: selectedMemories.length > 0,
       memoryFallbackApplied: memoryContext.fallbackApplied,
       entitiesLoaded: entityMatches.length > 0,

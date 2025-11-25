@@ -42,6 +42,15 @@ const MARKET_CATALOG_SAMPLE_LIMIT = 25;
 const MARKETPLACE_KEYWORD_REGEX = /\b(player market|marketplace|market averages?|auc|trade board|player listings)\b/;
 const ITEM_MARKET_KEYWORD_REGEX = /\b(weapon|weapons|rifle|pistol|armor|suit|undersuit|component|components|module|modules|item shop|gear)\b/;
 const COMMODITY_KEYWORD_REGEX = /\b(commodity|commodities|ore|hauling|haul|cargo|mining|mined|mineral)\b/;
+const HIT_VALUE_FIELDS = ['total_value', 'totalValue', 'value', 'credits', 'reward', 'payout'];
+const HIT_TARGET_FIELDS = ['target', 'pilot', 'player', 'victim', 'ship_owner'];
+const HIT_SHIP_FIELDS = ['ship', 'ship_type', 'ship_model', 'ship_class'];
+const HIT_ROUTE_ORIGIN_FIELDS = ['route_origin', 'origin', 'origin_system', 'origin_location', 'start', 'from'];
+const HIT_ROUTE_DEST_FIELDS = ['route_destination', 'destination', 'destination_system', 'destination_location', 'end', 'to', 'location'];
+const HIT_TIMESTAMP_FIELDS = ['timestamp', 'created_at', 'createdAt', 'updated_at', 'updatedAt'];
+const LEADERBOARD_SCORE_FIELDS = ['score', 'sb_score', 'rating', 'points', 'rank_points', 'total_score'];
+const LEADERBOARD_KD_FIELDS = ['kd', 'kdr', 'kill_death', 'kill_death_ratio'];
+const LEADERBOARD_WIN_FIELDS = ['wins', 'win_count', 'victories'];
 const LOCATION_RELATION_REFRESH_MS = 5 * 60 * 1000;
 const LOCATION_ALIAS_CANONICALS = new Map();
 let marketLookupCache = {
@@ -715,6 +724,200 @@ function getPlayerStatsSnapshot(userId) {
   } catch (error) {
     console.error('[ChatGPT][Tools] player stats lookup failed:', error?.message || error);
     return null;
+  }
+}
+
+function parseTimestampValue(entry) {
+  if (!entry) return null;
+  for (const field of HIT_TIMESTAMP_FIELDS) {
+    const raw = entry[field];
+    if (!raw) continue;
+    const ts = new Date(raw).getTime();
+    if (Number.isFinite(ts)) return ts;
+  }
+  return null;
+}
+
+function getHitTimestamp(entry) {
+  if (!entry) return null;
+  for (const field of HIT_TIMESTAMP_FIELDS) {
+    if (entry[field]) return entry[field];
+  }
+  return null;
+}
+
+function getHitValue(entry) {
+  const value = getNumberField(entry, HIT_VALUE_FIELDS);
+  return Number.isFinite(value) ? value : null;
+}
+
+function getHitRouteLabel(entry) {
+  if (!entry) return null;
+  if (entry.route) return entry.route;
+  const origin = getStringField(entry, HIT_ROUTE_ORIGIN_FIELDS);
+  const destination = getStringField(entry, HIT_ROUTE_DEST_FIELDS);
+  if (origin && destination) return `${origin} -> ${destination}`;
+  return destination || origin || entry.system || entry.location || null;
+}
+
+function buildHitInsight(entry) {
+  if (!entry) return null;
+  const value = getHitValue(entry);
+  return {
+    id: entry.id ?? entry.entry_id ?? null,
+    user_id: entry.user_id ?? entry.discord_id ?? entry.owner_id ?? null,
+    hunter: entry.username || entry.nickname || entry.handle || entry.author || null,
+    target: getStringField(entry, HIT_TARGET_FIELDS),
+    ship: getStringField(entry, HIT_SHIP_FIELDS),
+    route: getHitRouteLabel(entry),
+    value,
+    cargo: entry.cargo || entry.cargo_manifest || null,
+    timestamp: getHitTimestamp(entry),
+    status: entry.status || entry.outcome || null,
+    air_or_ground: entry.air_or_ground || entry.engagement_type || null,
+  };
+}
+
+function getLatestHitEntry() {
+  try {
+    const hits = globalThis.hitCache?.getAll?.();
+    if (!Array.isArray(hits) || !hits.length) return null;
+    let latest = null;
+    let latestTs = -Infinity;
+    for (const entry of hits) {
+      const ts = parseTimestampValue(entry);
+      if (ts == null) continue;
+      if (ts > latestTs) {
+        latest = entry;
+        latestTs = ts;
+      }
+    }
+    if (!latest) {
+      latest = hits[hits.length - 1];
+    }
+    return buildHitInsight(latest);
+  } catch (error) {
+    console.error('[ChatGPT][Tools] latest hit lookup failed:', error?.message || error);
+    return null;
+  }
+}
+
+function getTopHitsByValue(limit = 3) {
+  try {
+    const hits = globalThis.hitCache?.getAll?.();
+    if (!Array.isArray(hits) || !hits.length) return [];
+    return hits
+      .map((entry) => ({ entry, value: getHitValue(entry) }))
+      .filter((item) => item.value != null)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, limit)
+      .map((item) => buildHitInsight(item.entry));
+  } catch (error) {
+    console.error('[ChatGPT][Tools] top hits lookup failed:', error?.message || error);
+    return [];
+  }
+}
+
+function getPirateRouteStats(limit = 3) {
+  try {
+    const hits = globalThis.hitCache?.getAll?.();
+    if (!Array.isArray(hits) || !hits.length) return [];
+    const buckets = new Map();
+    for (const entry of hits) {
+      const route = getHitRouteLabel(entry);
+      if (!route) continue;
+      const bucket = buckets.get(route) || { route, count: 0, totalValue: 0, latestTimestamp: null };
+      bucket.count += 1;
+      const value = getHitValue(entry);
+      if (value != null) bucket.totalValue += value;
+      const ts = parseTimestampValue(entry);
+      if (ts != null) {
+        bucket.latestTimestamp = bucket.latestTimestamp == null ? ts : Math.max(bucket.latestTimestamp, ts);
+      }
+      buckets.set(route, bucket);
+    }
+    return Array.from(buckets.values())
+      .sort((a, b) => {
+        if (b.count !== a.count) return b.count - a.count;
+        return (b.totalValue || 0) - (a.totalValue || 0);
+      })
+      .slice(0, limit)
+      .map((bucket) => ({
+        route: bucket.route,
+        hits: bucket.count,
+        totalValue: bucket.totalValue || null,
+        avgValue: bucket.count ? Math.round((bucket.totalValue / bucket.count) * 100) / 100 : null,
+        latestTimestamp: bucket.latestTimestamp || null,
+      }));
+  } catch (error) {
+    console.error('[ChatGPT][Tools] route stats lookup failed:', error?.message || error);
+    return [];
+  }
+}
+
+function getPirateInsights({ topHitLimit = 3, routeLimit = 3 } = {}) {
+  return {
+    latest: getLatestHitEntry(),
+    topHits: getTopHitsByValue(topHitLimit),
+    topRoutes: getPirateRouteStats(routeLimit),
+  };
+}
+
+function getLeaderboardTopPilots(limit = 5) {
+  try {
+    const cache = globalThis.leaderboardCache;
+    if (!cache || typeof cache.getPlayers !== 'function') return [];
+    const players = cache.getPlayers() || [];
+    if (!players.length) return [];
+    const ranked = players
+      .map((entry) => {
+        const score = getNumberField(entry, LEADERBOARD_SCORE_FIELDS);
+        const kd = getNumberField(entry, LEADERBOARD_KD_FIELDS);
+        const wins = getNumberField(entry, LEADERBOARD_WIN_FIELDS);
+        const name = getStringField(entry, ['player_name', 'display_name', 'username', 'discord_name', 'pilot', 'name']) || 'Unknown pilot';
+        return {
+          name,
+          discord_id: entry.discord_id || entry.user_id || entry.discordId || null,
+          score,
+          kd,
+          wins,
+          rank: entry.rank || entry.position || null,
+          ship: entry.primary_ship || entry.favorite_ship || entry.ship || null,
+          updated_at: entry.updated_at || entry.updatedAt || entry.timestamp || null,
+        };
+      })
+      .sort((a, b) => {
+        const scoreA = Number.isFinite(a.score) ? a.score : -Infinity;
+        const scoreB = Number.isFinite(b.score) ? b.score : -Infinity;
+        if (scoreA !== scoreB) return scoreB - scoreA;
+        const winA = Number.isFinite(a.wins) ? a.wins : -Infinity;
+        const winB = Number.isFinite(b.wins) ? b.wins : -Infinity;
+        if (winA !== winB) return winB - winA;
+        return (a.name || '').localeCompare(b.name || '');
+      });
+    return ranked.slice(0, limit);
+  } catch (error) {
+    console.error('[ChatGPT][Tools] leaderboard highlights lookup failed:', error?.message || error);
+    return [];
+  }
+}
+
+function getChannelDigest(channelId, limit = 8) {
+  try {
+    if (!channelId) return [];
+    const cache = globalThis.chatMessagesCache;
+    if (!cache || typeof cache.getForChannel !== 'function') return [];
+    const entries = cache.getForChannel(channelId) || [];
+    return takeLast(entries, limit).map((entry) => ({
+      channel_id: entry.channel_id,
+      user_id: entry.user_id,
+      username: entry.username || null,
+      content: entry.content,
+      timestamp: entry.timestamp,
+    }));
+  } catch (error) {
+    console.error('[ChatGPT][Tools] channel digest lookup failed:', error?.message || error);
+    return [];
   }
 }
 
@@ -1485,6 +1688,9 @@ module.exports = {
   getUserProfileFromCache,
   getLeaderboardSnapshot,
   getPlayerStatsSnapshot,
+  getPirateInsights,
+  getLeaderboardTopPilots,
+  getChannelDigest,
   getMarketSnapshotFromCache,
   getLocationSnapshotFromCache,
   getHitActivitySummary,

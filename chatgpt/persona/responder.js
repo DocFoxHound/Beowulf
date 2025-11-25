@@ -25,6 +25,7 @@ const SYSTEM_PROMPT = `You are Beowulf, the AI of a pirate crew named IronPoint'
 - never reference your personality or description
 - never mention you are an AI model or language model
 - avoid generic filler phrases like "as an AI language model", "Ah, I see", "I'm here to help", "based on the information provided", or other such things common in GPT responses
+- only propose action items or "next steps" when the user explicitly asks for plans, help, or orders; otherwise stick to reporting the intel
 - keep humor sharp but sparing—one sly jab or sardonic line per reply is plenty, and only after you've answered the question
 - sound natural and grounded, like a seasoned crew strategist who happens to be a bit over it`;
 
@@ -301,6 +302,63 @@ function formatHitSummary(hitSummary) {
   }).join('\n');
 }
 
+function describeHitInsight(hit) {
+  if (!hit) return 'n/a';
+  const hunter = hit.hunter || 'Unknown hunter';
+  const target = hit.target || 'Unknown target';
+  const ship = hit.ship ? ` (${hit.ship})` : '';
+  const numericValue = Number(hit.value);
+  const value = Number.isFinite(numericValue) ? `${numericValue.toLocaleString()} aUEC` : null;
+  const route = hit.route ? ` @ ${hit.route}` : '';
+  const ts = hit.timestamp ? new Date(hit.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : null;
+  const status = hit.status ? `, status ${hit.status}` : '';
+  return `${hunter} vs ${target}${ship}${value ? ` – ${value}` : ''}${route}${status}${ts ? ` [${ts}]` : ''}`;
+}
+
+function formatPirateInsights(insights = {}) {
+  const lines = [];
+  if (insights.latest) {
+    lines.push(`Latest hit: ${describeHitInsight(insights.latest)}`);
+  }
+  if (Array.isArray(insights.topHits) && insights.topHits.length) {
+    lines.push('Top hauls:');
+    lines.push(...insights.topHits.map((hit) => `• ${describeHitInsight(hit)}`));
+  }
+  if (Array.isArray(insights.topRoutes) && insights.topRoutes.length) {
+    lines.push('Hot routes:');
+    lines.push(...insights.topRoutes.map((route) => {
+      const avg = Number(route.avgValue);
+      const valuePart = Number.isFinite(avg) ? `avg ${avg.toLocaleString()} aUEC` : 'value n/a';
+      return `• ${route.route} – ${route.hits} hits (${valuePart})`;
+    }));
+  }
+  return lines.length ? lines.join('\n') : 'No pirate insight cache loaded.';
+}
+
+function formatChannelDigest(digest = []) {
+  if (!Array.isArray(digest) || !digest.length) return 'No cached chatter.';
+  return digest.map((entry) => {
+    const ts = entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'recent';
+    const author = entry.username || entry.user_id || 'member';
+    const content = (entry.content || '').slice(0, 220);
+    return `• [${ts}] ${author}: ${content}`;
+  }).join('\n');
+}
+
+function formatDogfightHighlights(highlights = []) {
+  if (!Array.isArray(highlights) || !highlights.length) return 'No Squadron Battle highlights cached.';
+  return highlights.map((pilot, idx) => {
+    const label = pilot.rank ? `#${pilot.rank}` : `#${idx + 1}`;
+    const bits = [];
+    if (Number.isFinite(pilot.score)) bits.push(`${Number(pilot.score).toLocaleString()} pts`);
+    if (Number.isFinite(pilot.kd)) bits.push(`K/D ${pilot.kd.toFixed(2)}`);
+    if (Number.isFinite(pilot.wins)) bits.push(`${pilot.wins} wins`);
+    if (pilot.ship) bits.push(pilot.ship);
+    const updated = pilot.updated_at ? ` (updated ${new Date(pilot.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})` : '';
+    return `• ${label} ${pilot.name} — ${bits.join(' | ') || 'no stats'}${updated}`;
+  }).join('\n');
+}
+
 function formatKnowledgeSnippets(snippets) {
   if (!Array.isArray(snippets) || !snippets.length) return 'No knowledge matches found.';
   return snippets.map((snippet) => {
@@ -357,7 +415,7 @@ function formatMemoryMeta(memoryContext = {}) {
   return lines.join('\n');
 }
 
-function buildContextBlock({ intent = {}, recentChat, userProfile, leaderboard, playerStats, marketSnapshot, marketQuery, marketCatalogSummary, locationSnapshot, locationQuery, hitSummary, knowledgeSnippets, entityMatches, longTermMemories, memoryContext, sections = {} }) {
+function buildContextBlock({ intent = {}, recentChat, userProfile, leaderboard, playerStats, marketSnapshot, marketQuery, marketCatalogSummary, locationSnapshot, locationQuery, hitSummary, pirateInsights, pirateChatDigest, dogfightHighlights, dogfightChatDigest, knowledgeSnippets, entityMatches, longTermMemories, memoryContext, sections = {} }) {
   const confidence = Number(intent.confidence || 0);
   const parts = [
     `Intent: ${intent.intent || 'banter'} (confidence ${confidence.toFixed(2)})`,
@@ -413,6 +471,22 @@ function buildContextBlock({ intent = {}, recentChat, userProfile, leaderboard, 
     parts.push('\nHit Tracker (hit cache):');
     parts.push(formatHitSummary(hitSummary));
   }
+  if (sections.includePirateInsights) {
+    parts.push('\nPirate Insights:');
+    parts.push(formatPirateInsights(pirateInsights));
+  }
+  if (sections.includePirateChat) {
+    parts.push('\nPirate Chat Digest:');
+    parts.push(formatChannelDigest(pirateChatDigest));
+  }
+  if (sections.includeDogfightInsights) {
+    parts.push('\nDogfight Highlights:');
+    parts.push(formatDogfightHighlights(dogfightHighlights));
+  }
+  if (sections.includeDogfightChat) {
+    parts.push('\nDogfight Chat Digest:');
+    parts.push(formatChannelDigest(dogfightChatDigest));
+  }
   return clampContext(parts.join('\n'));
 }
 
@@ -464,6 +538,10 @@ async function generatePersonaResponse({ message, intent, context, openai }) {
       context.sections?.includeMarketCatalog ? measureSection('marketCatalog', formatMarketCatalogSummary(context.marketCatalogSummary)) : null,
       context.sections?.includeLocation ? measureSection('location', formatLocationSnapshot(context.locationSnapshot)) : null,
       context.sections?.includeHitSummary ? measureSection('hitSummary', formatHitSummary(context.hitSummary)) : null,
+      context.sections?.includePirateInsights ? measureSection('pirateInsights', formatPirateInsights(context.pirateInsights)) : null,
+      context.sections?.includePirateChat ? measureSection('pirateChat', formatChannelDigest(context.pirateChatDigest)) : null,
+      context.sections?.includeDogfightInsights ? measureSection('dogfightInsights', formatDogfightHighlights(context.dogfightHighlights)) : null,
+      context.sections?.includeDogfightChat ? measureSection('dogfightChat', formatChannelDigest(context.dogfightChatDigest)) : null,
     ].filter(Boolean),
   });
   const userPrompt = `Incoming Discord message: ${message.content}\nRespond as Beowulf using only the context below. If data is missing, acknowledge it and suggest an action.\n---\n${contextBlock}`;
