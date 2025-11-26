@@ -1,5 +1,6 @@
 
 const fs = require("node:fs");
+const { randomUUID } = require("node:crypto");
 const { updateVoiceSession, createVoiceSession, getAllActiveVoiceSessions } = require("../api/voiceChannelSessionsApi");
 const { ChannelType } = require("discord.js");
 const { checkRecentGatherings } = require("./recent-gatherings.js");
@@ -57,6 +58,13 @@ function calculateSessionMinutes(joinedAt, leftAt, fallbackMinutes = 1) {
     return clampSessionMinutes(fallbackMinutes, 1);
 }
 
+function generateSessionId(userId, channelId) {
+    const userSegment = String(userId || "user").slice(-6);
+    const channelSegment = String(channelId || "chan").slice(-6);
+    const unique = randomUUID ? randomUUID() : Math.floor(Math.random() * 1_000_000).toString().padStart(6, "0");
+    return `${Date.now()}_${userSegment}_${channelSegment}_${unique}`;
+}
+
 
 async function voiceChannelSessions(client, openai) {
     const guildId = process.env.LIVE_ENVIRONMENT === "true" ? process.env.GUILD_ID : process.env.TEST_GUILD_ID;
@@ -88,114 +96,87 @@ async function voiceChannelSessions(client, openai) {
         const activeSessions = activeSessionsRaw
             .map(session => normalizeSession(session, guildId))
             .filter(session => session?.user_id);
-        const now = new Date();
 
-        // Track users currently in voice
-        const currentUserIds = new Set();
-        Object.values(channelUserMap).forEach(userIds => userIds.forEach(id => currentUserIds.add(id)));
-
-        // 1. Update minutes for users still in channel or who switched channels
+        const activeSessionsByUser = new Map();
         for (const session of activeSessions) {
-            // Find the user's current channel (if any)
-            let currentChannelId = null;
-            for (const [chanId, userIds] of Object.entries(channelUserMap)) {
-                if (userIds.includes(session.user_id)) {
-                    currentChannelId = chanId;
-                    break;
+            if (!activeSessionsByUser.has(session.user_id)) {
+                activeSessionsByUser.set(session.user_id, []);
+            }
+            activeSessionsByUser.get(session.user_id).push(session);
+        }
+
+        const handledSessionIds = new Set();
+        const now = new Date();
+        const nowIso = now.toISOString();
+
+        const closeSession = async (session) => {
+            const joinedAt = ensureJoinedAt(session, nowIso);
+            const minutes = calculateSessionMinutes(joinedAt, nowIso, session.minutes);
+            const payload = {
+                ...session,
+                joined_at: joinedAt,
+                left_at: nowIso,
+                minutes,
+                guild_id: session.guild_id || guildId,
+            };
+            await updateVoiceSession(session.id, payload);
+            handledSessionIds.add(session.id);
+        };
+
+        const refreshSession = async (session) => {
+            const joinedAt = ensureJoinedAt(session, nowIso);
+            const minutes = calculateSessionMinutes(joinedAt, nowIso, session.minutes);
+            const payload = {
+                ...session,
+                joined_at: joinedAt,
+                left_at: null,
+                minutes,
+                guild_id: session.guild_id || guildId,
+            };
+            await updateVoiceSession(session.id, payload);
+            handledSessionIds.add(session.id);
+        };
+
+        // Process current channel occupancy
+        for (const [channelId, userIds] of Object.entries(channelUserMap)) {
+            if (channelId === afkChannelId) continue;
+
+            for (const userId of userIds) {
+                const sessionsForUser = activeSessionsByUser.get(userId) || [];
+                const matchingSession = sessionsForUser.find(s => s.channel_id === channelId);
+
+                if (matchingSession) {
+                    await refreshSession(matchingSession);
+                    continue;
                 }
-            }
 
-            // If user is in AFK channel, close session and do not create a new one
-            if (currentChannelId === afkChannelId) {
-                const leftAt = now.toISOString();
-                const joinedAt = ensureJoinedAt(session, now.toISOString());
-                const diffMinutes = calculateSessionMinutes(joinedAt, leftAt, session.minutes);
-                const updatedSession = {
-                    ...session,
-                    joined_at: joinedAt,
-                    left_at: leftAt,
-                    minutes: diffMinutes,
-                    guild_id: session.guild_id || guildId
-                };
-                await updateVoiceSession(session.id, updatedSession);
-                continue;
-            }
+                const sessionToClose = sessionsForUser.find(s => !handledSessionIds.has(s.id));
+                if (sessionToClose) {
+                    await closeSession(sessionToClose);
+                }
 
-            if (currentChannelId === session.channel_id && currentChannelId !== null) {
-                // User is still in the same voice channel, increment minutes
-                const joinedAt = ensureJoinedAt(session, now.toISOString());
-                const stillInChannelMinutes = calculateSessionMinutes(joinedAt, now.toISOString(), session.minutes);
-                const updatedSession = {
-                    ...session,
-                    joined_at: joinedAt,
-                    left_at: null,
-                    minutes: stillInChannelMinutes,
-                    guild_id: session.guild_id || guildId
-                };
-                await updateVoiceSession(session.id, updatedSession);
-            } else if (currentChannelId !== null && currentChannelId !== session.channel_id) {
-                // User switched channels: close old session, create new one
-                const leftAt = now.toISOString();
-                const joinedAt = ensureJoinedAt(session, now.toISOString());
-                const diffMinutes = calculateSessionMinutes(joinedAt, leftAt, session.minutes);
-                const updatedSession = {
-                    ...session,
-                    joined_at: joinedAt,
-                    left_at: leftAt,
-                    minutes: diffMinutes,
-                    guild_id: session.guild_id || guildId
-                };
-                await updateVoiceSession(session.id, updatedSession);
-
-                // Create new session for the new channel
-                const channel = guild.channels.cache.get(currentChannelId);
+                const channel = guild.channels.cache.get(channelId);
                 const newSession = {
-                    user_id: session.user_id,
-                    channel_id: currentChannelId,
+                    id: generateSessionId(userId, channelId),
+                    user_id: userId,
+                    channel_id: channelId,
                     channel_name: channel ? channel.name : "Unknown",
-                    joined_at: now.toISOString(),
+                    joined_at: nowIso,
                     left_at: null,
                     minutes: 1,
-                    guild_id: guildId
+                    guild_id: guildId,
                 };
                 await createVoiceSession(newSession);
-            } else {
-                // User has left all voice channels, close session
-                const leftAt = now.toISOString();
-                const joinedAt = ensureJoinedAt(session, now.toISOString());
-                const diffMinutes = calculateSessionMinutes(joinedAt, leftAt, session.minutes);
-                const updatedSession = {
-                    ...session,
-                    joined_at: joinedAt,
-                    left_at: leftAt,
-                    minutes: diffMinutes,
-                    guild_id: session.guild_id || guildId
-                };
-                await updateVoiceSession(session.id, updatedSession);
             }
         }
 
-        // 2. Create new sessions for users who joined (no active session)
-        const activeUserIds = new Set(activeSessions.filter(s => s.left_at === null).map(s => s.user_id));
-        for (const [channelId, userIds] of Object.entries(channelUserMap)) {
-            // Ignore AFK channel
-            if (channelId === afkChannelId) continue;
-            for (const userId of userIds) {
-                if (!activeUserIds.has(userId)) {
-                    // New user joined, create session
-                    const channel = guild.channels.cache.get(channelId);
-                    const newSession = {
-                        user_id: userId,
-                        channel_id: channelId,
-                        channel_name: channel ? channel.name : "Unknown",
-                        joined_at: now.toISOString(),
-                        left_at: null,
-                        minutes: 1,
-                        guild_id: guildId
-                    };
-                    await createVoiceSession(newSession);
-                }
+        // Close sessions for users no longer present (or sitting in AFK)
+        for (const session of activeSessions) {
+            if (handledSessionIds.has(session.id)) {
+                continue;
             }
+
+            await closeSession(session);
         }
 
         // Optional: log current state
