@@ -110,8 +110,11 @@ async function voiceChannelSessions(client, openai) {
         const nowIso = now.toISOString();
 
         const closeSession = async (session) => {
+            if (session.left_at) {
+                return;
+            }
             const joinedAt = ensureJoinedAt(session, nowIso);
-            const minutes = calculateSessionMinutes(joinedAt, nowIso, session.minutes);
+            const minutes = calculateSessionMinutes(joinedAt, nowIso, 1);
             const payload = {
                 ...session,
                 joined_at: joinedAt,
@@ -124,8 +127,11 @@ async function voiceChannelSessions(client, openai) {
         };
 
         const refreshSession = async (session) => {
+            if (session.left_at) {
+                return;
+            }
             const joinedAt = ensureJoinedAt(session, nowIso);
-            const minutes = calculateSessionMinutes(joinedAt, nowIso, session.minutes);
+            const minutes = calculateSessionMinutes(joinedAt, nowIso, 1);
             const payload = {
                 ...session,
                 joined_at: joinedAt,
@@ -142,7 +148,7 @@ async function voiceChannelSessions(client, openai) {
             if (channelId === afkChannelId) continue;
 
             for (const userId of userIds) {
-                const sessionsForUser = activeSessionsByUser.get(userId) || [];
+                const sessionsForUser = (activeSessionsByUser.get(userId) || []).filter(s => !s.left_at);
                 const matchingSession = sessionsForUser.find(s => s.channel_id === channelId);
 
                 if (matchingSession) {
