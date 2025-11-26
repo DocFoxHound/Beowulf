@@ -246,7 +246,7 @@ try {
 channelIdAndName = [];
 
 const clientToken = process.env.LIVE_ENVIRONMENT === "true" ? process.env.CLIENT_TOKEN : process.env.TEST_CLIENT_TOKEN;
-const VOICE_SESSION_REPAIR_ON_START = false
+const VOICE_SESSION_REPAIR_ON_START = true
 
 //json things to hold in memory
 let preloadedDbTables;

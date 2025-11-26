@@ -14,6 +14,12 @@ function clampMinutesValue(value) {
     return rounded;
 }
 
+function normalizeUserId(raw) {
+    if (raw === null || raw === undefined) return null;
+    const str = String(raw).trim();
+    return str.length ? str : null;
+}
+
 function sanitizeVoiceSessionPayload(payload = {}) {
     const sanitized = {};
     for (const [key, value] of Object.entries(payload)) {
@@ -25,6 +31,14 @@ function sanitizeVoiceSessionPayload(payload = {}) {
             const normalizedId = String(value).trim();
             if (normalizedId) {
                 sanitized.id = normalizedId;
+            }
+            continue;
+        }
+
+        if (key === 'user_id' || key === 'userId') {
+            const normalizedUserId = normalizeUserId(value);
+            if (normalizedUserId) {
+                sanitized.user_id = normalizedUserId;
             }
             continue;
         }
@@ -125,10 +139,17 @@ async function getAllActiveVoiceSessions() {
 async function createVoiceSession(gatheringData) {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_VOICE_CHANNEL_SESSION}/`;
     try {
-        const payloadWithId = ensureVoiceSessionIdentifier(gatheringData);
+        const payloadWithUser = {
+            ...gatheringData,
+            user_id: normalizeUserId(gatheringData?.user_id || gatheringData?.userId || gatheringData?.user?.id || gatheringData?.userId),
+        };
+        const payloadWithId = ensureVoiceSessionIdentifier(payloadWithUser);
         const sanitizedPayload = sanitizeVoiceSessionPayload(payloadWithId);
         if (!sanitizedPayload.id) {
             sanitizedPayload.id = payloadWithId.id || generateSessionId(payloadWithId);
+        }
+        if (!sanitizedPayload.user_id) {
+            sanitizedPayload.user_id = payloadWithId.user_id || normalizeUserId(payloadWithId.userId || payloadWithId.user?.id);
         }
         const response = await axios.post(apiUrl, sanitizedPayload, {
             headers: {
@@ -145,10 +166,17 @@ async function createVoiceSession(gatheringData) {
 async function updateVoiceSession(id, updateData) {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_VOICE_CHANNEL_SESSION}/${id}`;
     try {
-        const payloadWithId = ensureVoiceSessionIdentifier({ ...updateData, id });
+        const payloadWithUser = {
+            ...updateData,
+            user_id: normalizeUserId(updateData?.user_id || updateData?.userId || updateData?.user?.id),
+        };
+        const payloadWithId = ensureVoiceSessionIdentifier({ ...payloadWithUser, id });
         const sanitizedPayload = sanitizeVoiceSessionPayload(payloadWithId);
         if (!sanitizedPayload.id) {
             sanitizedPayload.id = payloadWithId.id || String(id);
+        }
+        if (!sanitizedPayload.user_id && payloadWithId.user_id) {
+            sanitizedPayload.user_id = payloadWithId.user_id;
         }
         const response = await axios.put(apiUrl, sanitizedPayload, {
             headers: {

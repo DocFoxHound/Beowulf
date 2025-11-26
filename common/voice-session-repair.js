@@ -1,12 +1,10 @@
-const { getAllVoiceSessions, updateVoiceSession } = require("../api/voiceChannelSessionsApi");
-const { normalizeSession, calculateSessionMinutes } = require("./voice-channel-sessions.js");
+const { getAllVoiceSessions, deleteVoiceSession } = require("../api/voiceChannelSessionsApi");
+const { normalizeSession } = require("./voice-channel-sessions.js");
 
-function hasNullishMinutes(rawMinutes) {
-    if (rawMinutes === null || rawMinutes === undefined || rawMinutes === "") {
-        return true;
-    }
-    const numeric = Number(rawMinutes);
-    return Number.isNaN(numeric);
+function hasMissingUserId(rawSession = {}) {
+    const userId = rawSession.user_id || rawSession.userId || rawSession.user?.id;
+    if (userId === null || userId === undefined) return true;
+    return String(userId).trim().length === 0;
 }
 
 function deriveFallbackTimestamps(rawSession = {}) {
@@ -27,10 +25,10 @@ async function repairVoiceSessionsWithNullMinutes(guildId) {
         }
 
         let scanned = 0;
-        let repaired = 0;
+        let deleted = 0;
         for (const rawSession of allSessions) {
             scanned += 1;
-            if (!hasNullishMinutes(rawSession?.minutes)) {
+            if (!hasMissingUserId(rawSession)) {
                 continue;
             }
 
@@ -39,30 +37,16 @@ async function repairVoiceSessionsWithNullMinutes(guildId) {
                 continue; // Cannot update without an identifier.
             }
 
-            const { joinedIso, leftIso } = deriveFallbackTimestamps(rawSession);
-            const requiresFallbackTimestamps = !normalized.joined_at || !normalized.left_at;
-            const joinedAt = normalized.joined_at || joinedIso;
-            const leftAt = normalized.left_at || leftIso;
-
-            const recalculatedMinutes = requiresFallbackTimestamps
-                ? 1
-                : calculateSessionMinutes(joinedAt, leftAt, 1);
-
-            await updateVoiceSession(normalized.id, {
-                minutes: recalculatedMinutes,
-                joined_at: joinedAt,
-                left_at: leftAt,
-                guild_id: normalized.guild_id || guildId,
-            });
-            repaired += 1;
+            await deleteVoiceSession(normalized.id);
+            deleted += 1;
         }
 
-        if (repaired > 0) {
-            console.info(`[VoiceSessionRepair] Repaired ${repaired} session minute value(s) across ${scanned} record(s).`);
+        if (deleted > 0) {
+            console.info(`[VoiceSessionRepair] Deleted ${deleted} session(s) missing user ids across ${scanned} record(s).`);
         } else {
-            console.info(`[VoiceSessionRepair] No null minute sessions detected across ${scanned} record(s).`);
+            console.info(`[VoiceSessionRepair] No sessions missing user ids detected across ${scanned} record(s).`);
         }
-        return { scanned, repaired };
+        return { scanned, deleted };
     } catch (error) {
         console.error("[VoiceSessionRepair] Failed to repair sessions:", error);
         throw error;
