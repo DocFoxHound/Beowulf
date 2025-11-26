@@ -1,6 +1,18 @@
 const axios = require('axios');
 
-// Remove nullish values and normalize minutes before sending to the API.
+const MAX_VOICE_SESSION_MINUTES = 32767;
+
+function clampMinutesValue(value) {
+    const numericMinutes = Number(value);
+    if (!Number.isFinite(numericMinutes)) {
+        return 0;
+    }
+    const rounded = Math.round(numericMinutes);
+    if (rounded < 0) return 0;
+    if (rounded > MAX_VOICE_SESSION_MINUTES) return MAX_VOICE_SESSION_MINUTES;
+    return rounded;
+}
+
 function sanitizeVoiceSessionPayload(payload = {}) {
     const sanitized = {};
     for (const [key, value] of Object.entries(payload)) {
@@ -9,8 +21,7 @@ function sanitizeVoiceSessionPayload(payload = {}) {
         }
 
         if (key === 'minutes') {
-            const numericMinutes = Number(value);
-            sanitized.minutes = Number.isFinite(numericMinutes) ? numericMinutes : 0;
+            sanitized.minutes = clampMinutesValue(value);
             continue;
         }
 
@@ -22,6 +33,25 @@ function sanitizeVoiceSessionPayload(payload = {}) {
     }
 
     return sanitized;
+}
+
+function ensureVoiceSessionIdentifier(payload = {}) {
+    const hasValidId = typeof payload.id === 'string'
+        ? payload.id.trim().length > 0
+        : payload.id != null;
+    if (hasValidId) {
+        return payload;
+    }
+
+    const userFragmentSource = payload.user_id || payload.userId || 'user';
+    const userFragment = String(userFragmentSource).slice(-6) || 'user';
+    const randomFragment = Math.floor(Math.random() * 1_000_000).toString().padStart(6, '0');
+    const generatedId = `${Date.now()}_${userFragment}_${randomFragment}`;
+
+    return {
+        ...payload,
+        id: generatedId,
+    };
 }
 
 async function getAllVoiceSessions() {
@@ -60,7 +90,8 @@ async function getAllActiveVoiceSessions() {
 async function createVoiceSession(gatheringData) {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_VOICE_CHANNEL_SESSION}/`;
     try {
-        const sanitizedPayload = sanitizeVoiceSessionPayload(gatheringData);
+        const payloadWithId = ensureVoiceSessionIdentifier(gatheringData);
+        const sanitizedPayload = sanitizeVoiceSessionPayload(payloadWithId);
         const response = await axios.post(apiUrl, sanitizedPayload, {
             headers: {
                 'Content-Type': 'application/json'

@@ -5,8 +5,13 @@ const { ChannelType } = require("discord.js");
 const { checkRecentGatherings } = require("./recent-gatherings.js");
 const { checkRecentGangs } = require("./recent-fleets.js");
 
+const MAX_VOICE_SESSION_MINUTES = 32767;
+
 function normalizeSession(rawSession = {}, fallbackGuildId) {
     const parsedMinutes = Number(rawSession.minutes);
+    const boundedMinutes = Number.isFinite(parsedMinutes)
+        ? Math.min(MAX_VOICE_SESSION_MINUTES, Math.max(0, Math.round(parsedMinutes)))
+        : 0;
     const normalized = {
         id: String(rawSession.id ?? rawSession.session_id ?? ""),
         user_id: rawSession.user_id || rawSession.userId || rawSession.user || null,
@@ -14,10 +19,31 @@ function normalizeSession(rawSession = {}, fallbackGuildId) {
         channel_name: rawSession.channel_name || rawSession.channelName || null,
         joined_at: rawSession.joined_at || rawSession.joinedAt || null,
         left_at: rawSession.left_at || rawSession.leftAt || null,
-        minutes: Number.isFinite(parsedMinutes) ? parsedMinutes : 0,
+        minutes: boundedMinutes,
         guild_id: rawSession.guild_id || rawSession.guildId || fallbackGuildId,
     };
     return normalized;
+}
+
+function clampSessionMinutes(value, fallback = 1) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) {
+        const rounded = Math.round(numeric);
+        return Math.max(1, Math.min(MAX_VOICE_SESSION_MINUTES, rounded));
+    }
+    const fallbackNumeric = Number(fallback);
+    if (Number.isFinite(fallbackNumeric) && fallbackNumeric > 0) {
+        const rounded = Math.round(fallbackNumeric);
+        return Math.max(1, Math.min(MAX_VOICE_SESSION_MINUTES, rounded));
+    }
+    return 1;
+}
+
+function ensureJoinedAt(session, fallbackIso) {
+    if (session?.joined_at) return session.joined_at;
+    if (session?.joinedAt) return session.joinedAt;
+    if (fallbackIso) return fallbackIso;
+    return new Date().toISOString();
 }
 
 // Ensures we never send NaN/null minutes back to the API when closing a session.
@@ -26,13 +52,9 @@ function calculateSessionMinutes(joinedAt, leftAt, fallbackMinutes = 1) {
     const leftTimestamp = Date.parse(leftAt);
     if (Number.isFinite(joinedTimestamp) && Number.isFinite(leftTimestamp) && leftTimestamp >= joinedTimestamp) {
         const diffMinutes = Math.round((leftTimestamp - joinedTimestamp) / 60000);
-        return Math.max(1, diffMinutes);
+        return clampSessionMinutes(diffMinutes, fallbackMinutes);
     }
-    const fallback = Number(fallbackMinutes);
-    if (Number.isFinite(fallback) && fallback > 0) {
-        return Math.round(fallback);
-    }
-    return 1;
+    return clampSessionMinutes(fallbackMinutes, 1);
 }
 
 
@@ -86,9 +108,11 @@ async function voiceChannelSessions(client, openai) {
             // If user is in AFK channel, close session and do not create a new one
             if (currentChannelId === afkChannelId) {
                 const leftAt = now.toISOString();
-                const diffMinutes = calculateSessionMinutes(session.joined_at, leftAt, session.minutes);
+                const joinedAt = ensureJoinedAt(session, now.toISOString());
+                const diffMinutes = calculateSessionMinutes(joinedAt, leftAt, session.minutes);
                 const updatedSession = {
                     ...session,
+                    joined_at: joinedAt,
                     left_at: leftAt,
                     minutes: diffMinutes,
                     guild_id: session.guild_id || guildId
@@ -99,18 +123,24 @@ async function voiceChannelSessions(client, openai) {
 
             if (currentChannelId === session.channel_id && currentChannelId !== null) {
                 // User is still in the same voice channel, increment minutes
+                const joinedAt = ensureJoinedAt(session, now.toISOString());
+                const stillInChannelMinutes = calculateSessionMinutes(joinedAt, now.toISOString(), session.minutes);
                 const updatedSession = {
                     ...session,
-                    minutes: (parseInt(session.minutes) || 0) + 1,
+                    joined_at: joinedAt,
+                    left_at: null,
+                    minutes: stillInChannelMinutes,
                     guild_id: session.guild_id || guildId
                 };
                 await updateVoiceSession(session.id, updatedSession);
             } else if (currentChannelId !== null && currentChannelId !== session.channel_id) {
                 // User switched channels: close old session, create new one
                 const leftAt = now.toISOString();
-                const diffMinutes = calculateSessionMinutes(session.joined_at, leftAt, session.minutes);
+                const joinedAt = ensureJoinedAt(session, now.toISOString());
+                const diffMinutes = calculateSessionMinutes(joinedAt, leftAt, session.minutes);
                 const updatedSession = {
                     ...session,
+                    joined_at: joinedAt,
                     left_at: leftAt,
                     minutes: diffMinutes,
                     guild_id: session.guild_id || guildId
@@ -125,16 +155,18 @@ async function voiceChannelSessions(client, openai) {
                     channel_name: channel ? channel.name : "Unknown",
                     joined_at: now.toISOString(),
                     left_at: null,
-                    minutes: 0,
+                    minutes: 1,
                     guild_id: guildId
                 };
                 await createVoiceSession(newSession);
             } else {
                 // User has left all voice channels, close session
                 const leftAt = now.toISOString();
-                const diffMinutes = calculateSessionMinutes(session.joined_at, leftAt, session.minutes);
+                const joinedAt = ensureJoinedAt(session, now.toISOString());
+                const diffMinutes = calculateSessionMinutes(joinedAt, leftAt, session.minutes);
                 const updatedSession = {
                     ...session,
+                    joined_at: joinedAt,
                     left_at: leftAt,
                     minutes: diffMinutes,
                     guild_id: session.guild_id || guildId
@@ -158,7 +190,7 @@ async function voiceChannelSessions(client, openai) {
                         channel_name: channel ? channel.name : "Unknown",
                         joined_at: now.toISOString(),
                         left_at: null,
-                        minutes: 0,
+                        minutes: 1,
                         guild_id: guildId
                     };
                     await createVoiceSession(newSession);

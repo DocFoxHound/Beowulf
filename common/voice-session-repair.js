@@ -9,6 +9,15 @@ function hasNullishMinutes(rawMinutes) {
     return Number.isNaN(numeric);
 }
 
+function deriveFallbackTimestamps(rawSession = {}) {
+    const createdSource = rawSession.created_at || rawSession.createdAt || rawSession.updated_at || rawSession.timestamp || new Date().toISOString();
+    const createdDate = new Date(createdSource);
+    const safeCreated = Number.isFinite(createdDate.getTime()) ? createdDate : new Date();
+    const joinedIso = safeCreated.toISOString();
+    const leftIso = new Date(safeCreated.getTime() + 60000).toISOString();
+    return { joinedIso, leftIso };
+}
+
 async function repairVoiceSessionsWithNullMinutes(guildId) {
     try {
         const allSessions = await getAllVoiceSessions();
@@ -26,19 +35,23 @@ async function repairVoiceSessionsWithNullMinutes(guildId) {
             }
 
             const normalized = normalizeSession(rawSession, guildId);
-            if (!normalized?.id || !normalized.joined_at || !normalized.left_at) {
-                continue; // Cannot compute duration without identifiers and timestamps.
+            if (!normalized?.id) {
+                continue; // Cannot update without an identifier.
             }
 
-            const recalculatedMinutes = calculateSessionMinutes(normalized.joined_at, normalized.left_at, 1);
-            if (!Number.isFinite(recalculatedMinutes)) {
-                continue;
-            }
+            const { joinedIso, leftIso } = deriveFallbackTimestamps(rawSession);
+            const requiresFallbackTimestamps = !normalized.joined_at || !normalized.left_at;
+            const joinedAt = normalized.joined_at || joinedIso;
+            const leftAt = normalized.left_at || leftIso;
+
+            const recalculatedMinutes = requiresFallbackTimestamps
+                ? 1
+                : calculateSessionMinutes(joinedAt, leftAt, 1);
 
             await updateVoiceSession(normalized.id, {
                 minutes: recalculatedMinutes,
-                joined_at: normalized.joined_at,
-                left_at: normalized.left_at,
+                joined_at: joinedAt,
+                left_at: leftAt,
                 guild_id: normalized.guild_id || guildId,
             });
             repaired += 1;
