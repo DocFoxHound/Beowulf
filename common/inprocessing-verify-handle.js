@@ -305,32 +305,56 @@ async function handleSimpleWelcomeGuest(interaction, client, openai){
     const friendlyPendingRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.FRIENDLY_PENDING_ROLE : process.env.FRIENDLY_ROLE;
     const newUserRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.NEW_USER_ROLE : process.env.TEST_NEW_USER_ROLE;
     const channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.STARCITIZEN_CHANNEL : process.env.TEST_GENERAL_CHANNEL;
-    const userId = interaction.user.id;
-    const dbUser = await getUserById(userId);
-    const joinedDate = dbUser?.joined_date ? new Date(dbUser.joined_date) : null;
-    const maxGuestWelcomeAgeMs = 7 * 24 * 60 * 60 * 1000;
+    const inferredUserId = interaction?.user?.id
+        || interaction?.id
+        || interaction?.author?.id
+        || interaction?.member?.user?.id
+        || (typeof interaction === 'string' ? interaction : undefined);
 
-    if (joinedDate && !Number.isNaN(joinedDate.getTime())) {
-        const joinedAgeMs = Date.now() - joinedDate.getTime();
-        if (joinedAgeMs > maxGuestWelcomeAgeMs) {
-            console.log(`[handleSimpleWelcomeGuest] Suppressing guest welcome for ${userId}; joined_date=${dbUser.joined_date}`);
-            const rejectionMessage = 'Guest welcome messages are only available within the first 7 days after joining.';
-            if (typeof interaction?.reply === 'function') {
-                try {
-                    if (!interaction.deferred && !interaction.replied) {
-                        await interaction.reply({ content: rejectionMessage, ephemeral: true });
-                    } else if (typeof interaction.followUp === 'function') {
-                        await interaction.followUp({ content: rejectionMessage, ephemeral: true });
-                    }
-                } catch (error) {
-                    console.error('Error sending guest welcome suppression notice:', error);
-                }
-            }
-            return;
-        }
+    if (!inferredUserId) {
+        console.error('[handleSimpleWelcomeGuest] Unable to resolve user id from trigger context.');
+        return;
     }
+
+    const dbUser = await getUserById(inferredUserId);
+    if (!dbUser) {
+        console.error(`[handleSimpleWelcomeGuest] No dbUser found for ${inferredUserId}; skipping welcome.`);
+        return;
+    }
+
     const guild = getGuild(client);
-    const member = await guild.members.fetch(userId);
+    let member;
+    try {
+        member = await guild.members.fetch(dbUser.id);
+    } catch (error) {
+        console.error(`[handleSimpleWelcomeGuest] Unable to fetch guild member ${dbUser.id}:`, error);
+        return;
+    }
+
+    const now = Date.now();
+    const maxGuestWelcomeAgeMs = 7 * 24 * 60 * 60 * 1000;
+    const guildJoinedAge = typeof member.joinedTimestamp === 'number' ? now - member.joinedTimestamp : null;
+    const joinedDate = dbUser?.joined_date ? new Date(dbUser.joined_date) : null;
+    const dbJoinedAge = joinedDate && !Number.isNaN(joinedDate.getTime()) ? now - joinedDate.getTime() : null;
+    const effectiveJoinAge = guildJoinedAge ?? dbJoinedAge;
+
+    if (effectiveJoinAge !== null && effectiveJoinAge > maxGuestWelcomeAgeMs) {
+        console.log(`[handleSimpleWelcomeGuest] Suppressing guest welcome for ${dbUser.id}; join age ${effectiveJoinAge}ms exceeds ${maxGuestWelcomeAgeMs}ms.`);
+        const rejectionMessage = 'Guest welcome messages are only available within the first 7 days after joining.';
+        if (typeof interaction?.reply === 'function') {
+            try {
+                if (!interaction.deferred && !interaction.replied) {
+                    await interaction.reply({ content: rejectionMessage, ephemeral: true });
+                } else if (typeof interaction.followUp === 'function') {
+                    await interaction.followUp({ content: rejectionMessage, ephemeral: true });
+                }
+            } catch (error) {
+                console.error('Error sending guest welcome suppression notice:', error);
+            }
+        }
+        return;
+    }
+
     // Add friendlyPendingRole, remove newUserRole
     try {
         await member.roles.add(friendlyPendingRole);
@@ -342,9 +366,7 @@ async function handleSimpleWelcomeGuest(interaction, client, openai){
     } catch (error) {
         console.error('Error removing newUserRole:', error);
     }
-    // Create welcome message
-        // const welcomeMessage = `Welcome ${dbUser.username} to IronPoint, let them know they can feel free to join the crew whenever you see us online. If they're interested in joining, please let us know! We open recruitment periodically and it's great to see interest.`;
-        // const defaultReturnMessage = "Welcome to IronPoint, feel free to join the crew whenever you see us online. If you're interested in joining, please let us know! We open recruitment periodically and it's great to see interest.";
+
     const guestMessage = `Welcome ${dbUser.username} to IronPoint, let them know they can feel free to join the crew whenever you see us online. If they're interested in joining, please let us know! We open recruitment periodically and it's great to see interest.`;
     let returnedMessage = "";
     try{
@@ -353,22 +375,25 @@ async function handleSimpleWelcomeGuest(interaction, client, openai){
         returnedMessage = "Welcome to IronPoint, feel free to join the crew whenever you see us online. If you're interested in joining, please let us know! We open recruitment periodically and it's great to see interest.";
         console.error("Error notifying welcome for embed:", error);
     }
-    // Create embed with avatar, title, and welcome message
-    const avatarUrl = interaction.user.displayAvatarURL();
+
+    const displayUser = member?.user || interaction?.user;
+    const avatarUrl = typeof displayUser?.displayAvatarURL === 'function' ? displayUser.displayAvatarURL() : null;
     const embed = new EmbedBuilder()
         .setTitle(`Welcome, ${dbUser.username}, our newest Guest!`)
         .setDescription(returnedMessage)
-        .setThumbnail(avatarUrl)
         .setColor(0x3498db)
         .addFields(
             { name: 'Apply to IronPoint', value: '[💀Join IronPoint💀](https://discord.com/channels/692428312840110090/1434066387529240646)', inline: false },
             { name: 'Website', value: '[ironpoint.org](https://www.ironpoint.org/)', inline: false },
             { name: 'Dogfighting 101 Videos', value: `[Kozuka's Raptor 101](https://www.youtube.com/playlist?list=PL3P2dFMRGUtYJa4NauDruO76hSdNCDBOQ)`, inline: false },
         );
-    // Send embed to channel
+    if (avatarUrl) {
+        embed.setThumbnail(avatarUrl);
+    }
+
     const channel = guild.channels.cache.get(channelToNotify);
     if (channel) {
-        await channel.send({ content: `<@${userId}>`, embeds: [embed] });
+        await channel.send({ content: `<@${member.id}>`, embeds: [embed] });
     } else {
         console.error('Welcome channel not found:', channelToNotify);
     }

@@ -646,18 +646,29 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
     try { await updateMemberOnMemberChange(oldMember, newMember); } catch (e) { console.error('[MemberRole] live update failed:', e?.message || e); }
     // Compute role changes first (independent of DB state)
     const memberRoles = newMember.roles.cache.map(role => role.id);
-    const prospectRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.PROSPECT_ROLE : process.env.TEST_PROSPECT_ROLE;
-    const friendlyRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.FRIENDLY_ROLE : process.env.TEST_FRIENDLY_ROLE;
-    const verifiedRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.VERIFIED_ROLE : process.env.TEST_VERIFIED_ROLE;
-    const newUserRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.NEW_USER_ROLE : process.env.TEST_NEW_USER_ROLE;
+    const isLive = process.env.LIVE_ENVIRONMENT === "true";
+    const prospectRole = isLive ? process.env.PROSPECT_ROLE : process.env.TEST_PROSPECT_ROLE;
+    const crewRole = isLive ? process.env.CREW_ROLE : process.env.TEST_CREW_ROLE;
+    const marauderRole = isLive ? process.env.MARAUDER_ROLE : process.env.TEST_MARAUDER_ROLE;
+    const bloodedRole = isLive ? process.env.BLOODED_ROLE : process.env.TEST_BLOODED_ROLE;
+    const friendlyRole = isLive ? process.env.FRIENDLY_ROLE : process.env.TEST_FRIENDLY_ROLE;
+    const verifiedRole = isLive ? process.env.VERIFIED_ROLE : process.env.TEST_VERIFIED_ROLE;
+    const newUserRole = isLive ? process.env.NEW_USER_ROLE : process.env.TEST_NEW_USER_ROLE;
     const oldRoles = oldMember.roles.cache.map(role => role.id);
+    const lostPromotionRole = [prospectRole, crewRole, marauderRole, bloodedRole]
+      .filter(Boolean)
+      .some(roleId => oldRoles.includes(roleId) && !memberRoles.includes(roleId));
 
     // Trigger welcomes when the role is newly gained (do not require NEW_USER_ROLE)
     if (!oldRoles.includes(prospectRole) && memberRoles.includes(prospectRole)) {
       try { await handleSimpleWelcomeProspect(newMember, client, openai); } catch (e) { console.error('[WelcomeProspect] failed:', e?.message || e); }
     }
     if (!oldRoles.includes(friendlyRole) && memberRoles.includes(friendlyRole)) {
-      try { await handleSimpleWelcomeGuest(newMember, client, openai); } catch (e) { console.error('[WelcomeGuest] failed:', e?.message || e); }
+      if (lostPromotionRole) {
+        console.log(`[WelcomeGuest] Skipping guest welcome for ${newMember.id}; gained friendly while losing higher rank.`);
+      } else {
+        try { await handleSimpleWelcomeGuest(newMember, client, openai); } catch (e) { console.error('[WelcomeGuest] failed:', e?.message || e); }
+      }
     }
 
     // ...existing code...
