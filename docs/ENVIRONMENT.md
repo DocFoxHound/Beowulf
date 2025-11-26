@@ -61,6 +61,8 @@ This document enumerates all environment variables referenced in the codebase an
 - `CHATGPT_ENTITY_INCLUDE_CACHE_FALLBACK` (default 'true') – When true, append legacy UEX catalog entries if the DB is empty.
 - `USER_OPINION_USE_LLM` (default 'true') – Generates opinion responses via LLM.
 - `KNOWLEDGE_INGEST_ENABLE` – Master flag controlling ingestion pipelines (chat/hits/stats).
+- `MEMORY_BATCHER_ENABLE` – Force-enable the channel memory summarizer even if other ingest flags are off (defaults to 'false'; falls back to `KNOWLEDGE_INGEST_ENABLE` when undefined).
+- `MEMORY_IMMEDIATE_WRITE_ENABLE` – Legacy escape hatch that writes every user message directly into the memories table (defaults to 'false'; leave disabled so the batch summarizer + GPT filtering are used).
 - `CHAT_VECTOR_INGEST_ON_START` – Batch ingest historical chat logs at startup.
 - `CHAT_VECTOR_INGEST_LIVE` – Live per-message vector ingestion.
 - `SAVE_MESSAGES` – Persist raw Discord messages for retrieval scoring.

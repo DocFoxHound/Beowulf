@@ -1,5 +1,29 @@
 const axios = require('axios');
 
+// Remove nullish values and normalize minutes before sending to the API.
+function sanitizeVoiceSessionPayload(payload = {}) {
+    const sanitized = {};
+    for (const [key, value] of Object.entries(payload)) {
+        if (value === null || value === undefined) {
+            continue;
+        }
+
+        if (key === 'minutes') {
+            const numericMinutes = Number(value);
+            sanitized.minutes = Number.isFinite(numericMinutes) ? numericMinutes : 0;
+            continue;
+        }
+
+        sanitized[key] = value;
+    }
+
+    if (sanitized.minutes === undefined) {
+        sanitized.minutes = 0;
+    }
+
+    return sanitized;
+}
+
 async function getAllVoiceSessions() {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_VOICE_CHANNEL_SESSION}/`;
     try {
@@ -36,7 +60,8 @@ async function getAllActiveVoiceSessions() {
 async function createVoiceSession(gatheringData) {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_VOICE_CHANNEL_SESSION}/`;
     try {
-        const response = await axios.post(apiUrl, gatheringData, {
+        const sanitizedPayload = sanitizeVoiceSessionPayload(gatheringData);
+        const response = await axios.post(apiUrl, sanitizedPayload, {
             headers: {
                 'Content-Type': 'application/json'
             }
@@ -51,7 +76,8 @@ async function createVoiceSession(gatheringData) {
 async function updateVoiceSession(id, updateData) {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_VOICE_CHANNEL_SESSION}/${id}`;
     try {
-        const response = await axios.put(apiUrl, updateData, {
+        const sanitizedPayload = sanitizeVoiceSessionPayload(updateData);
+        const response = await axios.put(apiUrl, sanitizedPayload, {
             headers: {
                 'Content-Type': 'application/json'
             }

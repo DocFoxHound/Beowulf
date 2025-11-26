@@ -99,7 +99,7 @@ async function flushChannel(channelId, reason = 'interval') {
   state.isProcessing = true;
   debugLog(`Flushing channel ${channelId} reason=${reason} count=${batch.length}`);
   try {
-    await batchHandler({ channelId, reason, messages: batch });
+    await batchHandler({ channelId, reason, messages: batch, openai: sharedOpenAi });
     state.lastProcessedIso = batch[batch.length - 1]?.timestamp || state.lastProcessedIso;
     state.accumulated = 0;
   } catch (error) {
@@ -135,7 +135,7 @@ function startIntervalTimer() {
   if (typeof intervalHandle.unref === 'function') intervalHandle.unref();
 }
 
-function startMemoryBatchWorker({ channelIds = [], onBatch, intervalMsOverride, replayFromHistory = false } = {}) {
+function startMemoryBatchWorker({ channelIds = [], onBatch, intervalMsOverride, replayFromHistory = false, openai = null } = {}) {
   if (!ENABLED) {
     debugLog('Batcher disabled via env.');
     return false;
@@ -143,6 +143,7 @@ function startMemoryBatchWorker({ channelIds = [], onBatch, intervalMsOverride, 
   if (typeof onBatch === 'function') {
     batchHandler = onBatch;
   }
+  sharedOpenAi = openai || null;
   if (intervalMsOverride) {
     intervalMs = Math.max(15000, Number(intervalMsOverride));
   }

@@ -1,8 +1,10 @@
 const { saveMemoryEntry } = require('./memory-store');
 const { isBotUser } = require('../../common/bot-identity');
 
+const LEGACY_IMMEDIATE_MEMORY_WRITE = (process.env.MEMORY_IMMEDIATE_WRITE_ENABLE || 'false').toLowerCase() === 'true';
+
 function shouldWriteMemories() {
-  return (process.env.KNOWLEDGE_INGEST_ENABLE || 'false').toLowerCase() === 'true';
+  return LEGACY_IMMEDIATE_MEMORY_WRITE;
 }
 
 async function persistUserMessageMemory({ message, meta, openai }) {

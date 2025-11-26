@@ -71,6 +71,7 @@ const { handleFleetCommanderChange } = require('./functions/fleet-commander-chan
 const { handleFleetMemberChange } = require('./functions/fleet-member-change.js');
 const { processPlayerLeaderboards } = require('./functions/process-leaderboards.js');
 const { voiceChannelSessions } = require("./common/voice-channel-sessions.js");
+const { repairVoiceSessionsWithNullMinutes } = require("./common/voice-session-repair.js");
 const { automatedAwards } = require("./common/automated-awards.js");
 const { promotePlayerNotify } = require('./common/promote-player-notify.js');
 const { notifyForAward } = require('./common/bot-notify.js');
@@ -243,6 +244,9 @@ try {
   if (hitForumId && !channelIds.includes(hitForumId)) channelIds.push(hitForumId);
 } catch {}
 channelIdAndName = [];
+
+const clientToken = process.env.LIVE_ENVIRONMENT === "true" ? process.env.CLIENT_TOKEN : process.env.TEST_CLIENT_TOKEN;
+const VOICE_SESSION_REPAIR_ON_START = (process.env.VOICE_SESSION_REPAIR_ON_START || 'true').toLowerCase() === 'true';
 
 //json things to hold in memory
 let preloadedDbTables;
@@ -793,11 +797,26 @@ client.on("error", (e) => {
 // Attempt to auto-reconnect on disconnection
 client.on("disconnect", () => {
   console.log("Disconnected! Trying to reconnect...");
-  client.login(process.env.LIVE_ENVIRONMENT === "true" ? process.env.CLIENT_TOKEN : process.env.TEST_CLIENT_TOKEN);
+  client.login(clientToken);
 });
 
-//logs the bot in
-client.login(process.env.LIVE_ENVIRONMENT === "true" ? process.env.CLIENT_TOKEN : process.env.TEST_CLIENT_TOKEN);
+// Run voice session repairs before logging the bot in
+(async () => {
+  try {
+    const guildId = getActiveGuildId();
+    if (!VOICE_SESSION_REPAIR_ON_START) {
+      console.info('[VoiceSessionRepair] Startup repair disabled via VOICE_SESSION_REPAIR_ON_START=false.');
+    } else if (guildId) {
+      await repairVoiceSessionsWithNullMinutes(guildId);
+    } else {
+      console.warn('[VoiceSessionRepair] Skipping startup repair; missing guild id.');
+    }
+  } catch (error) {
+    console.error('[VoiceSessionRepair] Startup repair failed:', error?.message || error);
+  } finally {
+    client.login(clientToken);
+  }
+})();
 
 const express = require('express');
 const app = express();

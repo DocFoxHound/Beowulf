@@ -3,9 +3,10 @@ const fs = require("node:fs");
 const { updateVoiceSession, createVoiceSession, getAllActiveVoiceSessions } = require("../api/voiceChannelSessionsApi");
 const { ChannelType } = require("discord.js");
 const { checkRecentGatherings } = require("./recent-gatherings.js");
-const { checkRecentGangs } = require("./recent-fleets.js")
+const { checkRecentGangs } = require("./recent-fleets.js");
 
 function normalizeSession(rawSession = {}, fallbackGuildId) {
+    const parsedMinutes = Number(rawSession.minutes);
     const normalized = {
         id: String(rawSession.id ?? rawSession.session_id ?? ""),
         user_id: rawSession.user_id || rawSession.userId || rawSession.user || null,
@@ -13,10 +14,25 @@ function normalizeSession(rawSession = {}, fallbackGuildId) {
         channel_name: rawSession.channel_name || rawSession.channelName || null,
         joined_at: rawSession.joined_at || rawSession.joinedAt || null,
         left_at: rawSession.left_at || rawSession.leftAt || null,
-        minutes: Number(rawSession.minutes || 0),
+        minutes: Number.isFinite(parsedMinutes) ? parsedMinutes : 0,
         guild_id: rawSession.guild_id || rawSession.guildId || fallbackGuildId,
     };
     return normalized;
+}
+
+// Ensures we never send NaN/null minutes back to the API when closing a session.
+function calculateSessionMinutes(joinedAt, leftAt, fallbackMinutes = 1) {
+    const joinedTimestamp = Date.parse(joinedAt);
+    const leftTimestamp = Date.parse(leftAt);
+    if (Number.isFinite(joinedTimestamp) && Number.isFinite(leftTimestamp) && leftTimestamp >= joinedTimestamp) {
+        const diffMinutes = Math.round((leftTimestamp - joinedTimestamp) / 60000);
+        return Math.max(1, diffMinutes);
+    }
+    const fallback = Number(fallbackMinutes);
+    if (Number.isFinite(fallback) && fallback > 0) {
+        return Math.round(fallback);
+    }
+    return 1;
 }
 
 
@@ -70,9 +86,7 @@ async function voiceChannelSessions(client, openai) {
             // If user is in AFK channel, close session and do not create a new one
             if (currentChannelId === afkChannelId) {
                 const leftAt = now.toISOString();
-                const joinedAt = new Date(session.joined_at);
-                const diffMs = new Date(leftAt) - joinedAt;
-                const diffMinutes = Math.max(1, Math.round(diffMs / 60000));
+                const diffMinutes = calculateSessionMinutes(session.joined_at, leftAt, session.minutes);
                 const updatedSession = {
                     ...session,
                     left_at: leftAt,
@@ -94,9 +108,7 @@ async function voiceChannelSessions(client, openai) {
             } else if (currentChannelId !== null && currentChannelId !== session.channel_id) {
                 // User switched channels: close old session, create new one
                 const leftAt = now.toISOString();
-                const joinedAt = new Date(session.joined_at);
-                const diffMs = new Date(leftAt) - joinedAt;
-                const diffMinutes = Math.max(1, Math.round(diffMs / 60000));
+                const diffMinutes = calculateSessionMinutes(session.joined_at, leftAt, session.minutes);
                 const updatedSession = {
                     ...session,
                     left_at: leftAt,
@@ -120,9 +132,7 @@ async function voiceChannelSessions(client, openai) {
             } else {
                 // User has left all voice channels, close session
                 const leftAt = now.toISOString();
-                const joinedAt = new Date(session.joined_at);
-                const diffMs = new Date(leftAt) - joinedAt;
-                const diffMinutes = Math.max(1, Math.round(diffMs / 60000));
+                const diffMinutes = calculateSessionMinutes(session.joined_at, leftAt, session.minutes);
                 const updatedSession = {
                     ...session,
                     left_at: leftAt,
@@ -187,4 +197,6 @@ async function voiceChannelSessions(client, openai) {
 
 module.exports = {
     voiceChannelSessions,
+    normalizeSession,
+    calculateSessionMinutes,
 }

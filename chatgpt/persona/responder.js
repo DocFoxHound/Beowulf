@@ -125,7 +125,6 @@ function formatLeaderboard(row) {
   const fields = [
     row.rank ? `Rank: ${row.rank}` : null,
     row.score ? `Score: ${row.score}` : null,
-    row.kills ? `Kills: ${row.kills}` : null,
   ].filter(Boolean);
   return fields.length ? fields.join('\n') : 'Leaderboard entry cached without key fields.';
 }

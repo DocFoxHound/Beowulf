@@ -51,6 +51,18 @@ const HIT_TIMESTAMP_FIELDS = ['timestamp', 'created_at', 'createdAt', 'updated_a
 const LEADERBOARD_SCORE_FIELDS = ['score', 'sb_score', 'rating', 'points', 'rank_points', 'total_score'];
 const LEADERBOARD_KD_FIELDS = ['kd', 'kdr', 'kill_death', 'kill_death_ratio'];
 const LEADERBOARD_WIN_FIELDS = ['wins', 'win_count', 'victories'];
+const PLAYER_STATS_FILTER_FIELDS = new Set([
+  'shipkills',
+  'fpskills',
+  'fleetleads',
+  'fleetassists',
+  'fleetparticipated',
+  'fleetkills',
+  'fleetscu',
+  'fleetvalue',
+  'fleetdamages',
+  'fleetcommander',
+]);
 const LOCATION_RELATION_REFRESH_MS = 5 * 60 * 1000;
 const LOCATION_ALIAS_CANONICALS = new Map();
 let marketLookupCache = {
@@ -64,6 +76,20 @@ let locationRelationCache = { builtAt: 0, relations: null };
 
 function safeJson(obj) {
   try { return JSON.parse(JSON.stringify(obj)); } catch { return obj; }
+}
+
+function sanitizePlayerStatsRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  const sanitized = safeJson(row) || {};
+  for (const field of PLAYER_STATS_FILTER_FIELDS) {
+    if (field in sanitized) delete sanitized[field];
+  }
+  if (sanitized.voicehours !== undefined && sanitized.voicehours !== null) {
+    const minutes = Number(sanitized.voicehours);
+    sanitized.voice_minutes = Number.isFinite(minutes) ? minutes : sanitized.voicehours;
+    delete sanitized.voicehours;
+  }
+  return sanitized;
 }
 
 function takeLast(arr, limit = FALLBACK_LIMIT) {
@@ -720,7 +746,7 @@ function getPlayerStatsSnapshot(userId) {
     const target = normalizeId(userId);
     if (!target) return null;
     const row = stats.find((entry) => [entry.discord_id, entry.user_id, entry.discordId].some((field) => normalizeId(field) === target));
-    return row ? safeJson(row) : null;
+    return row ? sanitizePlayerStatsRow(row) : null;
   } catch (error) {
     console.error('[ChatGPT][Tools] player stats lookup failed:', error?.message || error);
     return null;

@@ -8,7 +8,7 @@ const {
 const { isBotUser } = require('../../common/bot-identity');
 
 const MEMORY_MODEL = process.env.CHATGPT_MEMORY_MODEL || process.env.CHATGPT_PERSONA_MODEL || 'gpt-4o-mini';
-const MEMORY_IMPORTANCE_THRESHOLD = Math.max(1, Number(process.env.MEMORY_IMPORTANCE_THRESHOLD || 3));
+const MEMORY_IMPORTANCE_THRESHOLD = Number(process.env.MEMORY_IMPORTANCE_THRESHOLD);
 const MAX_MEMORIES_PER_BATCH = Math.max(1, Number(process.env.MEMORY_BATCH_MAX_MEMORIES || 3));
 const MEMORY_BATCH_DEBUG = 0;
 const MAX_SERIALIZED_MESSAGES = Math.max(5, Number(process.env.MEMORY_BATCH_MAX_MESSAGES || 20));
@@ -18,7 +18,33 @@ const PROFILE_NOTES_KEY = 'notes';
 const PERSONA_STRING_FIELDS = ['profession', 'demeanor', 'relationship_notes', 'personality_summary', 'catchphrase'];
 const PERSONA_ARRAY_FIELDS = ['known_for', 'notable_quotes', 'favorite_topics', 'achievements', 'notable_traits', 'warnings'];
 const PERSONA_TRAIT_FIELDS = ['openness', 'conscientiousness', 'extraversion', 'agreeableness', 'neuroticism', 'confidence', 'courage', 'integrity', 'resilience', 'humor'];
-const ALLOWED_MEMORY_TYPES = new Set(['episodic', 'inside_joke', 'profile', 'lore', 'dogfighting_advice', 'piracy_advice']);
+const ALLOWED_MEMORY_TYPES = new Set([
+  'episodic',
+  'inside_joke',
+  'profile',
+  'lore',
+  'dogfighting_advice',
+  'piracy_advice',
+  'strategy',
+  'item_info',
+  'location_info',
+  'game_knowledge',
+]);
+const MEMORY_TYPE_ALIASES = {
+  fact: 'game_knowledge',
+  knowledge: 'game_knowledge',
+  info: 'game_knowledge',
+  tactic: 'strategy',
+  tactics: 'strategy',
+  strategic: 'strategy',
+  item: 'item_info',
+  commodity: 'item_info',
+  trade: 'item_info',
+  location: 'location_info',
+  locationinfo: 'location_info',
+  place: 'location_info',
+};
+const RELAXED_MEMORY_TYPES = new Set(['inside_joke', 'profile', 'item_info', 'location_info', 'game_knowledge']);
 const MAX_PROFILE_NICKNAME = 120;
 const DEFAULT_LIKEABLE_SCORE = (() => {
   const raw = Number(process.env.USER_PROFILE_DEFAULT_LIKEABLE || 55);
@@ -422,7 +448,7 @@ function buildPersonaGuidance(profilesMap) {
 }
 
 function buildPrompts({ channelId, channelName, guildId, reason, serializedMessages, speakerSummary, personaGuidance }) {
-  const systemPrompt = `You are Beowulf's memory curator. Analyze recent Discord chat logs and decide if any information deserves a long-term memory or a user profile tweak. Store durable info: achievements, battle results, logistics, BUT ALSO capture memorable banter, recurring jokes, or strong opinions that reveal personality or relationships. Additionally classify any actionable pilotry/fighter tactics as dogfighting_advice, and any piracy strategies, market ambush intel, or profit routes as piracy_advice. Rate importance 1-5 (5 = core lore). Output JSON strictly matching the requested schema. If nothing qualifies, return empty arrays.`;
+  const systemPrompt = `You are Beowulf's memory curator. Every batch you see represents the last few minutes of chat in a single channel. Decide whether the combined discussion deserves a new long-term memory or a profile tweak. Only store durable intel—achievements, logistics, recurring jokes, strong opinions, strategy, item/commodity intel, location intel, or broader game knowledge. Categorize each stored memory with one of: episodic, strategy, item_info, location_info, game_knowledge, dogfighting_advice, piracy_advice, inside_joke, profile, or lore. Rate importance 1-5 (5 = core lore). Output JSON exactly matching the schema. If nothing qualifies, return empty arrays.`;
   const instructions = [
     `Guild ID: ${guildId || 'unknown'}`,
     `Channel: ${channelName || channelId || 'unknown'}`,
@@ -431,6 +457,15 @@ function buildPrompts({ channelId, channelName, guildId, reason, serializedMessa
     personaGuidance || 'No persona baselines available for these speakers.',
     'Messages JSON follows:',
     JSON.stringify(serializedMessages, null, 2),
+    'Memory type cheat sheet:',
+    '- episodic: meaningful interactions, conflicts, schedule changes, announcements.',
+    '- strategy: reusable combat/mission tactics that are not purely piracy or dogfighting.',
+    '- dogfighting_advice: fighter-specific maneuvers, loadouts, or joust notes.',
+    '- piracy_advice: ambush setups, profit routes, interdiction intel.',
+    '- item_info: where to find gear/items/commodities plus prices or quantities.',
+    '- location_info: which outposts/terminals/stations provide what services or loot.',
+    '- game_knowledge: mechanics, patch intel, org lore, anything evergreen.',
+    '- inside_joke/profile/lore: personality cues, jokes, relationships, timeless history.',
     'Desired JSON schema:',
     '{"memories":[{"summary":"string","details":"include concrete facts, stats, or quotes","importance":1-5,"type":"episodic|inside_joke|profile|lore|dogfighting_advice|piracy_advice|fact","related_users":["discordId"],"tags":["string"],"should_store":true|false}],"profile_adjustments":[{"user_id":"string","nickname":"string?","tease_level":0-100,"tease_level_delta":-10-10,"style_preferences":{"tone_preference":"short text"},"persona_details":{"profession":"string?","known_for":["string"],"notable_quotes":["string"],"favorite_topics":["string"],"achievements":["string"],"personality_summary":"string?","relationship_notes":"string?","catchphrase":"string?","traits":{"openness":0-10,"conscientiousness":0-10,"extraversion":0-10,"agreeableness":0-10,"neuroticism":0-10,"confidence":0-10,"courage":0-10,"integrity":0-10,"resilience":0-10,"humor":0-10}},"stats_adjustments":{"likeable":0-100,"likeable_delta":-15-15,"other_numeric_stat":0-100},"notes":"short guidance"}]}',
     `Limit memories to ${MAX_MEMORIES_PER_BATCH} items. Reject mundane updates unless they include a concrete plan, metric, or character insight. Classify fighter tactics, formation calls, joust angles, missile baiting, or EVA boarding plans as dogfighting_advice. Classify profitable commodity intel, piracy routes, snare traps, loot valuations, or fence strategies as piracy_advice. If someone states a strong opinion, shares a recurring joke, or teases another member in a way that defines their relationship, capture it as an inside_joke (with the direct quote in details). If you keep a memory, ensure the summary explains why it matters AND populate the details field with supporting numbers, names, timestamps, or direct quotes. Set should_store=false for filler banter. Only populate persona_details when the chat gives reliable signals (profession, what they are known for, quotes, quirks, etc.). When updating trait sliders, reference the baseline above and adjust gradually (no jumps bigger than 1 point).`,
@@ -475,15 +510,18 @@ async function callMemoryModel({ channelId, channelName, guildId, reason, messag
 function normalizeMemory(entry = {}) {
   const summary = typeof entry.summary === 'string' ? entry.summary.trim() : '';
   if (!summary) return null;
-  let type = typeof entry.type === 'string' ? entry.type.toLowerCase() : 'episodic';
+  let type = typeof entry.type === 'string' ? entry.type.toLowerCase().trim() : 'episodic';
+  if (type) {
+    type = MEMORY_TYPE_ALIASES[type] || type;
+  }
   if (!ALLOWED_MEMORY_TYPES.has(type)) {
-    type = type === 'fact' ? 'lore' : 'episodic';
+    type = type === 'fact' ? 'game_knowledge' : 'episodic';
   }
   const importance = clamp(entry.importance, 1, 5) || 1;
   const shouldStore = entry.should_store !== false;
   const explicitStore = entry.should_store === true;
   if (!shouldStore) return null;
-  const relaxedThreshold = ALLOWED_MEMORY_TYPES.has(type) && (type === 'inside_joke' || type === 'profile')
+  const relaxedThreshold = RELAXED_MEMORY_TYPES.has(type)
     ? Math.max(1, MEMORY_IMPORTANCE_THRESHOLD - 1)
     : MEMORY_IMPORTANCE_THRESHOLD;
   if (!explicitStore && importance < relaxedThreshold) return null;
@@ -605,7 +643,8 @@ async function persistMemories(memories = [], { channelId, channelName, guildId,
     const tags = memory.tags?.length ? `\nTags: ${memory.tags.join(', ')}` : '';
     const related = memory.relatedUsers?.length ? `\nRelated Users: ${memory.relatedUsers.join(', ')}` : '';
     const detailLine = memory.details ? `\nDetails: ${memory.details}` : '';
-    const content = `Summary: ${memory.summary}${detailLine}${tags}${related}`;
+    const typeLine = `Type: ${memory.type || 'episodic'}`;
+    const content = `${typeLine}\nSummary: ${memory.summary}${detailLine}${tags}${related}`;
     const tagsList = Array.isArray(memory.tags) && memory.tags.length
       ? memory.tags
       : ['memory-batcher'];
