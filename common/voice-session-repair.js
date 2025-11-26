@@ -11,22 +11,23 @@ function hasNullishMinutes(rawMinutes) {
 
 async function repairVoiceSessionsWithNullMinutes(guildId) {
     try {
-        const allSessionsRaw = await getAllVoiceSessions();
-        if (!Array.isArray(allSessionsRaw) || allSessionsRaw.length === 0) {
+        const allSessions = await getAllVoiceSessions();
+        if (!Array.isArray(allSessions) || allSessions.length === 0) {
+            console.info("[VoiceSessionRepair] No voice sessions returned by API; nothing to repair.");
             return { scanned: 0, repaired: 0 };
         }
 
-        let repaired = 0;
         let scanned = 0;
-        for (const rawSession of allSessionsRaw) {
+        let repaired = 0;
+        for (const rawSession of allSessions) {
             scanned += 1;
-            if (!hasNullishMinutes(rawSession.minutes)) {
+            if (!hasNullishMinutes(rawSession?.minutes)) {
                 continue;
             }
 
             const normalized = normalizeSession(rawSession, guildId);
             if (!normalized?.id || !normalized.joined_at || !normalized.left_at) {
-                continue; // Can't fix without a full session record.
+                continue; // Cannot compute duration without identifiers and timestamps.
             }
 
             const recalculatedMinutes = calculateSessionMinutes(normalized.joined_at, normalized.left_at, 1);
