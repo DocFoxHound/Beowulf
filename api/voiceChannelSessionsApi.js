@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { randomUUID } = require('node:crypto');
 
 const MAX_VOICE_SESSION_MINUTES = 32767;
 
@@ -35,22 +36,22 @@ function sanitizeVoiceSessionPayload(payload = {}) {
     return sanitized;
 }
 
-function ensureVoiceSessionIdentifier(payload = {}) {
-    const hasValidId = typeof payload.id === 'string'
-        ? payload.id.trim().length > 0
-        : payload.id != null;
-    if (hasValidId) {
-        return payload;
-    }
-
+function generateSessionId(payload = {}) {
     const userFragmentSource = payload.user_id || payload.userId || 'user';
-    const userFragment = String(userFragmentSource).slice(-6) || 'user';
-    const randomFragment = Math.floor(Math.random() * 1_000_000).toString().padStart(6, '0');
-    const generatedId = `${Date.now()}_${userFragment}_${randomFragment}`;
+    const userFragment = String(userFragmentSource || 'user').slice(-6) || 'user';
+    const suffix = randomUUID ? randomUUID() : Math.floor(Math.random() * 1_000_000).toString().padStart(6, '0');
+    return `${Date.now()}_${userFragment}_${suffix}`;
+}
+
+function ensureVoiceSessionIdentifier(payload = {}) {
+    const normalizedId = payload.id != null ? String(payload.id).trim() : '';
+    if (normalizedId) {
+        return { ...payload, id: normalizedId };
+    }
 
     return {
         ...payload,
-        id: generatedId,
+        id: generateSessionId(payload),
     };
 }
 
@@ -133,7 +134,8 @@ async function createVoiceSession(gatheringData) {
 async function updateVoiceSession(id, updateData) {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_VOICE_CHANNEL_SESSION}/${id}`;
     try {
-        const sanitizedPayload = sanitizeVoiceSessionPayload(updateData);
+        const payloadWithId = ensureVoiceSessionIdentifier({ ...updateData, id });
+        const sanitizedPayload = sanitizeVoiceSessionPayload(payloadWithId);
         const response = await axios.put(apiUrl, sanitizedPayload, {
             headers: {
                 'Content-Type': 'application/json'
