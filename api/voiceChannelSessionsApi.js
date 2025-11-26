@@ -21,6 +21,14 @@ function sanitizeVoiceSessionPayload(payload = {}) {
             continue;
         }
 
+        if (key === 'id') {
+            const normalizedId = String(value).trim();
+            if (normalizedId) {
+                sanitized.id = normalizedId;
+            }
+            continue;
+        }
+
         if (key === 'minutes') {
             sanitized.minutes = clampMinutesValue(value);
             continue;
@@ -119,6 +127,9 @@ async function createVoiceSession(gatheringData) {
     try {
         const payloadWithId = ensureVoiceSessionIdentifier(gatheringData);
         const sanitizedPayload = sanitizeVoiceSessionPayload(payloadWithId);
+        if (!sanitizedPayload.id) {
+            sanitizedPayload.id = payloadWithId.id || generateSessionId(payloadWithId);
+        }
         const response = await axios.post(apiUrl, sanitizedPayload, {
             headers: {
                 'Content-Type': 'application/json'
@@ -136,6 +147,9 @@ async function updateVoiceSession(id, updateData) {
     try {
         const payloadWithId = ensureVoiceSessionIdentifier({ ...updateData, id });
         const sanitizedPayload = sanitizeVoiceSessionPayload(payloadWithId);
+        if (!sanitizedPayload.id) {
+            sanitizedPayload.id = payloadWithId.id || String(id);
+        }
         const response = await axios.put(apiUrl, sanitizedPayload, {
             headers: {
                 'Content-Type': 'application/json'
