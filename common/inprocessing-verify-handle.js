@@ -307,6 +307,28 @@ async function handleSimpleWelcomeGuest(interaction, client, openai){
     const channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.STARCITIZEN_CHANNEL : process.env.TEST_GENERAL_CHANNEL;
     const userId = interaction.user.id;
     const dbUser = await getUserById(userId);
+    const joinedDate = dbUser?.joined_date ? new Date(dbUser.joined_date) : null;
+    const maxGuestWelcomeAgeMs = 7 * 24 * 60 * 60 * 1000;
+
+    if (joinedDate && !Number.isNaN(joinedDate.getTime())) {
+        const joinedAgeMs = Date.now() - joinedDate.getTime();
+        if (joinedAgeMs > maxGuestWelcomeAgeMs) {
+            console.log(`[handleSimpleWelcomeGuest] Suppressing guest welcome for ${userId}; joined_date=${dbUser.joined_date}`);
+            const rejectionMessage = 'Guest welcome messages are only available within the first 7 days after joining.';
+            if (typeof interaction?.reply === 'function') {
+                try {
+                    if (!interaction.deferred && !interaction.replied) {
+                        await interaction.reply({ content: rejectionMessage, ephemeral: true });
+                    } else if (typeof interaction.followUp === 'function') {
+                        await interaction.followUp({ content: rejectionMessage, ephemeral: true });
+                    }
+                } catch (error) {
+                    console.error('Error sending guest welcome suppression notice:', error);
+                }
+            }
+            return;
+        }
+    }
     const guild = getGuild(client);
     const member = await guild.members.fetch(userId);
     // Add friendlyPendingRole, remove newUserRole
