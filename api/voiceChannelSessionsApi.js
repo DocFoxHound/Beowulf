@@ -54,11 +54,37 @@ function ensureVoiceSessionIdentifier(payload = {}) {
     };
 }
 
-async function getAllVoiceSessions() {
+async function getAllVoiceSessions({ pageSize = 500, maxPages = 500, order = 'id.asc' } = {}) {
     const apiUrl = `${process.env.SERVER_URL}${process.env.API_VOICE_CHANNEL_SESSION}/`;
+    const sessions = [];
+    let offset = 0;
+
     try {
-        const response = await axios.get(apiUrl);
-        return response.data;
+        for (let page = 0; page < maxPages; page++) {
+            const params = { limit: pageSize, offset };
+            if (order) params.order = order;
+
+            const response = await axios.get(apiUrl, { params });
+            const rows = Array.isArray(response.data)
+                ? response.data
+                : Array.isArray(response.data?.data)
+                    ? response.data.data
+                    : [];
+
+            if (!rows.length) {
+                break;
+            }
+
+            sessions.push(...rows);
+
+            if (rows.length < pageSize) {
+                break; // Last partial page fetched.
+            }
+
+            offset += rows.length;
+        }
+
+        return sessions;
     } catch (error) {
         console.error('Error fetching all voice sessions:', error.response ? error.response.data : error.message);
         return null;
