@@ -1,5 +1,5 @@
 const { getUserById, createUser, editUser } = require('../api/userlistApi');
-const { verifyHandle, handleSimpleWelcomeGuest, handleSimpleJoin } = require('../common/inprocessing-verify-handle');
+const { verifyHandle, handleSimpleWelcomeGuest } = require('../common/inprocessing-verify-handle');
 const { notifyRejoinWelcome, notifyJoinMemberWelcome, notifyJoinGuestWelcome } = require('./bot-notify');
 
 // Helper to get the guild from client and .env
@@ -56,15 +56,6 @@ async function handleNewGuildMember(member, client, openai) {
                 const errMsg = `[handleNewGuildMember] Failed to add New User role (${newUserRole}) to ${member.user.tag}: ${roleErr?.message || roleErr}`;
                 console.error(errMsg);
                 actionMsg += ` Failed to apply New User role.`;
-            }
-        }
-
-        // Directly initiate welcome flow here to avoid unreliable role-update triggers
-        if (isNewUser) {
-            try {
-                await handleSimpleJoin(member, client, openai);
-            } catch (welcomeErr) {
-                console.error('[handleNewGuildMember] Failed to initiate simple join welcome:', welcomeErr);
             }
         }
 

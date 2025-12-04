@@ -673,6 +673,15 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
       }
     }
 
+    const gainedFriendlyPending = friendlyPendingRole && !oldRoles.includes(friendlyPendingRole) && memberRoles.includes(friendlyPendingRole);
+    if (gainedFriendlyPending) {
+      try {
+        await handleSimpleJoin(newMember, client, openai);
+      } catch (e) {
+        console.error('[WelcomeFriendlyPending] failed:', e?.message || e);
+      }
+    }
+
     // Trigger welcomes when the role is newly gained (do not require NEW_USER_ROLE)
     if (!oldRoles.includes(prospectRole) && memberRoles.includes(prospectRole)) {
       try { await handleSimpleWelcomeProspect(newMember, client, openai); } catch (e) { console.error('[WelcomeProspect] failed:', e?.message || e); }
