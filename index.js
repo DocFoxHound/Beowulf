@@ -652,12 +652,26 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
     const marauderRole = isLive ? process.env.MARAUDER_ROLE : process.env.TEST_MARAUDER_ROLE;
     const bloodedRole = isLive ? process.env.BLOODED_ROLE : process.env.TEST_BLOODED_ROLE;
     const friendlyRole = isLive ? process.env.FRIENDLY_ROLE : process.env.TEST_FRIENDLY_ROLE;
+    const friendlyPendingRole = isLive ? process.env.FRIENDLY_PENDING_ROLE : process.env.TEST_FRIENDLY_ROLE;
     const verifiedRole = isLive ? process.env.VERIFIED_ROLE : process.env.TEST_VERIFIED_ROLE;
     const newUserRole = isLive ? process.env.NEW_USER_ROLE : process.env.TEST_NEW_USER_ROLE;
     const oldRoles = oldMember.roles.cache.map(role => role.id);
     const lostPromotionRole = [prospectRole, crewRole, marauderRole, bloodedRole]
       .filter(Boolean)
       .some(roleId => oldRoles.includes(roleId) && !memberRoles.includes(roleId));
+
+    // Ensure newly verified members always carry the friendly pending role for onboarding follow-up
+    const gainedVerified = verifiedRole && !oldRoles.includes(verifiedRole) && memberRoles.includes(verifiedRole);
+    const priorityRoles = [friendlyRole, prospectRole, crewRole, marauderRole, bloodedRole].filter(Boolean);
+    const hasHigherPriorityRole = priorityRoles.some(roleId => memberRoles.includes(roleId));
+
+    if (gainedVerified && friendlyPendingRole && !memberRoles.includes(friendlyPendingRole) && !hasHigherPriorityRole) {
+      try {
+        await newMember.roles.add(friendlyPendingRole, 'Auto-apply friendly pending when verified');
+      } catch (e) {
+        console.error('[GuildMemberUpdate] Failed to add friendly pending on verification:', e?.message || e);
+      }
+    }
 
     // Trigger welcomes when the role is newly gained (do not require NEW_USER_ROLE)
     if (!oldRoles.includes(prospectRole) && memberRoles.includes(prospectRole)) {

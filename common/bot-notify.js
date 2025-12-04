@@ -38,10 +38,8 @@ async function notifyRankPromotion(rank, userData, _openai, client){
 }
 
 async function notifyForAward(badgeName, badgeDescription, userName, userId, _openai, client){
-    const channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.GENERAL_CHANNEL : process.env.TEST_GENERAL_CHANNEL;
-    if (!channelToNotify || !userId) return;
-    const message = `🏅 ${userName} just earned the **${badgeName}** badge — ${badgeDescription}. Send your props and share a favorite moment!`;
-    await sendMessageNotifySubject(channelToNotify, userId, message, client);
+    console.log(`[BotNotify] Award notification skipped for ${userName || userId}: ${badgeName}`);
+    return true;
 }
 
 async function notifyRemovalFromQueue(){
