@@ -12,6 +12,8 @@ const splitList = hitIntakeInternals.splitList
   || ((value) => (value ? value.split(/[,;\n]+/).map((entry) => entry.trim()).filter(Boolean) : []));
 const formatCurrency = hitIntakeInternals.formatCurrency || ((value) => String(value ?? '0'));
 const formatScu = hitIntakeInternals.formatScu || ((value) => String(value ?? '0'));
+const DEFAULT_AIR_OR_GROUND = 'Air';
+const DEFAULT_PIRACY_STYLE = 'Brute Force';
 
 const EDIT_SESSION_TTL_MS = Number(process.env.HIT_EDIT_SESSION_TTL_MS || 10 * 60 * 1000);
 const SESSION_INTENT = {
@@ -32,7 +34,8 @@ const FIELD_ALIAS_MAP = [
   { field: 'story', keywords: ['story', 'description', 'summary', 'notes'] },
   { field: 'video_link', keywords: ['video', 'vod', 'clip', 'recording', 'youtube', 'link'] },
   { field: 'additional_media_links', keywords: ['media', 'images', 'screenshots', 'proof'] },
-  { field: 'type_of_piracy', keywords: ['type of piracy', 'air or ground', 'mode', 'type'] },
+  { field: 'air_or_ground', keywords: ['air or ground', 'mode', 'engagement', 'engagement type'] },
+  { field: 'type_of_piracy', keywords: ['type of piracy', 'piracy type', 'piracy style', 'extortion', 'brute force', 'piracy'] },
 ];
 
 const COMMAND_WORDS = {
@@ -172,7 +175,7 @@ const SESSION_ACTION_HINT = 'Say `done` to apply the pending changes or `cancel`
 
 const EDIT_VERBS = /\b(edit|update|fix|modify|change|amend)\b/;
 const ADJUST_VERBS = /\b(add|include|remove|set|make|adjust|attach)\b/;
-const FIELD_KEYWORDS = /\b(assist|victim|cargo|title|value|scu|story|media|video|timestamp|type|guest|link|patch)\b/;
+const FIELD_KEYWORDS = /\b(assist|victim|cargo|title|value|scu|story|media|video|timestamp|type|piracy|guest|link|patch)\b/;
 const GENERIC_LIST_CHANGE_REGEX = /\b(add|include|remove|drop|delete|plus|append|take\s+out|take\s+off)\b[^\n]{0,80}?\bhit\b/i;
 
 function getSessionKey(meta) {
@@ -291,8 +294,10 @@ function normalizeHitRecord(hit) {
   clone.total_scu = Number(hit.total_scu ?? hit.totalScu ?? 0) || 0;
   clone.total_cut_value = Number(hit.total_cut_value ?? hit.totalCutValue ?? 0) || 0;
   clone.total_cut_scu = Number(hit.total_cut_scu ?? hit.totalCutScu ?? 0) || 0;
-  clone.air_or_ground = normalizeAirOrGroundValue(hit.air_or_ground || hit.type_of_piracy);
-  clone.type_of_piracy = clone.air_or_ground;
+  const normalizedMode = normalizeAirOrGroundValue(hit.air_or_ground || hit.type_of_piracy) || DEFAULT_AIR_OR_GROUND;
+  const normalizedPiracy = normalizePiracyStyleValue(hit.type_of_piracy) || DEFAULT_PIRACY_STYLE;
+  clone.air_or_ground = normalizedMode;
+  clone.type_of_piracy = normalizedPiracy;
   clone.fleet_activity = !!hit.fleet_activity;
   clone.title = hit.title || hit.nickname || hit.username || 'Pirate Hit';
   clone.story = hit.story || '';
@@ -324,9 +329,18 @@ function normalizeCargoArray(cargo) {
 
 function normalizeAirOrGroundValue(value) {
   const str = (value == null ? '' : String(value)).trim().toLowerCase();
-  if (!str) return 'air';
-  if (str.startsWith('g')) return 'ground';
-  return 'air';
+  if (!str) return null;
+  if (str.startsWith('g')) return 'Ground';
+  if (str.startsWith('a')) return 'Air';
+  return null;
+}
+
+function normalizePiracyStyleValue(value) {
+  const str = (value == null ? '' : String(value)).trim().toLowerCase();
+  if (!str) return null;
+  if (str.startsWith('ext')) return 'Extortion';
+  if (str.startsWith('bru') || str.startsWith('for')) return 'Brute Force';
+  return null;
 }
 
 function ensureSession(meta, hit) {
@@ -449,6 +463,7 @@ function parseAssignments(content) {
 function mapFieldAlias(rawField, fullText) {
   if (!rawField) return null;
   const normalized = rawField.toLowerCase().trim();
+  if (normalized === 'type') return 'air_or_ground';
   for (const entry of FIELD_ALIAS_MAP) {
     if (entry.keywords.some((keyword) => normalized.includes(keyword))) {
       return entry.field;
@@ -723,21 +738,52 @@ async function applyAssignment(session, assignment, message, meta) {
       }
       return mutateAssistList(session, { ids: assistIds, operation });
     }
-    case 'type':
-    case 'type_of_piracy':
     case 'air_or_ground':
       if (isClearValue(value)) {
-        session.working.air_or_ground = 'air';
-        session.working.type_of_piracy = 'air';
-        session.updatedFields.add('type_of_piracy');
-        return 'Type reset to air.';
+        session.working.air_or_ground = DEFAULT_AIR_OR_GROUND;
+        session.updatedFields.add('air_or_ground');
+        return 'Engagement reset to Air.';
       }
       {
         const normalized = normalizeAirOrGroundValue(value);
+        if (!normalized) {
+          throw new Error('Engagement must be `Air` or `Ground`.');
+        }
         session.working.air_or_ground = normalized;
+        session.updatedFields.add('air_or_ground');
+        return `Engagement set to ${normalized}.`;
+      }
+    case 'type_of_piracy':
+    case 'piracy':
+      if (isClearValue(value)) {
+        session.working.type_of_piracy = DEFAULT_PIRACY_STYLE;
+        session.updatedFields.add('type_of_piracy');
+        return 'Piracy style reset to Brute Force.';
+      }
+      {
+        const normalized = normalizePiracyStyleValue(value);
+        if (!normalized) {
+          throw new Error('Piracy style must be `Extortion` or `Brute Force`.');
+        }
         session.working.type_of_piracy = normalized;
         session.updatedFields.add('type_of_piracy');
-        return `Set hit type to ${normalized}.`;
+        return `Piracy style set to ${normalized}.`;
+      }
+    case 'type':
+      {
+        const piracy = normalizePiracyStyleValue(value);
+        if (piracy) {
+          session.working.type_of_piracy = piracy;
+          session.updatedFields.add('type_of_piracy');
+          return `Piracy style set to ${piracy}.`;
+        }
+        const engagement = normalizeAirOrGroundValue(value);
+        if (!engagement) {
+          throw new Error('Specify `Air/Ground` or `Extortion/Brute Force` when updating the type.');
+        }
+        session.working.air_or_ground = engagement;
+        session.updatedFields.add('air_or_ground');
+        return `Engagement set to ${engagement}.`;
       }
     case 'timestamp':
     case 'time':

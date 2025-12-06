@@ -1,5 +1,4 @@
 const { ChannelType, EmbedBuilder } = require("discord.js");
-const { getFleetById } = require("../api/userFleetApi"); // <-- Add this import
 const { editHitLog } = require("../api/hitTrackerApi"); // <-- Add this import
 const { upsertHitInCache, removeHitFromCache } = require("../common/hit-cache.js");
 
@@ -80,7 +79,8 @@ function buildHitEmbed(hitTrack) {
 
     return new EmbedBuilder()
         .setTitle(`${hitTrack.nickname || hitTrack.username}: ${hitTrack.title}`)
-        .setDescription(toEmbedValue(hitTrack.story, ""))
+        // Discord requires descriptions to be non-empty; fall back to a friendly placeholder
+        .setDescription(toEmbedValue(hitTrack.story, "No story provided."))
         .addFields(
             { name: "User", value: toEmbedValue(hitTrack.nickname || hitTrack.username), inline: true },
             { name: "Hit ID", value: toEmbedValue(hitTrack.id), inline: true },
@@ -111,24 +111,6 @@ async function handleHitPost(client, openai, hitTrack) {
         const channel = await client.channels.fetch(channelId);
         if (!channel || channel.type !== ChannelType.GuildForum) {
             throw new Error("Channel not found or is not a forum channel.");
-        }
-
-        // Fetch fleet names from fleet_ids
-        let fleetNames = [];
-        if (Array.isArray(hitTrack.fleet_ids) && hitTrack.fleet_ids.length > 0) {
-            // Fetch all fleet names in parallel
-            const fleetResults = await Promise.all(
-                hitTrack.fleet_ids.map(async (id) => {
-                    try {
-                        const fleet = await getFleetById(id);
-                        return fleet && fleet.name ? fleet.name : null;
-                    } catch (err) {
-                        console.error(err);
-                        return null;
-                    }
-                })
-            );
-            fleetNames = fleetResults.filter(name => !!name);
         }
 
         // Create the embed

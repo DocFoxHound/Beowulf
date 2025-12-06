@@ -1,5 +1,4 @@
 const { ChannelType, EmbedBuilder } = require("discord.js");
-const { getFleetById } = require("../api/userFleetApi"); // <-- Add this import
 const { deleteHitLog } = require("../api/hitTrackerApi"); // <-- Add this import
 const { getHitLogByEntryId } = require("../api/hitTrackerApi"); // <-- Add this import
 

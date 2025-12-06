@@ -35,6 +35,12 @@ const CARGO_UNIT_HINT_PATTERN = /\b(scu|unit|units|box|boxes|crate|crates|haul|l
 const AUTO_ASSIST_LIMIT = Number(process.env.HIT_INTAKE_AUTO_ASSIST_LIMIT || 6);
 const AUTO_EXTRACTION_MIN_CONFIDENCE = Number(process.env.HIT_AUTO_EXTRACTION_MIN_CONFIDENCE || 0.6);
 const AUTO_EXTRACTION_MAX_CARGO = Number(process.env.HIT_AUTO_EXTRACTION_MAX_CARGO || 8);
+const DEFAULT_AIR_OR_GROUND = 'Air';
+const DEFAULT_PIRACY_STYLE = 'Brute Force';
+const AIR_AND_PIRACY_PROMPT = [
+  'Is this hit Air or Ground? Reply with `Air` or `Ground` (defaults to Air).',
+  'Extortion or Brute Force? Reply with `Extortion` or `Brute Force` (defaults to Brute Force).',
+].join('\n');
 const OPTIONAL_DETAILS_PROMPT = 'Optional: add `title/summary/video/victims` using `title=`, `story=`, `video=URL`, `victims=Name1,Name2` or say `skip`. Attach media if you have receipts.';
 const CONFIRMATION_INSTRUCTIONS = 'Say `done` to post this hit, provide adjustments like `title=New Title` to tweak fields, or say `cancel` to abort.';
 const HIT_ID_RANDOM_SUFFIX_MAX = (() => {
@@ -114,8 +120,8 @@ function startSession(meta, message) {
       victims: [],
       additional_media_links: [],
       video_link: null,
-      type_of_piracy: null,
-      air_or_ground: null,
+      type_of_piracy: DEFAULT_PIRACY_STYLE,
+      air_or_ground: DEFAULT_AIR_OR_GROUND,
       timestamp: null,
       patch: null,
     },
@@ -566,18 +572,73 @@ function coerceTimestampIso(value) {
 function normalizeAirOrGroundValue(value) {
   const str = (value == null ? '' : String(value)).trim().toLowerCase();
   if (!str) return null;
-  if (str.startsWith('g')) return 'ground';
-  return 'air';
+  if (str.startsWith('g')) return 'Ground';
+  if (str.startsWith('a')) return 'Air';
+  return null;
 }
 
-function setSessionPiracyType(session, value) {
-  if (!session) return;
+function normalizePiracyStyleValue(value) {
+  const str = (value == null ? '' : String(value)).trim().toLowerCase();
+  if (!str) return null;
+  if (str.startsWith('ext')) return 'Extortion';
+  if (str.startsWith('bru') || str.startsWith('for')) return 'Brute Force';
+  return null;
+}
+
+function inferEngagementDetailsFromText(text) {
+  const result = {};
+  const raw = (text || '').trim();
+  if (!raw) return result;
+  const lowered = raw.toLowerCase();
+  const directAir = normalizeAirOrGroundValue(raw);
+  if (directAir) {
+    result.air_or_ground = directAir;
+  } else if (/\bground\b/.test(lowered)) {
+    result.air_or_ground = 'Ground';
+  } else if (/\bair\b/.test(lowered)) {
+    result.air_or_ground = 'Air';
+  }
+  const directPiracy = normalizePiracyStyleValue(raw);
+  if (directPiracy) {
+    result.type_of_piracy = directPiracy;
+  } else if (/\bextort(?:ion|ing|ed|s)?\b/.test(lowered)) {
+    result.type_of_piracy = 'Extortion';
+  } else if (/\bbrute\s*force\b/.test(lowered) || /\bbruteforce\b/.test(lowered)) {
+    result.type_of_piracy = 'Brute Force';
+  }
+  return result;
+}
+
+function isPureEngagementResponse(text) {
+  if (!text) return false;
+  const normalized = text
+    .toLowerCase()
+    .replace(/[^a-z\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!normalized) return false;
+  const allowed = new Set(['air', 'ground', 'brute', 'force', 'bruteforce', 'extortion', 'with', 'and', 'or']);
+  return normalized.split(' ').every((token) => allowed.has(token));
+}
+
+function setSessionAirOrGround(session, value) {
+  if (!session) return null;
   const target = session.fields || session;
-  if (!target) return;
+  if (!target) return null;
   const normalized = normalizeAirOrGroundValue(value);
-  if (!normalized) return;
+  if (!normalized) return null;
   target.air_or_ground = normalized;
+  return normalized;
+}
+
+function setSessionPiracyStyle(session, value) {
+  if (!session) return null;
+  const target = session.fields || session;
+  if (!target) return null;
+  const normalized = normalizePiracyStyleValue(value);
+  if (!normalized) return null;
   target.type_of_piracy = normalized;
+  return normalized;
 }
 
 function applyExtractionOptionalDetails(session, extraction) {
@@ -585,7 +646,10 @@ function applyExtractionOptionalDetails(session, extraction) {
   if (extraction.title && !session.fields.title) session.fields.title = extraction.title;
   if (extraction.story && !session.fields.story) session.fields.story = extraction.story;
   if (extraction.type_of_piracy) {
-    setSessionPiracyType(session, extraction.type_of_piracy);
+    const appliedPiracy = setSessionPiracyStyle(session, extraction.type_of_piracy);
+    if (!appliedPiracy) {
+      setSessionAirOrGround(session, extraction.type_of_piracy);
+    }
   }
   if (extraction.timestamp) {
     const normalized = coerceTimestampIso(extraction.timestamp);
@@ -610,7 +674,7 @@ function parseOptionalDetails(message) {
   const content = (message.content || '').trim();
   const attachments = Array.from(message.attachments?.values?.() || []);
   const details = {};
-  let keyedFieldFound = false;
+  let hasStructuredFields = false;
   if (content.includes('=') || content.includes(':')) {
     const segments = content.split(/;|\n/);
     for (const raw of segments) {
@@ -618,36 +682,61 @@ function parseOptionalDetails(message) {
       if (!segment) continue;
       const match = segment.match(/^(\w+)\s*[:=]\s*(.+)$/i);
       if (!match) continue;
-      keyedFieldFound = true;
       const key = match[1].toLowerCase();
       const value = match[2].trim();
       if (!value) continue;
       switch (key) {
         case 'title':
           details.title = value;
+          hasStructuredFields = true;
           break;
         case 'story':
         case 'summary':
           details.story = value;
+          hasStructuredFields = true;
           break;
         case 'video':
         case 'video_link':
           details.video_link = value;
+          hasStructuredFields = true;
           break;
         case 'media':
         case 'additional_media':
           details.additional_media_links = splitList(value);
+          hasStructuredFields = true;
           break;
         case 'victims':
           details.victims = splitList(value);
+          hasStructuredFields = true;
           break;
         case 'guests':
           details.guests = splitList(value);
+          hasStructuredFields = true;
+          break;
+        case 'air':
+        case 'mode':
+        case 'air_or_ground':
+        case 'engagement':
+          details.air_or_ground = value;
+          hasStructuredFields = true;
+          break;
+        case 'piracy':
+        case 'piracy_type':
+        case 'type_of_piracy':
+        case 'piracy_style':
+          details.type_of_piracy = value;
+          hasStructuredFields = true;
           break;
         case 'type':
-          details.type_of_piracy = value;
-          if (['air', 'ground', 'mixed'].includes(value.toLowerCase())) {
-            details.air_or_ground = value.toLowerCase();
+          {
+            const piracyGuess = normalizePiracyStyleValue(value);
+            if (piracyGuess) {
+              details.type_of_piracy = piracyGuess;
+              hasStructuredFields = true;
+            } else {
+              details.air_or_ground = value;
+              hasStructuredFields = true;
+            }
           }
           break;
         case 'timestamp':
@@ -655,22 +744,39 @@ function parseOptionalDetails(message) {
             const parsed = new Date(value);
             if (!Number.isNaN(parsed.valueOf())) {
               details.timestamp = parsed.toISOString();
+              hasStructuredFields = true;
             }
           }
           break;
         case 'patch':
           details.patch = value;
+          hasStructuredFields = true;
           break;
         case 'victim':
           details.victims = splitList(value);
+          hasStructuredFields = true;
           break;
         default:
           break;
       }
     }
   }
-  if (!keyedFieldFound && content) {
+  if (content) {
+    const inferred = inferEngagementDetailsFromText(content);
+    if (inferred.air_or_ground && !details.air_or_ground) {
+      details.air_or_ground = inferred.air_or_ground;
+    }
+    if (inferred.type_of_piracy && !details.type_of_piracy) {
+      details.type_of_piracy = inferred.type_of_piracy;
+    }
+    const inferredAny = Boolean(inferred.air_or_ground || inferred.type_of_piracy);
+    if (inferredAny && isPureEngagementResponse(content)) {
+      hasStructuredFields = true;
+    }
+  }
+  if (!hasStructuredFields && content) {
     details.story = content;
+    hasStructuredFields = true;
   }
   if (attachments.length) {
     const urls = attachments.map((file) => file?.url).filter(Boolean);
@@ -695,8 +801,8 @@ function mergeOptionalDetails(target, updates) {
   if (Array.isArray(updates.guests) && updates.guests.length) {
     target.guests = dedupeStrings((target.guests || []).concat(updates.guests));
   }
-  if (updates.type_of_piracy) setSessionPiracyType(target, updates.type_of_piracy);
-  if (updates.air_or_ground) setSessionPiracyType(target, updates.air_or_ground);
+  if (updates.type_of_piracy) setSessionPiracyStyle(target, updates.type_of_piracy);
+  if (updates.air_or_ground) setSessionAirOrGround(target, updates.air_or_ground);
   if (updates.timestamp) target.timestamp = updates.timestamp;
   if (updates.patch) target.patch = updates.patch;
 }
@@ -734,7 +840,7 @@ function buildGuestsSummary(session) {
 function buildAssistAndOptionalSummary(session) {
   const guestLine = buildGuestsSummary(session);
   const assistBlock = [buildAssistsSummary(session), guestLine].filter(Boolean).join('\n');
-  return `${assistBlock}\n\n${OPTIONAL_DETAILS_PROMPT}`;
+  return `${assistBlock}\n\n${AIR_AND_PIRACY_PROMPT}\n\n${OPTIONAL_DETAILS_PROMPT}`;
 }
 
 function buildStatusSummary(session) {
@@ -767,7 +873,8 @@ function buildOptionalDetailsSummary(session) {
   if (fields.additional_media_links?.length) {
     lines.push(`Media links: ${fields.additional_media_links.length}`);
   }
-  if (fields.type_of_piracy) lines.push(`Type: ${fields.type_of_piracy}`);
+  if (fields.air_or_ground) lines.push(`Engagement: ${fields.air_or_ground}`);
+  if (fields.type_of_piracy) lines.push(`Piracy Style: ${fields.type_of_piracy}`);
   if (fields.timestamp) {
     const formatted = formatTimestampForSummary(fields.timestamp);
     if (formatted) lines.push(`Timestamp: ${formatted}`);
@@ -815,7 +922,8 @@ function buildHitPayload(session) {
   const fields = session.fields;
   const rawId = Number(fields.id);
   const entryId = Number.isFinite(rawId) ? rawId : generateHitEntryId();
-  const piracyType = normalizeAirOrGroundValue(fields.air_or_ground || fields.type_of_piracy) || 'air';
+  const airOrGround = normalizeAirOrGroundValue(fields.air_or_ground) || DEFAULT_AIR_OR_GROUND;
+  const piracyStyle = normalizePiracyStyleValue(fields.type_of_piracy) || DEFAULT_PIRACY_STYLE;
   const valueLabel = formatCurrency(Math.round(session.pricing.totalValue || 0));
   const baseTitle = fields.title
     || `${fields.username || fields.nickname || 'Unknown'} hit — ${valueLabel} aUEC`;
@@ -838,8 +946,8 @@ function buildHitPayload(session) {
     victims: fields.victims,
     video_link: fields.video_link || undefined,
     additional_media_links: fields.additional_media_links,
-    type_of_piracy: piracyType || undefined,
-    air_or_ground: piracyType || undefined,
+    type_of_piracy: piracyStyle,
+    air_or_ground: airOrGround,
     timestamp: fields.timestamp || new Date().toISOString(),
     patch: fields.patch || undefined,
     fleet_activity: false,
@@ -905,7 +1013,7 @@ function processDetailsStep(session, message) {
   }
   const details = parseOptionalDetails(message);
   if (!Object.keys(details).length) {
-    return 'Did not catch any details. Use `title=`, `story=`, `video=` or say `skip`.';
+    return 'Did not catch any details. Use `title=`, `air=Ground`, `piracy=Extortion`, `video=` or say `skip`.';
   }
   mergeOptionalDetails(session.fields, details);
   ensureStep(session, 'confirm');
@@ -946,6 +1054,11 @@ async function tryAutoBootstrapHitFromModel({ session, message, meta, openai }) 
       session.fields.guests = dedupeStrings((session.fields.guests || []).concat(extraction.guests));
     }
     applyExtractionOptionalDetails(session, extraction);
+    if (message?.content) {
+      const inferred = inferEngagementDetailsFromText(message.content);
+      if (inferred.air_or_ground) setSessionAirOrGround(session, inferred.air_or_ground);
+      if (inferred.type_of_piracy) setSessionPiracyStyle(session, inferred.type_of_piracy);
+    }
 
     const mentionAssistParse = parseAssistsFromMessage(message, { excludeIds: [meta?.botUserId] });
     if (mentionAssistParse?.handled) {

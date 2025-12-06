@@ -1,8 +1,11 @@
-const fs = require("node:fs");
 const { getAllVoiceSessionsLastHour } = require("../api/voiceChannelSessionsApi.js");
 const { createRecentFleet, updateRecentFleet, getRecentFleetsWithinTimeframe } = require("../api/recentFleetsApi.js");
-const { getUserBlackBoxesBetweenTimestamps } = require("../api/blackBoxApi.js");
 const { getAllGameVersions } = require("../api/gameVersionApi.js");
+const {
+    getPlayerLeaderboardCache,
+    findPlayerLeaderboardEntry,
+    hydrateLeaderboardsFromDb
+} = require("./leaderboard-cache.js");
 
 async function checkRecentGangs(client, openai, session, users) {
     try {
@@ -119,55 +122,10 @@ async function checkRecentGangs(client, openai, session, users) {
                     };
                 }
             }
-                // Update user stats from blackboxes before building updatedFleet
-                for (let i = 0; i < mergedUsers.length; i++) {
-                    const user = mergedUsers[i];
-                    const userId = user.id;
-                    const joinTime = user.join_time;
-                    const leaveTime = user.leave_time || now.toISOString();
-                    if (userId && joinTime) {
-                        try {
-                            const blackboxes = await getUserBlackBoxesBetweenTimestamps({
-                                user_id: userId,
-                                start_timestamp: toDbTimestamp(joinTime),
-                                end_timestamp: toDbTimestamp(leaveTime)
-                            }) || [];
-                            let pu_shipkills = 0, pu_fpskills = 0, ac_shipkills = 0, ac_fpskills = 0, damages = 0;
-                            for (const box of blackboxes) {
-                                const val = Number(box?.value) || 0;
-                                if (box.game_mode === "PU") {
-                                    if (box.ship_killed === "FPS") {
-                                        pu_fpskills++;
-                                    } else {
-                                        pu_shipkills++;
-                                        damages += val;
-                                    }
-                                } else if (box.game_mode === "AC") {
-                                    if (box.ship_killed === "FPS") {
-                                        ac_fpskills++;
-                                    } else {
-                                        ac_shipkills++;
-                                        damages += val;
-                                    }
-                                }
-                            }
-                            mergedUsers[i] = {
-                                ...user,
-                                pu_shipkills,
-                                pu_fpskills,
-                                ac_shipkills,
-                                ac_fpskills,
-                                damages
-                            };
-                        } catch (err) {
-                            console.error("checkRecentGangs: getUserBlackBoxesBetweenTimestamps failed", { userId, joinTime, leaveTime, error: err?.message || err });
-                            // If error, keep user unchanged
-                        }
-                    }
-                }
+            const mergedUsersWithStats = await annotateUsersWithLeaderboardStats(mergedUsers);
 
             // Sum all users' stats for fleet totals
-            const fleetTotals = mergedUsers.reduce((totals, user) => {
+            const fleetTotals = mergedUsersWithStats.reduce((totals, user) => {
                 totals.pu_shipkills += user.pu_shipkills || 0;
                 totals.pu_fpskills += user.pu_fpskills || 0;
                 totals.ac_shipkills += user.ac_shipkills || 0;
@@ -178,7 +136,7 @@ async function checkRecentGangs(client, openai, session, users) {
 
             const updatedFleet = {
                 ...fleet,
-                users: mergedUsers,
+                users: mergedUsersWithStats,
                 timestamp: now.toISOString(),
                 pu_shipkills: fleetTotals.pu_shipkills,
                 pu_fpskills: fleetTotals.pu_fpskills,
@@ -211,11 +169,12 @@ async function checkRecentGangs(client, openai, session, users) {
                 console.error("checkRecentGangs: getAllGameVersions failed", err?.message || err);
             }
             const randomBigInt = Math.floor(Math.random() * 9e17) + 1e17; // Range: 1e17 to 1e18-1
+            const annotatedUsers = await annotateUsersWithLeaderboardStats(usersArray);
             const newFleet = {
                 id: randomBigInt,
                 channel_id: session.channelId,
                 channel_name: session.channelName,
-                users: usersArray,
+                users: annotatedUsers,
                 timestamp: now.toISOString(),
                 created_at: now.toISOString(),
                 pu_shipkills: 0,
@@ -333,6 +292,76 @@ async function manageRecentGangs(client, openai){
 function toDbTimestamp(dateOrString) {
     const d = typeof dateOrString === 'string' ? new Date(dateOrString) : dateOrString;
     return d.toISOString().replace('T', ' ').replace('Z', '+00');
+}
+
+function toNumber(value) {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : null;
+}
+
+function calculateKd(kills, deaths) {
+    if (!Number.isFinite(kills) || !Number.isFinite(deaths)) {
+        return null;
+    }
+    const divisor = deaths <= 0 ? 1 : deaths;
+    return Math.round((kills / divisor) * 100) / 100;
+}
+
+function buildLeaderboardStats(entry) {
+    if (!entry) return null;
+    const kills = toNumber(entry.kills ?? entry.total_kills);
+    const deaths = toNumber(entry.deaths ?? entry.total_deaths);
+    return {
+        source: 'squadron_battle',
+        rank: entry.rank ?? entry.position ?? null,
+        score: toNumber(entry.score ?? entry.rank_score),
+        rating: toNumber(entry.rating),
+        kills,
+        deaths,
+        kd: calculateKd(kills, deaths),
+        wins: toNumber(entry.victories ?? entry.wins),
+        losses: toNumber(entry.losses),
+        ship: entry.primary_ship || entry.favorite_ship || entry.ship || null,
+        map: entry.map || null,
+        season: entry.season || null,
+        updated_at: entry.updated_at || entry.created_at || null,
+    };
+}
+
+async function annotateUsersWithLeaderboardStats(users = []) {
+    if (!Array.isArray(users) || users.length === 0) {
+        return users;
+    }
+    let players = getPlayerLeaderboardCache();
+    if (!Array.isArray(players) || players.length === 0) {
+        try {
+            await hydrateLeaderboardsFromDb();
+            players = getPlayerLeaderboardCache();
+        } catch (error) {
+            console.error("checkRecentGangs: failed to hydrate leaderboard cache", error?.message || error);
+            return users;
+        }
+    }
+    if (!Array.isArray(players) || players.length === 0) {
+        return users;
+    }
+
+    return users.map((user) => {
+        const leaderboardEntry = findPlayerLeaderboardEntry({
+            userId: user?.id,
+            handles: [user?.username, user?.nickname],
+        });
+        if (!leaderboardEntry) {
+            return {
+                ...user,
+                leaderboard_stats: null,
+            };
+        }
+        return {
+            ...user,
+            leaderboard_stats: buildLeaderboardStats(leaderboardEntry),
+        };
+    });
 }
 
 module.exports = {
