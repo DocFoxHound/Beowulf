@@ -36,12 +36,14 @@ function isDuplicateHit(hitTrack) {
 }
 
 // Ensure embed field values are always strings and within Discord limits
-function toEmbedValue(value, fallback = "N/A", limit = 1024) {
+function toEmbedValue(value, { fallback = "N/A", limit = 1024, formatNumber = false } = {}) {
     try {
         if (value === null || value === undefined) return fallback;
         let str;
         if (typeof value === "string") {
             str = value;
+        } else if (formatNumber && typeof value === "number") {
+            str = Intl.NumberFormat("en-US").format(value);
         } else if (typeof value === "number" || typeof value === "boolean") {
             str = String(value);
         } else if (Array.isArray(value) || typeof value === "object") {
@@ -80,18 +82,18 @@ function buildHitEmbed(hitTrack) {
     return new EmbedBuilder()
         .setTitle(`${hitTrack.nickname || hitTrack.username}: ${hitTrack.title}`)
         // Discord requires descriptions to be non-empty; fall back to a friendly placeholder
-        .setDescription(toEmbedValue(hitTrack.story, "No story provided."))
+        .setDescription(toEmbedValue(hitTrack.story, { fallback: "No story provided." }))
         .addFields(
             { name: "User", value: toEmbedValue(hitTrack.nickname || hitTrack.username), inline: true },
             { name: "Hit ID", value: toEmbedValue(hitTrack.id), inline: true },
             { name: "Type of Piracy", value: toEmbedValue(hitTrack.type_of_piracy), inline: true },
             { name: "Total SCU", value: toEmbedValue(hitTrack.total_scu), inline: true },
-            { name: "Total Value", value: toEmbedValue(hitTrack.total_value), inline: true },
-            { name: "Total Cut Value", value: toEmbedValue(hitTrack.total_cut_value), inline: true },
-            { name: "Assists", value: toEmbedValue(assistMentions, "None"), inline: true },
-            { name: "Victims", value: toEmbedValue((hitTrack.victims || []).join(", "), "None"), inline: true },
-            { name: "Video Link", value: toEmbedValue(hitTrack.video_link, "N/A", 1024), inline: true },
-            { name: "Additional Media", value: toEmbedValue((hitTrack.additional_media_links || []).join(", "), "None"), inline: false },
+            { name: "Total Value", value: toEmbedValue(hitTrack.total_value, { formatNumber: true}), inline: true },
+            { name: "Total Cut Value", value: toEmbedValue(hitTrack.total_cut_value, { formatNumber: true}), inline: true },
+            { name: "Assists", value: toEmbedValue(assistMentions, { fallback: "None" }), inline: true },
+            { name: "Victims", value: toEmbedValue((hitTrack.victims || []).join(", "), { fallback: "None" }), inline: true },
+            { name: "Video Link", value: toEmbedValue(hitTrack.video_link), inline: true },
+            { name: "Additional Media", value: toEmbedValue((hitTrack.additional_media_links || []).join(", "), { fallback: "None" }), inline: false },
             { name: "Timestamp", value: toEmbedValue(hitTrack.timestamp), inline: true },
             { name: "Cargo JSON", value: toEmbedValue(hitTrack.cargo), inline: false }
         )
@@ -187,8 +189,8 @@ async function handleHitPostUpdate(client, hitBefore, hitAfter) {
 
         const changed = [];
         const addChange = (label, fromVal, toVal, opts = {}) => {
-            const f = toEmbedValue(fromVal, '—', opts.limit || 512);
-            const t = toEmbedValue(toVal, '—', opts.limit || 512);
+            const f = toEmbedValue(fromVal, { fallback: '—', limit: opts.limit || 512 });
+            const t = toEmbedValue(toVal, { fallback: '—', limit: opts.limit || 512 });
             if (f !== t) changed.push({ name: label, before: f, after: t });
         };
 
