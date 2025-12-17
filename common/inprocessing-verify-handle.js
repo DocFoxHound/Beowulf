@@ -250,23 +250,18 @@ async function handleSimpleJoin(interaction, client, openai){
 
 async function handleSimpleWelcomeProspect(interaction, client, openai){
     const { EmbedBuilder } = require('discord.js');
-    const friendlyPendingRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.FRIENDLY_PENDING_ROLE : process.env.FRIENDLY_ROLE;
+    const friendlyRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.FRIENDLY_ROLE : process.env.FRIENDLY_ROLE;
     const newUserRole = process.env.LIVE_ENVIRONMENT === "true" ? process.env.NEW_USER_ROLE : process.env.TEST_NEW_USER_ROLE;
     const channelToNotify = process.env.LIVE_ENVIRONMENT === "true" ? process.env.GENERAL_CHANNEL : process.env.TEST_GENERAL_CHANNEL;
     const userId = interaction.user.id;
     const dbUser = await getUserById(userId);
     const guild = getGuild(client);
     const member = await guild.members.fetch(userId);
-    // Add friendlyPendingRole, remove newUserRole
+    // remove Friendly role
     try {
-        await member.roles.add(friendlyPendingRole);
+        await member.roles.remove(friendlyRole);
     } catch (error) {
-        console.error('Error adding friendlyPendingRole:', error);
-    }
-    try {
-        await member.roles.remove(newUserRole);
-    } catch (error) {
-        console.error('Error removing newUserRole:', error);
+        console.error('Error removing friendlyRole:', error);
     }
     // Create welcome message
     const prospectMessage = `Congratulations on locking in as a PROSPECT, ${dbUser.username}! Check the website for requirements, master both Raptor (dogfighting) and Raider (piracy) prestiges, and prove you can steal something valuable while surviving the fight.`;
