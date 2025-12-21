@@ -1,4 +1,5 @@
 const { UsersModel } = require('../api/models/users');
+const { getUsers } = require('../api/userlistApi');
 const { getPrestigeRanks } = require('../userlist-functions/userlist-controller');
 const { PermissionsBitField } = require('discord.js');
 
@@ -15,6 +16,18 @@ function envBool(val) {
 
 function getGuildId() {
   return envBool(process.env.LIVE_ENVIRONMENT) ? process.env.GUILD_ID : process.env.TEST_GUILD_ID;
+}
+
+function getMemberRoleId() {
+  const live = envBool(process.env.LIVE_ENVIRONMENT);
+  return live ? process.env.MEMBER : process.env.TEST_MEMBER;
+}
+
+function getPrestigeRoleIds() {
+  const live = envBool(process.env.LIVE_ENVIRONMENT);
+  const raptor = [1, 2, 3, 4, 5].map((n) => live ? process.env[`RAPTOR_${n}_ROLE`] : process.env[`RAPTOR_${n}_TEST_ROLE`]);
+  const raider = [1, 2, 3, 4, 5].map((n) => live ? process.env[`RAIDER_${n}_ROLE`] : process.env[`RAIDER_${n}_TEST_ROLE`]);
+  return [...raptor, ...raider].filter(Boolean);
 }
 
 function getSkillRoleIds() {
@@ -209,6 +222,114 @@ async function syncSkillLevelsFromDb(client, { delayMs=50, verbose = VERBOSE } =
   console.log(`[SkillRoles] DB sync complete. processed=${processed}, assigned=${assigned}, skipped=${skipped}, notFound=${notFound}, errors=${errors}`);
 }
 
+// New: Sync based on userlist API getUsers() records, filtering to users who have MEMBER role in their stored role array.
+// Prestige is computed from stored RAPTOR/RAIDER role IDs (not DB raptor_level/raider_level fields).
+async function syncSkillLevelsFromUserListApi(client, { delayMs = 25, verbose = VERBOSE } = {}) {
+  const guildId = getGuildId();
+  if (!guildId) {
+    console.warn('[SkillRoles] Missing guild id');
+    return;
+  }
+
+  const guild = await client.guilds.fetch(guildId);
+  if (!guild) {
+    console.warn('[SkillRoles] Guild not found');
+    return;
+  }
+
+  const me = guild.members.me || await guild.members.fetchMe();
+  if (!me) {
+    console.warn('[SkillRoles] Could not resolve bot member');
+    return;
+  }
+  if (!me.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
+    console.warn('[SkillRoles] Bot lacks Manage Roles permission; cannot assign skill roles.');
+    return;
+  }
+
+  const memberRoleId = getMemberRoleId();
+  if (!memberRoleId) {
+    console.warn('[SkillRoles] Missing MEMBER/TEST_MEMBER env var; cannot filter member list.');
+    return;
+  }
+
+  const users = await getUsers();
+  if (!Array.isArray(users) || users.length === 0) {
+    console.warn('[SkillRoles] getUsers() returned no users; aborting.');
+    return;
+  }
+
+  const memberUsers = users.filter((u) => {
+    const roles = Array.isArray(u?.roles) ? u.roles.map(String) : [];
+    return roles.includes(String(memberRoleId));
+  });
+
+  console.log(`[SkillRoles] getUsers() returned ${users.length}; syncing SKILL roles for ${memberUsers.length} MEMBER users...`);
+
+  // Prefetch guild members once for fast lookups
+  let allMembers = null;
+  try {
+    allMembers = await guild.members.fetch();
+    if (VERBOSE) console.log(`[SkillRoles] Prefetched ${allMembers.size} guild members.`);
+  } catch (e) {
+    console.warn('[SkillRoles] Failed to prefetch guild members; falling back to cache/per-user fetch:', e?.message || e);
+    allMembers = guild.members.cache;
+  }
+
+  let targetUsers = memberUsers;
+  if (SYNC_LIMIT > 0 && targetUsers.length > SYNC_LIMIT) {
+    targetUsers = targetUsers.slice(0, SYNC_LIMIT);
+    console.log(`[SkillRoles] Applying limit: processing first ${SYNC_LIMIT} MEMBER users.`);
+  }
+
+  let processed = 0, assigned = 0, skipped = 0, notFound = 0, errors = 0;
+
+  const queue = [...targetUsers];
+  const workers = Array.from({ length: SYNC_CONCURRENCY }, async () => {
+    while (queue.length) {
+      const u = queue.shift();
+      const userId = String(u?.id || '');
+      try {
+        if (!userId) {
+          skipped++;
+          continue;
+        }
+
+        let member = null;
+        try {
+          member = (allMembers && typeof allMembers.get === 'function') ? (allMembers.get(userId) || null) : null;
+          if (!member) member = await guild.members.fetch(userId);
+        } catch (_) {
+          notFound++;
+          if (verbose) console.log(`[SkillRoles] skip ${userId}: not found in guild`);
+          continue;
+        }
+
+        const roleIds = Array.isArray(u?.roles) ? u.roles.map(String) : [];
+        const prestige = await getPrestigeRanks(roleIds);
+        const highest = Math.max(Number(prestige?.raptor_level || 0) || 0, Number(prestige?.raider_level || 0) || 0);
+        if (verbose) console.log(`[SkillRoles] user ${userId}: highestPrestige=${highest}`);
+
+        const res = await assignSkillLevelRole(member, highest, { verbose });
+        if (res && res.ok) assigned++; else skipped++;
+      } catch (e) {
+        errors++;
+        console.error('[SkillRoles] per-user error (getUsers sync)', userId, e?.message || e);
+      } finally {
+        processed++;
+        if (processed % 50 === 0) {
+          console.log(`[SkillRoles] Progress: ${processed}/${targetUsers.length} (assigned=${assigned}, skipped=${skipped}, notFound=${notFound}, errors=${errors})`);
+        }
+        if (delayMs) await sleep(delayMs);
+      }
+    }
+  });
+
+  await Promise.all(workers);
+
+  console.log(`[SkillRoles] getUsers() MEMBER sync complete. processed=${processed}, assigned=${assigned}, skipped=${skipped}, notFound=${notFound}, errors=${errors}`);
+}
+
 // New: Sync by fetching members from Discord (not DB) and computing from live roles
 async function syncSkillLevelsFromGuild(client, { delayMs = 50, verbose = VERBOSE } = {}) {
   const guildId = getGuildId();
@@ -291,6 +412,15 @@ async function updateSkillOnMemberChange(oldMember, newMember) {
     const oldRoles = oldMember?.roles?.cache ? Array.from(oldMember.roles.cache.keys()) : [];
     const newRoles = newMember?.roles?.cache ? Array.from(newMember.roles.cache.keys()) : [];
 
+    // Only recompute when a prestige role changes (gain or loss)
+    const prestigeRoleSet = new Set(getPrestigeRoleIds().map(String));
+    const oldSet = new Set(oldRoles.map(String));
+    const newSet = new Set(newRoles.map(String));
+    const gained = Array.from(newSet).filter((rid) => !oldSet.has(rid));
+    const lost = Array.from(oldSet).filter((rid) => !newSet.has(rid));
+    const prestigeChanged = gained.some((rid) => prestigeRoleSet.has(rid)) || lost.some((rid) => prestigeRoleSet.has(rid));
+    if (!prestigeChanged) return;
+
     const oldPrestige = await getPrestigeRanks(oldRoles);
     const newPrestige = await getPrestigeRanks(newRoles);
     const oldHighest = Math.max(oldPrestige?.raptor_level||0, oldPrestige?.raider_level||0);
@@ -307,6 +437,7 @@ async function updateSkillOnMemberChange(oldMember, newMember) {
 module.exports = {
   syncSkillLevelsFromDb,
   syncSkillLevelsFromGuild,
+  syncSkillLevelsFromUserListApi,
   updateSkillOnMemberChange,
   assignSkillLevelRole,
 };

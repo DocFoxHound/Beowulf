@@ -84,7 +84,7 @@ const { handleNewGuildMember } = require('./common/new-user.js');
 const { userlistEvents, USERLIST_CHANGED } = require('./common/userlist-events.js');
 const { handleSimpleWelcomeProspect, handleSimpleWelcomeGuest, handleSimpleJoin } = require("./common/inprocessing-verify-handle.js");
 const { removeProspectFromFriendlies } = require('./common/remove-prospect-from-friendly.js');
-const { syncSkillLevelsFromGuild, updateSkillOnMemberChange } = require('./common/skill-level-assigner.js');
+const { syncSkillLevelsFromGuild, syncSkillLevelsFromUserListApi, updateSkillOnMemberChange } = require('./common/skill-level-assigner.js');
 const { makeMember, updateMemberOnMemberChange } = require('./common/make-member.js');
 const { handleChatGptInteraction } = require('./chatgpt/orchestrator');
 const { handleSlashCommand } = require('./commands');
@@ -406,6 +406,10 @@ client.on("ready", async () => {
   }
   await refreshUserlist(client, openai) //actually leave this here
   try { await refreshUserListCache(); } catch (e) { console.error('[Startup] userlist cache refresh failed:', e?.message || e); }
+
+  // Assign SKILL_LEVEL_* based on highest RAPTOR/RAIDER roles for all stored users that have MEMBER role
+  try { await syncSkillLevelsFromUserListApi(client); } catch (e) { console.error('[SkillRoles] startup MEMBER sync failed:', e?.message || e); }
+
   try {
     await hydrateUexCachesFromDb();
     console.log('[UEXCache] Hydrated from database tables.');

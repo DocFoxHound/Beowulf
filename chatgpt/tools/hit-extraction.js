@@ -114,9 +114,9 @@ async function extractHitIntentFields({ message, meta = {}, openai }) {
           content: [
             'You extract structured pirate hit reports from Discord messages.',
             'Return JSON only, no prose.',
-            'Required fields: action ("hit_create" or "ignore"), confidence (0-1), cargo array (name + quantity + unit), assists array, guests array, victims array, title, story, type_of_piracy, timestamp (ISO if present), missing_fields array, notes.',
+            'Required fields: action ("hit_create" or "ignore"), confidence (0-1), cargo array (can be empty), assists array, guests array, victims array, title, story, type_of_piracy, timestamp (ISO if present), missing_fields array, notes.',
             'If the user is clearly logging a hit or describing stolen cargo, set action="hit_create" even if some fields are missing.',
-            'If cargo quantities are not provided, leave quantity null and list "cargo" in missing_fields.',
+            'If the user mentions cargo but quantities are not provided, leave quantity null and list "cargo" in missing_fields. If they explicitly say nothing was taken, set cargo=[].',
             'Do not invent people or cargo. Preserve SCU units when available.',
           ].join(' '),
         },

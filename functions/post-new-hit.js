@@ -61,6 +61,31 @@ function toEmbedValue(value, fallback = "N/A", limit = 1024) {
     }
 }
 
+// Format numbers with thousands separators, no decimals, no currency symbol
+const _INT_FORMAT = new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+    useGrouping: true,
+});
+
+function toNumberOrNull(value) {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+    if (typeof value === 'string') {
+        const cleaned = value.trim().replace(/,/g, '');
+        if (!cleaned) return null;
+        const num = Number(cleaned);
+        return Number.isFinite(num) ? num : null;
+    }
+    return null;
+}
+
+function toFormattedInt(value, fallback = 'N/A') {
+    const num = toNumberOrNull(value);
+    if (num === null) return fallback;
+    return _INT_FORMAT.format(Math.round(num));
+}
+
 function buildHitEmbed(hitTrack) {
     const assistList = Array.isArray(hitTrack.assists) && hitTrack.assists.length > 0
         ? hitTrack.assists.map(id => `<@${id}>`)
@@ -85,9 +110,9 @@ function buildHitEmbed(hitTrack) {
             { name: "User", value: toEmbedValue(hitTrack.nickname || hitTrack.username), inline: true },
             { name: "Hit ID", value: toEmbedValue(hitTrack.id), inline: true },
             { name: "Type of Piracy", value: toEmbedValue(hitTrack.type_of_piracy), inline: true },
-            { name: "Total SCU", value: toEmbedValue(hitTrack.total_scu), inline: true },
-            { name: "Total Value", value: toEmbedValue(hitTrack.total_value), inline: true },
-            { name: "Total Cut Value", value: toEmbedValue(hitTrack.total_cut_value), inline: true },
+            { name: "Total SCU", value: toFormattedInt(hitTrack.total_scu), inline: true },
+            { name: "Total Value", value: toFormattedInt(hitTrack.total_value), inline: true },
+            { name: "Total Cut Value", value: toFormattedInt(hitTrack.total_cut_value), inline: true },
             { name: "Assists", value: toEmbedValue(assistMentions, "None"), inline: true },
             { name: "Victims", value: toEmbedValue((hitTrack.victims || []).join(", "), "None"), inline: true },
             { name: "Video Link", value: toEmbedValue(hitTrack.video_link, "N/A", 1024), inline: true },
@@ -145,6 +170,20 @@ async function handleHitPost(client, openai, hitTrack) {
             }
         }
 
+        // Reminder: receipts + total value verification
+        try {
+            const authorId = hitTrack?.user_id;
+            const mention = authorId ? `<@${authorId}>` : (hitTrack?.nickname || hitTrack?.username || 'Pirate');
+            await thread.send(
+                `${mention} please post a screenshot of the sell/transaction total in this thread, then update the hit's **Total Value** to match the screenshot using \
+\`@Beowulf edit this hit\` → \
+\`total_value=...\` → \
+\`done\`.`
+            );
+        } catch (err) {
+            console.error(err);
+        }
+
         //save the thread ID to the hitTrack object
         hitTrack.thread_id = thread.id;
         try {
@@ -192,11 +231,17 @@ async function handleHitPostUpdate(client, hitBefore, hitAfter) {
             if (f !== t) changed.push({ name: label, before: f, after: t });
         };
 
+        const addIntChange = (label, fromVal, toVal) => {
+            const f = toFormattedInt(fromVal, '—');
+            const t = toFormattedInt(toVal, '—');
+            if (f !== t) changed.push({ name: label, before: f, after: t });
+        };
+
         addChange('Title', hitBefore?.title, hitAfter?.title, { limit: 256 });
         addChange('Type', hitBefore?.air_or_ground, hitAfter?.air_or_ground);
-        addChange('Total Value', hitBefore?.total_value, hitAfter?.total_value);
-        addChange('Value Per Share', hitBefore?.total_cut_value, hitAfter?.total_cut_value);
-        addChange('Total SCU', hitBefore?.total_scu, hitAfter?.total_scu);
+        addIntChange('Total Value', hitBefore?.total_value, hitAfter?.total_value);
+        addIntChange('Total Cut Value', hitBefore?.total_cut_value, hitAfter?.total_cut_value);
+        addIntChange('Total SCU', hitBefore?.total_scu, hitAfter?.total_scu);
         addChange('SCU Per Share', hitBefore?.total_cut_scu, hitAfter?.total_cut_scu);
         addChange('Patch', hitBefore?.patch, hitAfter?.patch);
         addChange('Assists', (hitBefore?.assists||[]).map(id=>`<@${id}>`).join(', ')||'None', (hitAfter?.assists||[]).map(id=>`<@${id}>`).join(', ')||'None');
@@ -204,7 +249,7 @@ async function handleHitPostUpdate(client, hitBefore, hitAfter) {
         addChange('Cargo', summarizeCargo(hitBefore?.cargo), summarizeCargo(hitAfter?.cargo), { limit: 1024 });
         addChange('Video Link', hitBefore?.video_link || 'None', hitAfter?.video_link || 'None');
         if (toEmbedValue(hitBefore?.story, '').slice(0, 64) !== toEmbedValue(hitAfter?.story, '').slice(0, 64)) {
-            changed.push({ name: 'Story', value: 'Story was updated.', inline: false });
+            changed.push({ name: 'Story', before: '—', after: 'Story was updated.' });
         }
 
         const changeLines = changed.length
@@ -246,8 +291,8 @@ async function handleHitPostDelete(client, hit) {
             .addFields(
                 { name: 'Hit ID', value: toEmbedValue(hit?.id), inline: true },
                 { name: 'Type', value: toEmbedValue(hit?.air_or_ground || hit?.type_of_piracy), inline: true },
-                { name: 'Total Value (aUEC)', value: toEmbedValue(hit?.total_value), inline: true },
-                { name: 'Total SCU', value: toEmbedValue(hit?.total_scu), inline: true },
+                { name: 'Total Value (aUEC)', value: toFormattedInt(hit?.total_value), inline: true },
+                { name: 'Total SCU', value: toFormattedInt(hit?.total_scu), inline: true },
                 { name: 'Assists', value: toEmbedValue(Array.isArray(hit?.assists) && hit.assists.length ? hit.assists.map(id=>`<@${id}>`).join(', ') : 'None'), inline: true },
                 { name: 'Original Timestamp', value: toEmbedValue(hit?.timestamp || hit?.created_at), inline: true },
             )

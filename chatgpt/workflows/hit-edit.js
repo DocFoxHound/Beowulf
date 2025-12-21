@@ -170,12 +170,12 @@ const GENERAL_ID_PATTERN = /\b(\d{6,})\b/;
 const BLOODED_ROLE = process.env.BLOODED_ROLE || null;
 const TEST_BLOODED_ROLE = process.env.TEST_BLOODED_ROLE || null;
 const LIVE_ENVIRONMENT = (process.env.LIVE_ENVIRONMENT || 'false').toLowerCase() === 'true';
-const EDIT_INSTRUCTIONS = 'Provide updates as `field=value` lines (e.g., `title=New Title`, `cargo=Fluorine 4; Distilled 6`). Say `done` to apply or `cancel` to abort.';
+const EDIT_INSTRUCTIONS = 'Provide updates as `field=value` lines (e.g., `title=New Title`, `cargo=Fluorine 4; Distilled 6`, or `commodity_name=Extortion; scuAmount=1; avg_price=10000000`). Say `done` to apply or `cancel` to abort.';
 const SESSION_ACTION_HINT = 'Say `done` to apply the pending changes or `cancel` to discard them.';
 
 const EDIT_VERBS = /\b(edit|update|fix|modify|change|amend)\b/;
 const ADJUST_VERBS = /\b(add|include|remove|set|make|adjust|attach)\b/;
-const FIELD_KEYWORDS = /\b(assist|victim|cargo|title|value|scu|story|media|video|timestamp|type|piracy|guest|link|patch)\b/;
+const FIELD_KEYWORDS = /\b(assist|victim|cargo|commodity|commodity_name|item|title|value|avg_price|price|scu|scuamount|quantity|story|media|video|timestamp|type|piracy|guest|link|patch)\b/;
 const GENERIC_LIST_CHANGE_REGEX = /\b(add|include|remove|drop|delete|plus|append|take\s+out|take\s+off)\b[^\n]{0,80}?\bhit\b/i;
 
 function getSessionKey(meta) {
@@ -398,6 +398,22 @@ function applyAutoTotals(session, { force = false } = {}) {
   }
 }
 
+function computeSharesForCut(session) {
+  const assists = Array.isArray(session?.working?.assists) ? session.working.assists : [];
+  return Math.max(1, assists.length + 1);
+}
+
+function maybeRecalcTotalCutValue(session) {
+  if (!session) return;
+  if (session.updatedFields.has('total_cut_value')) return; // user explicitly set it
+  const shares = computeSharesForCut(session);
+  const totalValue = Number(session.working.total_value);
+  if (!Number.isFinite(totalValue)) return;
+  const cut = totalValue / shares;
+  session.working.total_cut_value = Math.round(cut * 100) / 100;
+  session.updatedFields.add('total_cut_value');
+}
+
 function shouldStartEditSession(intent, message, { hasSession } = {}) {
   const inThread = isThreadChannel(message);
   if (!hasSession && !inThread) {
@@ -449,7 +465,10 @@ function buildSessionStatus(session) {
 
 function parseAssignments(content) {
   if (!content) return [];
-  const regex = /(\b[a-z][a-z0-9 _-]*\b)\s*(?:=|:)\s*([\s\S]*?)(?=(?:\n|;)\s*\b[a-z][a-z0-9 _-]*\s*(?:=|:)|$)/gi;
+  // Only treat tokens as field starters when they appear at the start or after a delimiter.
+  // Supports comma-separated pairs (common in chat) without breaking commas inside values,
+  // because we only split on commas when a new `field=` clearly follows.
+  const regex = /(?:^|[\n;]\s*|,\s*|:\s*)([a-z][a-z0-9 _-]{0,80})\s*(?:=|:)\s*([\s\S]*?)(?=(?:[\n;]|,\s*)(?:[a-z][a-z0-9 _-]{0,80})\s*(?:=|:)|$)/gi;
   const assignments = [];
   let match;
   while ((match = regex.exec(content)) !== null) {
@@ -458,6 +477,127 @@ function parseAssignments(content) {
     assignments.push({ field, value, operation: 'set' });
   }
   return assignments;
+}
+
+function parseScaledNumber(raw) {
+  if (raw == null) return null;
+  const str = String(raw).trim().toLowerCase();
+  if (!str) return null;
+  const cleaned = str.replace(/auec|uec|credits?/g, '').trim();
+  const match = cleaned.match(/(-?\d[\d,]*(?:\.\d+)?)\s*(million|billion|m|b)?/i);
+  if (!match) return null;
+  const base = Number(match[1].replace(/,/g, ''));
+  if (!Number.isFinite(base)) return null;
+  const suffix = (match[2] || '').toLowerCase();
+  if (suffix === 'million' || suffix === 'm') return base * 1_000_000;
+  if (suffix === 'billion' || suffix === 'b') return base * 1_000_000_000;
+  return base;
+}
+
+function normalizeCommodityName(raw) {
+  const value = (raw == null ? '' : String(raw)).trim();
+  return value.replace(/^['"`]+|['"`]+$/g, '').trim();
+}
+
+function applyCargoDraft(session, partial) {
+  if (!session) return { applied: false, message: null };
+  session.cargoDraft = session.cargoDraft || {};
+  const draft = session.cargoDraft;
+
+  if (partial?.commodity_name != null) {
+    draft.commodity_name = normalizeCommodityName(partial.commodity_name);
+  }
+  if (partial?.scuAmount != null) {
+    const amount = Number(partial.scuAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new Error('scuAmount must be a positive number.');
+    }
+    draft.scuAmount = Number(amount.toFixed(2));
+  }
+  if (partial?.avg_price != null) {
+    const price = Number(partial.avg_price);
+    if (!Number.isFinite(price) || price < 0) {
+      throw new Error('avg_price must be a number (>= 0).');
+    }
+    draft.avg_price = Math.round(price);
+  }
+
+  const name = draft.commodity_name;
+  const amount = draft.scuAmount;
+  if (!name || !amount) {
+    const missing = [];
+    if (!name) missing.push('commodity_name');
+    if (!amount) missing.push('scuAmount');
+    const hint = missing.length
+      ? `Provide ${missing.map((m) => `\`${m}\``).join(' and ')} (avg_price optional).`
+      : null;
+    return { applied: false, message: hint };
+  }
+
+  const cargo = Array.isArray(session.working.cargo) ? session.working.cargo.slice() : [];
+  const idx = cargo.findIndex((entry) => String(entry?.commodity_name || '').toLowerCase() === String(name).toLowerCase());
+  const nextEntry = {
+    commodity_name: name,
+    scuAmount: amount,
+    avg_price: Number.isFinite(draft.avg_price) ? draft.avg_price : 0,
+    pricing_note: 'custom',
+    pricing_match: null,
+  };
+
+  if (idx >= 0) {
+    cargo[idx] = { ...cargo[idx], ...nextEntry };
+    session.working.cargo = cargo;
+    session.updatedFields.add('cargo');
+    session.manualTotals.total_value = false;
+    session.manualTotals.total_scu = false;
+    applyAutoTotals(session, { force: false });
+    session.cargoDraft = {};
+    return { applied: true, message: `Updated cargo item: ${name} (${formatScu(amount)} SCU).` };
+  }
+
+  cargo.push(nextEntry);
+  session.working.cargo = cargo;
+  session.updatedFields.add('cargo');
+  session.manualTotals.total_value = false;
+  session.manualTotals.total_scu = false;
+  applyAutoTotals(session, { force: false });
+  session.cargoDraft = {};
+  return { applied: true, message: `Added cargo item: ${name} (${formatScu(amount)} SCU).` };
+}
+
+function inferCustomCargoFromText(content) {
+  if (!content) return null;
+  const text = String(content);
+  const lowered = text.toLowerCase();
+  if (!/(custom\s+(?:item|commodity)|include\s+(?:a\s+)?custom)/i.test(lowered)) return null;
+
+  // Quantity
+  const qtyMatch = lowered.match(/\b(\d+(?:\.\d+)?)\b\s*(?:qty|quantity|scu|scuamount)?\b[^\n]{0,20}?\bof\b/i);
+  const scuAmount = qtyMatch ? Number(qtyMatch[1]) : null;
+
+  // Name (prefer quoted)
+  let name = null;
+  const quoted = text.match(/\bof\b\s*['"`]\s*([^'"`]+?)\s*['"`]/i);
+  if (quoted) {
+    name = quoted[1];
+  } else {
+    const afterOf = text.match(/\bof\b\s+([^\n]+?)(?:\bvalue\b|\bworth\b|\bpriced\b|\bprice\b|\bauec\b|$)/i);
+    if (afterOf) name = afterOf[1];
+  }
+
+  // Value
+  const valueMatch = lowered.match(/\b(?:value|worth|price(?:d)?)\b[^\d]{0,20}(\d[\d,.]*)(?:\s*(million|billion|m|b))?/i)
+    || lowered.match(/\b(\d[\d,.]*)\s*(million|billion|m|b)\s*a?uec\b/i);
+  const avgPrice = valueMatch ? parseScaledNumber(`${valueMatch[1]} ${valueMatch[2] || ''}`) : null;
+
+  const commodity_name = normalizeCommodityName(name);
+  if (!commodity_name) return null;
+  if (!Number.isFinite(scuAmount) || scuAmount <= 0) return null;
+  return {
+    commodity_name,
+    scuAmount,
+    avg_price: Number.isFinite(avgPrice) ? avgPrice : null,
+  };
 }
 
 function mapFieldAlias(rawField, fullText) {
@@ -612,6 +752,7 @@ function mutateAssistList(session, { ids = [], operation }) {
       return 'Everyone you mentioned was already listed.';
     }
     updateListField(session, 'assists', next);
+    maybeRecalcTotalCutValue(session);
     const added = next.length - current.length;
     return `Added ${added} ${pluralize('assist', added)}.`;
   }
@@ -623,6 +764,7 @@ function mutateAssistList(session, { ids = [], operation }) {
     }
     const removed = current.length - next.length;
     updateListField(session, 'assists', next);
+    maybeRecalcTotalCutValue(session);
     return `Removed ${removed} ${pluralize('assist', removed)}.`;
   }
   const next = normalizedIds;
@@ -630,6 +772,7 @@ function mutateAssistList(session, { ids = [], operation }) {
     return 'Assists already match that list.';
   }
   updateListField(session, 'assists', next);
+  maybeRecalcTotalCutValue(session);
   return `Updated assists (${next.length}).`;
 }
 
@@ -689,6 +832,42 @@ function mutateNamedListField(session, field, { entries = [], operation }) {
 async function applyAssignment(session, assignment, message, meta) {
   const { field, value } = assignment;
   switch (field) {
+    case 'commodity_name':
+    case 'commodity':
+    case 'item': {
+      const result = applyCargoDraft(session, { commodity_name: value });
+      return result.message || 'Captured commodity name.';
+    }
+    case 'scuamount':
+    case 'scu_amount':
+    case 'quantity':
+    case 'qty': {
+      if (isClearValue(value)) {
+        session.cargoDraft = {};
+        return 'Cleared pending cargo item draft.';
+      }
+      const amount = parseScaledNumber(value);
+      if (!Number.isFinite(amount)) {
+        throw new Error('scuAmount must be a number.');
+      }
+      const result = applyCargoDraft(session, { scuAmount: amount });
+      return result.message || 'Captured SCU amount.';
+    }
+    case 'avg_price':
+    case 'avgprice':
+    case 'price': {
+      if (isClearValue(value)) {
+        session.cargoDraft = session.cargoDraft || {};
+        delete session.cargoDraft.avg_price;
+        return 'Cleared pending cargo item price.';
+      }
+      const price = parseScaledNumber(value);
+      if (!Number.isFinite(price)) {
+        throw new Error('avg_price must be a number (you can say `10 million`).');
+      }
+      const result = applyCargoDraft(session, { avg_price: price });
+      return result.message || 'Captured avg_price.';
+    }
     case 'title':
       if (isClearValue(value)) {
         updateSimpleField(session, 'title', `${session.working.username} hit — ${formatCurrency(session.working.total_value)} aUEC`);
@@ -809,6 +988,7 @@ async function applyAssignment(session, assignment, message, meta) {
         session.manualTotals.total_value = false;
         applyAutoTotals(session, { force: false });
         session.updatedFields.add('total_value');
+        maybeRecalcTotalCutValue(session);
         return 'Total value reset to automatic calculation.';
       }
       {
@@ -817,6 +997,7 @@ async function applyAssignment(session, assignment, message, meta) {
         session.manualTotals.total_value = true;
         session.working.total_value = Math.round(num);
         session.updatedFields.add('total_value');
+        maybeRecalcTotalCutValue(session);
         return `Total value set to ${formatCurrency(session.working.total_value)}.`;
       }
     case 'total_scu':
@@ -926,6 +1107,14 @@ async function submitSessionChanges(session, client) {
   const payload = { ...session.working };
   delete payload.thread_id;
   delete payload.threadId;
+
+  // If total_value or assists changed but the user didn't explicitly set a cut,
+  // drop the cut value so the API can derive it correctly.
+  if ((session.updatedFields.has('total_value') || session.updatedFields.has('assists'))
+      && !session.updatedFields.has('total_cut_value')) {
+    delete payload.total_cut_value;
+  }
+
   const ok = await HitTrackerModel.update(session.hitId, payload);
   if (!ok) {
     throw new Error('Hit update failed');
@@ -1048,6 +1237,20 @@ async function processHitEditInteraction({ message, meta, intent, client }) {
   const assignments = parseAssignments(content);
   let sourceAssignments = assignments;
   let usedInference = false;
+  if (!sourceAssignments.length) {
+    const inferredCustomCargo = inferCustomCargoFromText(content);
+    if (inferredCustomCargo) {
+      sourceAssignments = [
+        { field: 'commodity_name', value: inferredCustomCargo.commodity_name, inferred: true },
+        { field: 'scuamount', value: String(inferredCustomCargo.scuAmount), inferred: true },
+      ];
+      if (Number.isFinite(inferredCustomCargo.avg_price)) {
+        sourceAssignments.push({ field: 'avg_price', value: String(inferredCustomCargo.avg_price), inferred: true });
+      }
+      usedInference = true;
+    }
+  }
+
   if (!sourceAssignments.length) {
     const inferred = inferAssignmentsFromContent(content, message, meta, session);
     if (inferred.length) {

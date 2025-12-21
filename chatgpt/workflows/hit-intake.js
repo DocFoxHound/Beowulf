@@ -323,11 +323,32 @@ function parseCargoJson(text) {
       .map((entry) => ({
         commodity_name: entry?.commodity_name || entry?.commodity || entry?.name,
         scuAmount: Number(entry?.scuAmount ?? entry?.scu ?? entry?.amount ?? entry?.quantity),
+        avg_price: entry?.avg_price ?? entry?.avgPrice ?? entry?.price ?? null,
       }))
-      .filter((entry) => entry.commodity_name && Number.isFinite(entry.scuAmount) && entry.scuAmount > 0);
+      .filter((entry) => entry.commodity_name && Number.isFinite(entry.scuAmount) && entry.scuAmount > 0)
+      .map((entry) => ({
+        commodity_name: String(entry.commodity_name).trim(),
+        scuAmount: Number(entry.scuAmount),
+        avg_price: entry.avg_price == null ? null : Number(entry.avg_price),
+      }));
   } catch {
     return null;
   }
+}
+
+function parseScaledNumber(raw) {
+  if (raw == null) return null;
+  const str = String(raw).trim().toLowerCase();
+  if (!str) return null;
+  const cleaned = str.replace(/auec|uec|credits?/g, '').trim();
+  const match = cleaned.match(/(-?\d[\d,]*(?:\.\d+)?)\s*(million|billion|m|b)?/i);
+  if (!match) return null;
+  const base = Number(match[1].replace(/,/g, ''));
+  if (!Number.isFinite(base)) return null;
+  const suffix = (match[2] || '').toLowerCase();
+  if (suffix === 'million' || suffix === 'm') return base * 1_000_000;
+  if (suffix === 'billion' || suffix === 'b') return base * 1_000_000_000;
+  return base;
 }
 
 function parseCargoInput(text) {
@@ -342,6 +363,22 @@ function parseCargoInput(text) {
   const items = [];
   for (const segment of segments) {
     if (!/[0-9]/.test(segment)) continue;
+
+    // Optional inline pricing support: `Item: 1 @ 10000000` (or `@ 10 million`).
+    let price = null;
+    let segmentWithoutPrice = segment;
+    const atSplit = segment.split(/\s*@\s*/);
+    if (atSplit.length >= 2) {
+      segmentWithoutPrice = atSplit[0].trim();
+      price = parseScaledNumber(atSplit.slice(1).join('@'));
+    } else {
+      const priceMatch = segment.match(/\b(?:avg_price|price)\s*[:=]\s*([^\s]+(?:\s*(?:million|billion|m|b))?)/i);
+      if (priceMatch) {
+        price = parseScaledNumber(priceMatch[1]);
+        segmentWithoutPrice = segment.replace(priceMatch[0], '').trim();
+      }
+    }
+
     const patterns = [
       /^(?<name>[a-z0-9'\-\s()]+)\s*[:=]\s*(?<qty>\d+(?:\.\d+)?)/i,
       /^(?<qty>\d+(?:\.\d+)?)\s*(?:scu|u|units?)?\s+(?:of\s+)?(?<name>[a-z0-9'\-\s()]+)/i,
@@ -350,7 +387,7 @@ function parseCargoInput(text) {
     ];
     let match = null;
     for (const pattern of patterns) {
-      match = segment.match(pattern);
+      match = segmentWithoutPrice.match(pattern);
       if (match) break;
     }
     if (!match) continue;
@@ -360,7 +397,7 @@ function parseCargoInput(text) {
     if (!isLikelyCommodityName(name)) {
       continue;
     }
-    items.push({ commodity_name: name, scuAmount: qty });
+    items.push({ commodity_name: name, scuAmount: qty, avg_price: Number.isFinite(price) ? price : null });
   }
   if (items.length) return items;
   return extractFreeformCargo(trimmed);
@@ -416,8 +453,10 @@ async function enrichCargoPricing(items) {
   let totalValue = 0;
   let totalScu = 0;
   const priced = items.map((entry) => {
-    const lookup = lookupBestSellPrice(entry.commodity_name);
-    const avgPrice = lookup?.price ?? 0;
+    const explicit = Number(entry?.avg_price);
+    const hasExplicit = Number.isFinite(explicit) && explicit > 0;
+    const lookup = hasExplicit ? null : lookupBestSellPrice(entry.commodity_name);
+    const avgPrice = hasExplicit ? Math.round(explicit) : (lookup?.price ?? 0);
     const extended = Number(entry.scuAmount) * avgPrice;
     totalValue += Number.isFinite(extended) ? extended : 0;
     totalScu += Number(entry.scuAmount) || 0;
@@ -425,8 +464,10 @@ async function enrichCargoPricing(items) {
       commodity_name: entry.commodity_name,
       scuAmount: Number(entry.scuAmount) || 0,
       avg_price: avgPrice,
-      pricing_note: lookup?.location ? `Best sell @ ${lookup.location}` : null,
-      pricing_match: lookup?.matchName || null,
+      pricing_note: hasExplicit
+        ? 'custom'
+        : (lookup?.location ? `Best sell @ ${lookup.location}` : null),
+      pricing_match: hasExplicit ? null : (lookup?.matchName || null),
     };
   });
   return { priced, totalValue, totalScu };
@@ -978,9 +1019,19 @@ function ensureStep(session, step) {
 }
 
 async function processCargoStep(session, message) {
+  if (wantsSkip(message.content || '')) {
+    session.fields.cargo = [];
+    session.pricing.totalValue = 0;
+    session.pricing.totalScu = 0;
+    ensureStep(session, 'assists');
+    return `No cargo recorded.
+Total: ${formatScu(session.pricing.totalScu)} SCU / ${formatCurrency(session.pricing.totalValue)} aUEC
+
+Tag every assist or say \`none\`.`;
+  }
   const items = parseCargoInput(message.content || '');
   if (!items.length) {
-    return 'Need the cargo manifest first. Format each line as `Commodity: SCU` (e.g., `Quantanium: 48`).';
+    return 'Provide the cargo manifest (`Commodity: SCU`, optionally `@ price`) or say `none` if nothing was taken.';
   }
   const { priced, totalValue, totalScu } = await enrichCargoPricing(items);
   if (!priced.length) {
@@ -996,7 +1047,7 @@ async function processCargoStep(session, message) {
 async function processAssistsStep(session, message) {
   const parsed = parseAssistsFromMessage(message, { excludeIds: [session.botUserId] });
   if (!parsed.handled) {
-    return 'Need the assists. Mention them or type `none` if you ran it solo.';
+    return 'Need the assists. Mention them or say `none` if nothing was taken.';
   }
   session.fields.assists = parsed.assists;
   if (parsed.guests.length) {
