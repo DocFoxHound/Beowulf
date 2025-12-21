@@ -23,6 +23,11 @@ function getMemberRoleId() {
   return live ? process.env.MEMBER : process.env.TEST_MEMBER;
 }
 
+function getActiveRoleId() {
+  const live = envBool(process.env.LIVE_ENVIRONMENT);
+  return live ? process.env.ACTIVE_ROLE : process.env.TEST_ACTIVE_ROLE;
+}
+
 function getPrestigeRoleIds() {
   const live = envBool(process.env.LIVE_ENVIRONMENT);
   const raptor = [1, 2, 3, 4, 5].map((n) => live ? process.env[`RAPTOR_${n}_ROLE`] : process.env[`RAPTOR_${n}_TEST_ROLE`]);
@@ -32,15 +37,63 @@ function getPrestigeRoleIds() {
 
 function getSkillRoleIds() {
   const live = envBool(process.env.LIVE_ENVIRONMENT);
-  const roleIds = [1,2,3,4,5].map(n => live ? process.env[`SKILL_LEVEL_${n}`] : process.env[`TEST_SKILL_LEVEL_${n}`]);
-  const missing = roleIds.map((v,i)=>({v,i:i+1})).filter(x=>!x.v);
+  // Return a stable mapping for levels 0..5 so indexing aligns with the computed prestige level.
+  // Entries may be undefined when env vars are missing.
+  const roleIds = [0, 1, 2, 3, 4, 5].map((n) =>
+    live ? process.env[`SKILL_LEVEL_${n}`] : process.env[`TEST_SKILL_LEVEL_${n}`]
+  );
+  const missing = roleIds.map((v, i) => ({ v, i })).filter((x) => !x.v);
   if (missing.length) {
-    console.warn(`[SkillRoles] Missing env vars for ${live? 'SKILL_LEVEL' : 'TEST_SKILL_LEVEL'}: levels ${missing.map(m=>m.i).join(', ')}`);
+    console.warn(`[SkillRoles] Missing env vars for ${live ? 'SKILL_LEVEL' : 'TEST_SKILL_LEVEL'}: levels ${missing.map((m) => m.i).join(', ')}`);
   }
   if (VERBOSE) {
     console.log(`[SkillRoles] Mode: ${live ? 'LIVE' : 'TEST'} — using ${live ? 'SKILL_LEVEL_*' : 'TEST_SKILL_LEVEL_*'} role IDs: ${roleIds.filter(Boolean).join(', ')}`);
   }
-  return roleIds.filter(Boolean);
+  return roleIds;
+}
+
+async function removeAllSkillLevelRoles(member, { verbose = VERBOSE } = {}) {
+  const skillRoles = getSkillRoleIds();
+  const allSkillRoleIds = Array.isArray(skillRoles) ? skillRoles.filter(Boolean).map(String) : [];
+  if (!allSkillRoleIds.length) return { ok: false, reason: 'No SKILL_LEVEL roles configured' };
+  const rolesToRemove = allSkillRoleIds.filter((rid) => member?.roles?.cache?.has?.(rid));
+  if (!rolesToRemove.length) return { ok: true, removed: 0 };
+  if (verbose) console.log(`[SkillRoles] ${member?.id}: removing all skill roles [${rolesToRemove.join(',')}]`);
+  try {
+    await member.roles.remove(rolesToRemove).catch(() => {});
+    return { ok: true, removed: rolesToRemove.length };
+  } catch (e) {
+    return { ok: false, err: e };
+  }
+}
+
+async function applySkillPolicyForMember(member, desiredLevel, { verbose = VERBOSE } = {}) {
+  const activeRoleId = getActiveRoleId();
+  if (!activeRoleId) {
+    console.warn('[SkillRoles] Missing ACTIVE_ROLE/TEST_ACTIVE_ROLE env var; refusing to modify skill roles.');
+    return { ok: false, reason: 'Missing ACTIVE_ROLE env var' };
+  }
+
+  const hasActive = Boolean(member?.roles?.cache?.has?.(String(activeRoleId)));
+  if (!hasActive) {
+    // New requirement: if not ACTIVE, strip any SKILL roles.
+    const res = await removeAllSkillLevelRoles(member, { verbose });
+    return { ...res, inactive: true };
+  }
+
+  // Only assign/maintain a specific skill level for members.
+  const memberRoleId = getMemberRoleId();
+  if (!memberRoleId) {
+    console.warn('[SkillRoles] Missing MEMBER/TEST_MEMBER env var; refusing to assign skill roles.');
+    return { ok: false, reason: 'Missing MEMBER env var' };
+  }
+  const hasMember = Boolean(member?.roles?.cache?.has?.(String(memberRoleId)));
+  if (!hasMember) {
+    if (verbose) console.log(`[SkillRoles] skip ${member?.id}: ACTIVE but not MEMBER; leaving skill roles unchanged`);
+    return { ok: true, skipped: true, reason: 'Not a MEMBER' };
+  }
+
+  return assignSkillLevelRole(member, desiredLevel, { verbose });
 }
 
 function sleep(ms) { return new Promise(res => setTimeout(res, ms)); }
@@ -81,31 +134,33 @@ function highestPrestigeLevelFromRoles(roleIds) {
 async function assignSkillLevelRole(member, level, { verbose = VERBOSE } = {}) {
   try {
     const skillRoles = getSkillRoleIds();
-    if (!skillRoles.length) return { ok: false, reason: 'No SKILL_LEVEL roles configured' };
+    const allSkillRoleIds = Array.isArray(skillRoles) ? skillRoles.filter(Boolean).map(String) : [];
+    if (!allSkillRoleIds.length) return { ok: false, reason: 'No SKILL_LEVEL roles configured' };
 
-    // Clamp level to 0..skillRoles.length
-    const lvl = Math.min(Math.max(Number(level||0), 0), skillRoles.length);
+    // Clamp level to 0..maxConfiguredLevel (0..5)
+    const maxLevel = Math.max(0, (Array.isArray(skillRoles) ? skillRoles.length : 0) - 1);
+    const lvl = Math.min(Math.max(Number(level || 0), 0), maxLevel);
+    const targetRoleId = skillRoles?.[lvl] ? String(skillRoles[lvl]) : null;
 
-    const currentSkillRoles = skillRoles.filter(rid => member.roles.cache.has(rid));
-    const rolesToRemove = skillRoles.filter((rid, idx) => member.roles.cache.has(rid) && (idx+1) !== lvl);
+    const currentSkillRoles = allSkillRoleIds.filter((rid) => member.roles.cache.has(rid));
+    const rolesToRemove = allSkillRoleIds.filter((rid) => member.roles.cache.has(rid) && rid !== targetRoleId);
     if (rolesToRemove.length) {
-      try { await member.roles.remove(rolesToRemove).catch(()=>{}); } catch(_){}
+      try { await member.roles.remove(rolesToRemove).catch(()=>{}); } catch(_){ }
     }
     if (verbose) {
-      console.log(`[SkillRoles] ${member.id}: level=${lvl} current=[${currentSkillRoles.join(',')}] remove=[${rolesToRemove.join(',')}]`);
+      console.log(`[SkillRoles] ${member.id}: level=${lvl} current=[${currentSkillRoles.join(',')}] remove=[${rolesToRemove.join(',')}] target=${targetRoleId || 'none'}`);
     }
 
-    if (lvl === 0) {
-      if (verbose) console.log(`[SkillRoles] ${member.id}: no skill role to add (level 0)`);
-      return { ok: true, level: 0 };
+    if (!targetRoleId) {
+      if (verbose) console.log(`[SkillRoles] ${member.id}: no SKILL role configured for level ${lvl}; nothing to add`);
+      return { ok: true, level: lvl, added: null };
     }
 
-    const targetRoleId = skillRoles[lvl-1];
     if (!member.roles.cache.has(targetRoleId)) {
       if (verbose) console.log(`[SkillRoles] ${member.id}: add=${targetRoleId}`);
       await member.roles.add(targetRoleId);
     }
-    return { ok: true, level: lvl };
+    return { ok: true, level: lvl, added: targetRoleId };
   } catch (err) {
     console.error('[SkillRoles] assign failed for', member?.id, err?.message || err);
     return { ok: false, err };
@@ -190,7 +245,7 @@ async function syncSkillLevelsFromDb(client, { delayMs=50, verbose = VERBOSE } =
     const level = highestPrestigeLevelFromDb(u);
     try {
       if (verbose) console.log(`[SkillRoles] user ${userId}: computed highest level=${level}`);
-      const res = await assignSkillLevelRole(member, level, { verbose });
+      const res = await applySkillPolicyForMember(member, level, { verbose });
       if (res && res.ok) assigned++; else skipped++;
     } catch (e) {
       errors++;
@@ -253,6 +308,12 @@ async function syncSkillLevelsFromUserListApi(client, { delayMs = 25, verbose = 
     return;
   }
 
+  const activeRoleId = getActiveRoleId();
+  if (!activeRoleId) {
+    console.warn('[SkillRoles] Missing ACTIVE_ROLE/TEST_ACTIVE_ROLE env var; cannot apply/remove skill roles.');
+    return;
+  }
+
   const users = await getUsers();
   if (!Array.isArray(users) || users.length === 0) {
     console.warn('[SkillRoles] getUsers() returned no users; aborting.');
@@ -261,10 +322,11 @@ async function syncSkillLevelsFromUserListApi(client, { delayMs = 25, verbose = 
 
   const memberUsers = users.filter((u) => {
     const roles = Array.isArray(u?.roles) ? u.roles.map(String) : [];
+    // Only require MEMBER here; ACTIVE is enforced against live Discord roles so we can strip skills from inactive users.
     return roles.includes(String(memberRoleId));
   });
 
-  console.log(`[SkillRoles] getUsers() returned ${users.length}; syncing SKILL roles for ${memberUsers.length} MEMBER users...`);
+  console.log(`[SkillRoles] getUsers() returned ${users.length}; syncing SKILL roles for ${memberUsers.length} MEMBER users (ACTIVE enforced from Discord)...`);
 
   // Prefetch guild members once for fast lookups
   let allMembers = null;
@@ -310,7 +372,7 @@ async function syncSkillLevelsFromUserListApi(client, { delayMs = 25, verbose = 
         const highest = Math.max(Number(prestige?.raptor_level || 0) || 0, Number(prestige?.raider_level || 0) || 0);
         if (verbose) console.log(`[SkillRoles] user ${userId}: highestPrestige=${highest}`);
 
-        const res = await assignSkillLevelRole(member, highest, { verbose });
+        const res = await applySkillPolicyForMember(member, highest, { verbose });
         if (res && res.ok) assigned++; else skipped++;
       } catch (e) {
         errors++;
@@ -380,7 +442,8 @@ async function syncSkillLevelsFromGuild(client, { delayMs = 50, verbose = VERBOS
 
   let processed = 0, assigned = 0, skipped = 0, errors = 0;
   const skillRoles = getSkillRoleIds();
-  if (!skillRoles.length) {
+  const allSkillRoleIds = Array.isArray(skillRoles) ? skillRoles.filter(Boolean) : [];
+  if (!allSkillRoleIds.length) {
     console.warn('[SkillRoles] No SKILL roles configured; aborting guild-based sync.');
     return;
   }
@@ -390,7 +453,7 @@ async function syncSkillLevelsFromGuild(client, { delayMs = 50, verbose = VERBOS
       const roleIds = member.roles?.cache ? Array.from(member.roles.cache.keys()) : [];
       const level = await highestPrestigeLevelFromRoles(roleIds);
       if (verbose) console.log(`[SkillRoles] guild user ${member.id}: computed highest level=${level}`);
-      const res = await assignSkillLevelRole(member, level, { verbose });
+      const res = await applySkillPolicyForMember(member, level, { verbose });
       if (res && res.ok) assigned++; else skipped++;
     } catch (e) {
       errors++;
@@ -412,21 +475,40 @@ async function updateSkillOnMemberChange(oldMember, newMember) {
     const oldRoles = oldMember?.roles?.cache ? Array.from(oldMember.roles.cache.keys()) : [];
     const newRoles = newMember?.roles?.cache ? Array.from(newMember.roles.cache.keys()) : [];
 
-    // Only recompute when a prestige role changes (gain or loss)
+    // Only recompute when a prestige role changes (gain/loss) OR when ACTIVE_ROLE toggles.
     const prestigeRoleSet = new Set(getPrestigeRoleIds().map(String));
     const oldSet = new Set(oldRoles.map(String));
     const newSet = new Set(newRoles.map(String));
     const gained = Array.from(newSet).filter((rid) => !oldSet.has(rid));
     const lost = Array.from(oldSet).filter((rid) => !newSet.has(rid));
     const prestigeChanged = gained.some((rid) => prestigeRoleSet.has(rid)) || lost.some((rid) => prestigeRoleSet.has(rid));
-    if (!prestigeChanged) return;
+    const activeRoleId = getActiveRoleId();
+    const memberRoleId = getMemberRoleId();
+    if (!activeRoleId || !memberRoleId) return;
+
+    const oldHasActive = oldSet.has(String(activeRoleId));
+    const newHasActive = newSet.has(String(activeRoleId));
+    const activeChanged = oldHasActive !== newHasActive;
+
+    if (!prestigeChanged && !activeChanged) return;
+
+    // If user is not active anymore, strip any SKILL roles.
+    if (!newHasActive) {
+      await removeAllSkillLevelRoles(newMember, { verbose: VERBOSE });
+      return;
+    }
+
+    // If ACTIVE but not MEMBER, do not assign.
+    const newHasMember = newSet.has(String(memberRoleId));
+    if (!newHasMember) return;
 
     const oldPrestige = await getPrestigeRanks(oldRoles);
     const newPrestige = await getPrestigeRanks(newRoles);
     const oldHighest = Math.max(oldPrestige?.raptor_level||0, oldPrestige?.raider_level||0);
     const newHighest = Math.max(newPrestige?.raptor_level||0, newPrestige?.raider_level||0);
 
-    if (oldHighest !== newHighest) {
+    // On ACTIVE gained, or prestige change, apply the latest computed level.
+    if (activeChanged || oldHighest !== newHighest) {
       await assignSkillLevelRole(newMember, newHighest);
     }
   } catch (err) {

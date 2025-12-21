@@ -644,8 +644,6 @@ client.on('guildMemberAdd', async (member) => {
 
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
   try {
-    // Adjust SKILL_LEVEL_* role when RAPTOR/RAIDER prestige roles change
-    try { await updateSkillOnMemberChange(oldMember, newMember); } catch (e) { console.error('[SkillRoles] live update failed:', e?.message || e); }
     // Ensure MEMBER role is aligned with CREW/MARAUDER/BLOODED changes
     try { await updateMemberOnMemberChange(oldMember, newMember); } catch (e) { console.error('[MemberRole] live update failed:', e?.message || e); }
     // Compute role changes first (independent of DB state)
@@ -660,6 +658,18 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
     const verifiedRole = isLive ? process.env.VERIFIED_ROLE : process.env.TEST_VERIFIED_ROLE;
     const newUserRole = isLive ? process.env.NEW_USER_ROLE : process.env.TEST_NEW_USER_ROLE;
     const oldRoles = oldMember.roles.cache.map(role => role.id);
+
+    // Trigger skill sync when ACTIVE_ROLE is gained (and also handle ACTIVE loss/prestige changes inside helper)
+    try {
+      const activeRoleId = isLive ? process.env.ACTIVE_ROLE : process.env.TEST_ACTIVE_ROLE;
+      const gainedActive = activeRoleId && !oldRoles.includes(activeRoleId) && memberRoles.includes(activeRoleId);
+      if (gainedActive) {
+        console.log(`[SkillRoles] ${newMember.id}: gained ACTIVE_ROLE; applying skill level.`);
+      }
+      await updateSkillOnMemberChange(oldMember, newMember);
+    } catch (e) {
+      console.error('[SkillRoles] live update failed:', e?.message || e);
+    }
     const lostPromotionRole = [prospectRole, crewRole, marauderRole, bloodedRole]
       .filter(Boolean)
       .some(roleId => oldRoles.includes(roleId) && !memberRoles.includes(roleId));
