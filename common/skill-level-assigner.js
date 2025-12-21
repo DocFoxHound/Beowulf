@@ -28,6 +28,11 @@ function getActiveRoleId() {
   return live ? process.env.ACTIVE_ROLE : process.env.TEST_ACTIVE_ROLE;
 }
 
+function getProspectRoleId() {
+  const live = envBool(process.env.LIVE_ENVIRONMENT);
+  return live ? process.env.PROSPECT_ROLE : process.env.TEST_PROSPECT_ROLE;
+}
+
 function getPrestigeRoleIds() {
   const live = envBool(process.env.LIVE_ENVIRONMENT);
   const raptor = [1, 2, 3, 4, 5].map((n) => live ? process.env[`RAPTOR_${n}_ROLE`] : process.env[`RAPTOR_${n}_TEST_ROLE`]);
@@ -79,6 +84,13 @@ async function applySkillPolicyForMember(member, desiredLevel, { verbose = VERBO
     // New requirement: if not ACTIVE, strip any SKILL roles.
     const res = await removeAllSkillLevelRoles(member, { verbose });
     return { ...res, inactive: true };
+  }
+
+  // New requirement: prospects are excluded from skill tiering.
+  const prospectRoleId = getProspectRoleId();
+  if (prospectRoleId && member?.roles?.cache?.has?.(String(prospectRoleId))) {
+    const res = await removeAllSkillLevelRoles(member, { verbose });
+    return { ...res, ineligible: true, reason: 'PROSPECT excluded' };
   }
 
   // Only assign/maintain a specific skill level for members.
@@ -475,7 +487,7 @@ async function updateSkillOnMemberChange(oldMember, newMember) {
     const oldRoles = oldMember?.roles?.cache ? Array.from(oldMember.roles.cache.keys()) : [];
     const newRoles = newMember?.roles?.cache ? Array.from(newMember.roles.cache.keys()) : [];
 
-    // Only recompute when a prestige role changes (gain/loss) OR when ACTIVE_ROLE toggles.
+    // Only recompute when a prestige role changes (gain/loss) OR when ACTIVE_ROLE / PROSPECT_ROLE toggles.
     const prestigeRoleSet = new Set(getPrestigeRoleIds().map(String));
     const oldSet = new Set(oldRoles.map(String));
     const newSet = new Set(newRoles.map(String));
@@ -484,16 +496,27 @@ async function updateSkillOnMemberChange(oldMember, newMember) {
     const prestigeChanged = gained.some((rid) => prestigeRoleSet.has(rid)) || lost.some((rid) => prestigeRoleSet.has(rid));
     const activeRoleId = getActiveRoleId();
     const memberRoleId = getMemberRoleId();
+    const prospectRoleId = getProspectRoleId();
     if (!activeRoleId || !memberRoleId) return;
 
     const oldHasActive = oldSet.has(String(activeRoleId));
     const newHasActive = newSet.has(String(activeRoleId));
     const activeChanged = oldHasActive !== newHasActive;
 
-    if (!prestigeChanged && !activeChanged) return;
+    const oldHasProspect = prospectRoleId ? oldSet.has(String(prospectRoleId)) : false;
+    const newHasProspect = prospectRoleId ? newSet.has(String(prospectRoleId)) : false;
+    const prospectChanged = oldHasProspect !== newHasProspect;
+
+    if (!prestigeChanged && !activeChanged && !prospectChanged) return;
 
     // If user is not active anymore, strip any SKILL roles.
     if (!newHasActive) {
+      await removeAllSkillLevelRoles(newMember, { verbose: VERBOSE });
+      return;
+    }
+
+    // If user is a prospect, strip any SKILL roles and stop.
+    if (newHasProspect) {
       await removeAllSkillLevelRoles(newMember, { verbose: VERBOSE });
       return;
     }
@@ -507,8 +530,8 @@ async function updateSkillOnMemberChange(oldMember, newMember) {
     const oldHighest = Math.max(oldPrestige?.raptor_level||0, oldPrestige?.raider_level||0);
     const newHighest = Math.max(newPrestige?.raptor_level||0, newPrestige?.raider_level||0);
 
-    // On ACTIVE gained, or prestige change, apply the latest computed level.
-    if (activeChanged || oldHighest !== newHighest) {
+    // On ACTIVE gained, PROSPECT lost, or prestige change, apply the latest computed level.
+    if (activeChanged || prospectChanged || oldHighest !== newHighest) {
       await assignSkillLevelRole(newMember, newHighest);
     }
   } catch (err) {
