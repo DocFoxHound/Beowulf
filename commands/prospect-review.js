@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { getUsers } = require('../api/userlistApi');
-const { getHitLogsByUserId } = require('../api/hitTrackerApi');
+const { getAssistHitLogs } = require('../api/hitTrackerApi');
 const { getBadgesByUserId } = require('../api/badgeApi');
 const { getAllVoiceSessions } = require('../api/voiceChannelSessionsApi');
 const {
@@ -248,7 +248,7 @@ function padRight(text, width) {
 function renderTableRows(rows) {
   // Fixed-width columns for Discord code block readability.
   const COLS = {
-    name: 7,
+    name: 9,
     flags: 5,
     hitsAll: 3,
     hits30: 3,
@@ -328,7 +328,7 @@ async function buildProspectReviewChunks({ guildId }) {
   const enriched = await mapWithConcurrency(prospects, CONCURRENCY, async (u) => {
     const userId = normalizeUserId(u?.id);
     const [hitLogs, badges] = await Promise.all([
-      getHitLogsByUserId(userId).catch(() => null),
+      getAssistHitLogs(userId).catch(() => null),
       getBadgesByUserId(userId).catch(() => null),
     ]);
 
