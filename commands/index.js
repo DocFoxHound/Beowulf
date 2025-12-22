@@ -4,6 +4,7 @@ const playerItemUpload = require('./player-item-upload');
 const componentItemUpload = require('./component-item-upload');
 const shipListUpload = require('./ship-list-upload');
 const rcoMiningUpload = require('./rco-mining-upload');
+const prospectReview = require('./prospect-review');
 
 const slashCommands = [
   knowledgeDocIngest,
@@ -12,6 +13,7 @@ const slashCommands = [
   componentItemUpload,
   shipListUpload,
   rcoMiningUpload,
+  prospectReview,
 ].filter(Boolean);
 
 function getSlashCommandData() {
