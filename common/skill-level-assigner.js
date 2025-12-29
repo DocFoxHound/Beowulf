@@ -129,7 +129,7 @@ async function fetchAllMembersWithTimeout(guild, timeoutMs = FETCH_TIMEOUT_MS) {
 function highestPrestigeLevelFromDb(user) {
   const r = Number(user?.raptor_level || 0) || 0;
   const d = Number(user?.raider_level || 0) || 0;
-  return Math.max(r, d, 0);
+  return Math.min(r, d);
 }
 
 function highestPrestigeLevelFromRoles(roleIds) {
@@ -139,7 +139,7 @@ function highestPrestigeLevelFromRoles(roleIds) {
   return getPrestigeRanks(roleIds).then(({ raptor_level = 0, raider_level = 0 } = {}) => {
     const r = Number(raptor_level || 0) || 0;
     const d = Number(raider_level || 0) || 0;
-    return Math.max(r, d, 0);
+    return Math.min(r, d);
   }).catch(() => 0);
 }
 
@@ -381,10 +381,10 @@ async function syncSkillLevelsFromUserListApi(client, { delayMs = 25, verbose = 
 
         const roleIds = Array.isArray(u?.roles) ? u.roles.map(String) : [];
         const prestige = await getPrestigeRanks(roleIds);
-        const highest = Math.max(Number(prestige?.raptor_level || 0) || 0, Number(prestige?.raider_level || 0) || 0);
-        if (verbose) console.log(`[SkillRoles] user ${userId}: highestPrestige=${highest}`);
+        const lowest = Math.min(Number(prestige?.raptor_level || 0) || 0, Number(prestige?.raider_level || 0) || 0);
+        if (verbose) console.log(`[SkillRoles] user ${userId}: lowestPrestige=${lowest}`);
 
-        const res = await applySkillPolicyForMember(member, highest, { verbose });
+        const res = await applySkillPolicyForMember(member, lowest, { verbose });
         if (res && res.ok) assigned++; else skipped++;
       } catch (e) {
         errors++;
@@ -527,8 +527,8 @@ async function updateSkillOnMemberChange(oldMember, newMember) {
 
     const oldPrestige = await getPrestigeRanks(oldRoles);
     const newPrestige = await getPrestigeRanks(newRoles);
-    const oldHighest = Math.max(oldPrestige?.raptor_level||0, oldPrestige?.raider_level||0);
-    const newHighest = Math.max(newPrestige?.raptor_level||0, newPrestige?.raider_level||0);
+    const oldHighest = Math.min(Number(oldPrestige?.raptor_level || 0) || 0, Number(oldPrestige?.raider_level || 0) || 0);
+    const newHighest = Math.min(Number(newPrestige?.raptor_level || 0) || 0, Number(newPrestige?.raider_level || 0) || 0);
 
     // On ACTIVE gained, PROSPECT lost, or prestige change, apply the latest computed level.
     if (activeChanged || prospectChanged || oldHighest !== newHighest) {
